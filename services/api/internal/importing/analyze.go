@@ -4,16 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"unicode/utf8"
 
+	"readvault/api/internal/tag"
 	"readvault/api/internal/urlnorm"
 )
 
 const (
 	maxURLBytes   = 2048
 	maxTitleRunes = 500
-	maxTagRunes   = 64
 )
 
 // analyzed pairs a candidate with the article it would become when valid.
@@ -65,8 +64,8 @@ func analyze(records []Record) []analyzed {
 
 		tags, tagProblems := normalizeTags(rec.Tags)
 		a.Warnings = append(a.Warnings, tagProblems...)
-		for _, tag := range tags {
-			a.Tags = append(a.Tags, tag.Name)
+		for _, t := range tags {
+			a.Tags = append(a.Tags, t.Name)
 		}
 
 		a.article = NewArticle{
@@ -102,33 +101,26 @@ func canonicalize(raw string) (string, *Problem) {
 	return canonical, nil
 }
 
-// normalizeTags collapses whitespace, drops over-long tags and removes
-// tags that share a slug, keeping the first spelling.
-func normalizeTags(names []string) ([]Tag, []Problem) {
-	tags := []Tag{}
+// normalizeTags drops empty and over-long tags and removes tags that share
+// a slug, keeping the first spelling.
+func normalizeTags(names []string) ([]tag.Tag, []Problem) {
+	tags := []tag.Tag{}
 	var problems []Problem
 	for _, name := range names {
-		name = strings.Join(strings.Fields(name), " ")
-		if name == "" {
+		t, err := tag.Normalize(name)
+		switch {
+		case errors.Is(err, tag.ErrEmpty):
+			continue
+		case err != nil:
+			problems = append(problems, Problem{Code: "tag_too_long", Message: fmt.Sprintf("a tag longer than %d characters was skipped", tag.MaxRunes)})
 			continue
 		}
-		if utf8.RuneCountInString(name) > maxTagRunes {
-			problems = append(problems, Problem{Code: "tag_too_long", Message: fmt.Sprintf("a tag longer than %d characters was skipped", maxTagRunes)})
+		if slices.ContainsFunc(tags, func(seen tag.Tag) bool { return seen.Slug == t.Slug }) {
 			continue
 		}
-		slug := Slugify(name)
-		if slices.ContainsFunc(tags, func(t Tag) bool { return t.Slug == slug }) {
-			continue
-		}
-		tags = append(tags, Tag{Name: name, Slug: slug})
+		tags = append(tags, t)
 	}
 	return tags, problems
-}
-
-// Slugify returns the per-user identity of a tag name: lowercase words
-// joined by hyphens. "Go News" and "go  news" share the slug "go-news".
-func Slugify(name string) string {
-	return strings.Join(strings.Fields(strings.ToLower(name)), "-")
 }
 
 // FillMissing completes an existing article with imported metadata without

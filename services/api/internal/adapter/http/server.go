@@ -24,6 +24,8 @@ type Deps struct {
 
 	// Imports serves the import endpoints; they are not mounted when nil.
 	Imports ImportService
+	// Library serves the article endpoints; they are not mounted when nil.
+	Library LibraryService
 	// OwnerID is the user every request acts for until authentication
 	// exists. It is never taken from the client.
 	OwnerID string
@@ -53,6 +55,11 @@ func NewHandler(deps Deps) http.Handler {
 		}
 		mux.HandleFunc("POST /api/imports/preview", h.preview)
 		mux.HandleFunc("POST /api/imports", h.run)
+	}
+	if deps.Library != nil {
+		h := &articleHandler{svc: deps.Library, ownerID: deps.OwnerID, logger: deps.Logger}
+		mux.HandleFunc("GET /api/articles", h.list)
+		mux.HandleFunc("GET /api/articles/{id}", h.get)
 	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "route not found")

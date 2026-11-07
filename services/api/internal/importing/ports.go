@@ -3,6 +3,8 @@ package importing
 import (
 	"context"
 	"time"
+
+	"readvault/api/internal/tag"
 )
 
 // Repository is the driven port the importing service persists through.
@@ -25,13 +27,7 @@ type NewArticle struct {
 	Title        string
 	Folder       []string
 	BookmarkedAt *time.Time
-	Tags         []Tag
-}
-
-// Tag is a normalized tag: Slug is its identity per user, Name its label.
-type Tag struct {
-	Name string
-	Slug string
+	Tags         []tag.Tag
 }
 
 // StoredArticle is the part of an existing article an import may complete.

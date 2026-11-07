@@ -43,7 +43,8 @@ Assumptions:
 | T5 | S5 | inline (Risk 1: schema, needs human review) | done (schema approved by user, L14) | RED: users relation missing; GREEN: up/down/up, dev owner, 6 invariants (`-tags=integration`); commit 8431f13 |
 | T6 | S6 | inline | done | RED: 4 service tests failed on stubs; GREEN: preview classification, idempotent re-import, edited title kept, missing title filled, tags only added, record limit, 4 concurrent imports with no duplicates (`-count=3`); branch feat/readvault-05-import-service |
 | T7 | S7 (import endpoints) | inline | done | RED: 2 handler tests failed with 404 before the routes existed; GREEN: owner from server not client, file at limit ok, over limit 413 `file_too_large`, non-multipart 400 `invalid_upload`, no file 400 `missing_file`, too many records 422, internal 500 without SQL details; integration preview→import→re-import→preview via HTTP; curl smoke on the real binary; branch feat/readvault-06-import-http |
-| T8 | S8 | inline | pending | |
+| T8a | S7, S8 (list and get) | inline | done | RED: 6 library integration tests and 3 handler tests failed on stubs; GREEN: 4 sorts paged with limit 2 (keyset, title ties by id), search by title words, title/URL substring, tag name and literal `%`, AND filter by tag slugs, user isolation, get with tags sorted by slug and provenance, malformed id 404, invalid params 400 `invalid_query` with field details; curl smoke; branch feat/readvault-07-library-read |
+| T8b | S8 (edit title and tags) | inline | pending | |
 | T9 | S9 | inline | pending | |
 | T10 | S10 | inline | pending (Node 22 at ~/.local/node/bin) | |
 | T11 | S1 | inline | pending | |
@@ -58,7 +59,8 @@ Assumptions:
 | 3 | `feat/readvault-03-html-import` | 0d77c0b | T3 |
 | 4 | `feat/readvault-04-schema` | 8431f13 | T5 |
 | 5 | `feat/readvault-05-import-service` | 446ed5f | T6 |
-| 6 | `feat/readvault-06-import-http` | 8266325 | T7 |
+| 6 | `feat/readvault-06-import-http` | 8266325, chore commit for `.atl/` | T7 |
+| 7 | `feat/readvault-07-library-read` | (this commit) | T8a |
 
 `main` has no commits yet. Before opening PR 1, `main` needs a base commit (for example, the product spec); that is the user's decision.
 
@@ -88,3 +90,4 @@ Assumptions:
 - L22: T7 done. The upload is streamed from the multipart reader (no `ParseMultipartForm`, so nothing is written to a temp file), capped at MAX_UPLOAD_BYTES plus 64 KiB of multipart overhead. Upload read errors are told apart from service errors by the reader wrapper, not by string matching. The rest of S7 (library, export endpoints) lands with T8 and T9. Next: T8.
 - L23: T7 commit 8266325 (444 insertions, 3 deletions). gentle-ai assess returned `high` with reason `unassessable`, not a real risk tier: the untracked `.atl/` needs an explicit declaration, the same blocker as L13. Native review is unavailable until `.atl/` is ignored or declared (user decision). Risk item 2 (upload size guard and server-side owner), covered by the end-of-feature verifier.
 - L24 (2026-11-08, user): "Si porque no se lo que tiene ni si aporta algo de verdad". `.atl/` holds the gentle-ai skill registry, generated with absolute home paths; added to `.gitignore`.
+- L25: T7 re-assessed after ignoring `.atl/`: medium, 452 changed lines, review not due (`under_budget`). T8 split into T8a (read) and T8b (edit) so each slice stays near the budget. Tag rules moved to the shared `internal/tag` package (Normalize, Slugify), so imports and edits normalize tags the same way; import tests stay green. Search combines full-text words on title and URL (`simple` config) with case-insensitive substring matches on title, URL and tag names; LIKE wildcards are escaped. "Filtrar por ... estado de importación cuando corresponda" does not apply: articles have no import status (no `import_jobs`, A8). Request and response schemas (§8 "Documentar esquemas") go to the API docs in T11.

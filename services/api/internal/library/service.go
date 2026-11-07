@@ -1,0 +1,181 @@
+package library
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"regexp"
+	"slices"
+	"time"
+	"unicode/utf8"
+
+	"readvault/api/internal/tag"
+)
+
+const (
+	defaultLimit   = 25
+	maxLimit       = 100
+	maxSearchRunes = 200
+	maxFilterTags  = 10
+)
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// ErrNotFound means the article does not exist for this user.
+var ErrNotFound = errors.New("library: article not found")
+
+// ListParams is a list request as the client sent it.
+type ListParams struct {
+	Search string
+	Tags   []string
+	Sort   string
+	Limit  int
+	Cursor string
+}
+
+// Page is one page of a list.
+type Page struct {
+	Items      []Article `json:"items"`
+	NextCursor *string   `json:"nextCursor"`
+}
+
+// FieldProblem explains why one input field was rejected.
+type FieldProblem struct {
+	Field   string `json:"field"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// ValidationError lists every rejected input field.
+type ValidationError struct {
+	Problems []FieldProblem
+}
+
+func (e *ValidationError) Error() string { return "library: invalid input" }
+
+// Service reads the library.
+type Service struct {
+	repo Repository
+}
+
+// NewService returns a library service.
+func NewService(repo Repository) *Service { return &Service{repo: repo} }
+
+// List returns one page of the user's articles. A zero Limit means the
+// default page size; an empty Sort means newest first.
+func (s *Service) List(ctx context.Context, userID string, p ListParams) (Page, error) {
+	q, err := parseQuery(p)
+	if err != nil {
+		return Page{}, err
+	}
+	rows, err := s.repo.List(ctx, userID, q)
+	if err != nil {
+		return Page{}, fmt.Errorf("listing articles: %w", err)
+	}
+
+	page := Page{Items: make([]Article, 0, min(len(rows), q.Limit))}
+	for _, r := range rows[:min(len(rows), q.Limit)] {
+		page.Items = append(page.Items, r.Article)
+	}
+	if len(rows) > q.Limit {
+		last := rows[q.Limit-1]
+		key := last.TitleKey
+		if !q.Sort.ByTitle() {
+			key = last.CreatedAt.UTC().Format(time.RFC3339Nano)
+		}
+		next := encodeCursor(cursor{Sort: q.Sort, Key: key, ID: last.ID})
+		page.NextCursor = &next
+	}
+	return page, nil
+}
+
+// Get returns one of the user's articles. A malformed id is not found.
+func (s *Service) Get(ctx context.Context, userID, articleID string) (Article, error) {
+	if !uuidPattern.MatchString(articleID) {
+		return Article{}, ErrNotFound
+	}
+	a, err := s.repo.Get(ctx, userID, articleID)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return Article{}, fmt.Errorf("getting article: %w", err)
+	}
+	return a, err
+}
+
+func parseQuery(p ListParams) (Query, error) {
+	var problems []FieldProblem
+	q := Query{Search: p.Search, Sort: Sort(p.Sort), Limit: p.Limit}
+
+	if utf8.RuneCountInString(q.Search) > maxSearchRunes {
+		problems = append(problems, FieldProblem{"q", "too_long", fmt.Sprintf("the search is longer than %d characters", maxSearchRunes)})
+	}
+
+	for _, name := range p.Tags {
+		slug := tag.Slugify(name)
+		if slug != "" && !slices.Contains(q.TagSlugs, slug) {
+			q.TagSlugs = append(q.TagSlugs, slug)
+		}
+	}
+	if len(q.TagSlugs) > maxFilterTags {
+		problems = append(problems, FieldProblem{"tag", "too_many", fmt.Sprintf("filter by at most %d tags", maxFilterTags)})
+	}
+
+	switch q.Sort {
+	case "":
+		q.Sort = SortNewest
+	case SortNewest, SortOldest, SortTitle, SortTitleDesc:
+	default:
+		problems = append(problems, FieldProblem{"sort", "invalid", "sort must be created_desc, created_asc, title_asc or title_desc"})
+	}
+
+	switch {
+	case q.Limit == 0:
+		q.Limit = defaultLimit
+	case q.Limit < 1 || q.Limit > maxLimit:
+		problems = append(problems, FieldProblem{"limit", "out_of_range", fmt.Sprintf("limit must be between 1 and %d", maxLimit)})
+	}
+
+	if p.Cursor != "" {
+		c, ok := decodeCursor(p.Cursor)
+		if !ok || c.Sort != q.Sort {
+			problems = append(problems, FieldProblem{"cursor", "invalid", "the cursor is not valid for this list; start from the first page"})
+		} else {
+			q.After = &Position{Key: c.Key, ID: c.ID}
+		}
+	}
+
+	if problems != nil {
+		return Query{}, &ValidationError{Problems: problems}
+	}
+	return q, nil
+}
+
+// cursor marks where the next page starts. It is opaque to clients.
+type cursor struct {
+	Sort Sort   `json:"s"`
+	Key  string `json:"k"`
+	ID   string `json:"i"`
+}
+
+func encodeCursor(c cursor) string {
+	b, _ := json.Marshal(c)
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func decodeCursor(raw string) (cursor, bool) {
+	b, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return cursor{}, false
+	}
+	var c cursor
+	if err := json.Unmarshal(b, &c); err != nil || !uuidPattern.MatchString(c.ID) {
+		return cursor{}, false
+	}
+	if !c.Sort.ByTitle() {
+		if _, err := time.Parse(time.RFC3339Nano, c.Key); err != nil {
+			return cursor{}, false
+		}
+	}
+	return c, true
+}

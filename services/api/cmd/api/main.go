@@ -16,6 +16,7 @@ import (
 	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/config"
 	"readvault/api/internal/importing"
+	"readvault/api/internal/library"
 )
 
 func main() {
@@ -46,6 +47,7 @@ func run() error {
 		DB:               pool,
 		Logger:           logger,
 		Imports:          importing.NewService(postgres.NewImportRepository(pool), cfg.MaxImportRecords),
+		Library:          library.NewService(postgres.NewLibraryRepository(pool)),
 		OwnerID:          postgres.DevOwnerID,
 		MaxUploadBytes:   cfg.MaxUploadBytes,
 		MaxImportRecords: cfg.MaxImportRecords,
