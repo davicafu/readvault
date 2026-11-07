@@ -28,8 +28,16 @@ db-up: .env ## Start Postgres and wait until it is healthy
 db-down: ## Stop Postgres (data is kept in the db-data volume)
 	$(COMPOSE) down
 
+.PHONY: migrate
+migrate: db-up ## Apply pending database migrations
+	cd $(API_DIR) && go run ./cmd/migrate up
+
+.PHONY: migrate-down
+migrate-down: db-up ## Roll back the last migration
+	cd $(API_DIR) && go run ./cmd/migrate down
+
 .PHONY: dev
-dev: db-up ## Run Postgres and the API (and the web app when present)
+dev: migrate ## Run Postgres, migrations and the API (and the web app when present)
 	@if [ -d $(WEB_DIR) ]; then \
 		trap 'kill 0' EXIT; \
 		(cd $(API_DIR) && go run ./cmd/api) & \
