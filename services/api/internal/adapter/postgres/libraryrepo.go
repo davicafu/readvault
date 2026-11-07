@@ -83,6 +83,23 @@ func (r *LibraryRepository) List(ctx context.Context, userID string, q library.Q
 	return listed, nil
 }
 
+// All implements library.Repository.
+func (r *LibraryRepository) All(ctx context.Context, userID string) ([]library.Article, error) {
+	rows, err := r.pool.Query(ctx, selectArticle+" WHERE a.user_id = $1 ORDER BY a.created_at, a.id", userID)
+	if err != nil {
+		return nil, fmt.Errorf("querying articles: %w", err)
+	}
+	listed, err := pgx.CollectRows(rows, scanListed)
+	if err != nil {
+		return nil, fmt.Errorf("reading articles: %w", err)
+	}
+	articles := make([]library.Article, len(listed))
+	for i, l := range listed {
+		articles[i] = l.Article
+	}
+	return articles, nil
+}
+
 // Get implements library.Repository.
 func (r *LibraryRepository) Get(ctx context.Context, userID, articleID string) (library.Article, error) {
 	return getArticle(ctx, r.pool, userID, articleID)

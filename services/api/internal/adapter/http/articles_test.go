@@ -22,6 +22,14 @@ type stubLibrary struct {
 	gotPatch  library.Patch
 }
 
+func (s *stubLibrary) Export(_ context.Context, userID string) (library.Export, error) {
+	s.gotUser = userID
+	if s.err != nil {
+		return library.Export{}, s.err
+	}
+	return library.Export{SchemaVersion: 1, Articles: []library.Article{{ID: "a1"}}}, nil
+}
+
 func (s *stubLibrary) Update(_ context.Context, userID, id string, p library.Patch) (library.Article, error) {
 	s.gotUser, s.gotID, s.gotPatch = userID, id, p
 	if s.err != nil {
@@ -204,5 +212,39 @@ func TestPatchArticle_MapsErrors(t *testing.T) {
 				t.Errorf("body leaks internal details: %s", rec.Body.String())
 			}
 		})
+	}
+}
+
+func TestExport_DownloadsTheOwnersLibraryAsJSON(t *testing.T) {
+	t.Parallel()
+	svc := &stubLibrary{}
+
+	rec := get(t, svc, "/api/export")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d; body %s", rec.Code, rec.Body.String())
+	}
+	if cd := rec.Header().Get("Content-Disposition"); !strings.HasPrefix(cd, `attachment; filename="readvault-export-`) || !strings.HasSuffix(cd, `.json"`) {
+		t.Errorf("Content-Disposition = %q", cd)
+	}
+	body := decode(t, rec)
+	if body["schemaVersion"] != float64(1) || len(body["articles"].([]any)) != 1 {
+		t.Errorf("body = %s", rec.Body.String())
+	}
+	if svc.gotUser != testOwner {
+		t.Errorf("user = %q, want the server owner", svc.gotUser)
+	}
+}
+
+func TestExport_FailureHidesInternalDetails(t *testing.T) {
+	t.Parallel()
+
+	rec := get(t, &stubLibrary{err: errors.New("ERROR: canceling statement (SQLSTATE 57014)")}, "/api/export")
+
+	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "SQLSTATE") {
+		t.Errorf("status = %d; body %s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Content-Disposition") != "" {
+		t.Error("a failed export must not be offered as a download")
 	}
 }

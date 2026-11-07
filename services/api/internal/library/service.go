@@ -67,6 +67,29 @@ type Service struct {
 // NewService returns a library service.
 func NewService(repo Repository) *Service { return &Service{repo: repo} }
 
+// ExportSchemaVersion is the version of the Export format. Bump it on any
+// change that is not a new optional field.
+const ExportSchemaVersion = 1
+
+// Export is a full copy of a user's library.
+type Export struct {
+	SchemaVersion int       `json:"schemaVersion"`
+	ExportedAt    time.Time `json:"exportedAt"`
+	Articles      []Article `json:"articles"`
+}
+
+// Export returns every article of the user, oldest first.
+func (s *Service) Export(ctx context.Context, userID string) (Export, error) {
+	articles, err := s.repo.All(ctx, userID)
+	if err != nil {
+		return Export{}, fmt.Errorf("exporting articles: %w", err)
+	}
+	if articles == nil {
+		articles = []Article{}
+	}
+	return Export{SchemaVersion: ExportSchemaVersion, ExportedAt: time.Now().UTC(), Articles: articles}, nil
+}
+
 // Patch is an edit as the client sent it. Nil fields are left as they are.
 type Patch struct {
 	Title *string   `json:"title"`

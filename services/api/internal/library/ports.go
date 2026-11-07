@@ -14,6 +14,9 @@ type Repository interface {
 	// q.Sort order, starting after q.After when it is set.
 	List(ctx context.Context, userID string, q Query) ([]Listed, error)
 
+	// All returns every article of the user, oldest first.
+	All(ctx context.Context, userID string) ([]Article, error)
+
 	// Get returns one article of the user, or ErrNotFound.
 	Get(ctx context.Context, userID, articleID string) (Article, error)
 

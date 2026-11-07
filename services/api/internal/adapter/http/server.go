@@ -61,6 +61,7 @@ func NewHandler(deps Deps) http.Handler {
 		mux.HandleFunc("GET /api/articles", h.list)
 		mux.HandleFunc("GET /api/articles/{id}", h.get)
 		mux.HandleFunc("PATCH /api/articles/{id}", h.update)
+		mux.HandleFunc("GET /api/export", h.export)
 	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "route not found")

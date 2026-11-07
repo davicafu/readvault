@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -15,6 +16,7 @@ type LibraryService interface {
 	List(ctx context.Context, userID string, p library.ListParams) (library.Page, error)
 	Get(ctx context.Context, userID, articleID string) (library.Article, error)
 	Update(ctx context.Context, userID, articleID string, p library.Patch) (library.Article, error)
+	Export(ctx context.Context, userID string) (library.Export, error)
 }
 
 type articleHandler struct {
@@ -69,6 +71,18 @@ func (h *articleHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, a)
+}
+
+// export serves GET /api/export: the owner's whole library as a JSON
+// download in the versioned library.Export format.
+func (h *articleHandler) export(w http.ResponseWriter, r *http.Request) {
+	e, err := h.svc.Export(r.Context(), h.ownerID)
+	if err != nil {
+		h.fail(w, r, err, http.StatusBadRequest, "invalid_query", "the request is not valid")
+		return
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="readvault-export-%s.json"`, e.ExportedAt.Format("20060102-150405")))
+	writeJSON(w, http.StatusOK, e)
 }
 
 // fail maps a service error to a response; a validation error is answered
