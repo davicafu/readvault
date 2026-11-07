@@ -1,0 +1,69 @@
+// Package config loads the API configuration from environment variables.
+package config
+
+import (
+	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+	"strconv"
+	"time"
+)
+
+// Config is the runtime configuration of the API.
+type Config struct {
+	DatabaseURL      string
+	HTTPAddr         string
+	LogLevel         slog.Level
+	MaxUploadBytes   int64
+	MaxImportRecords int
+	RequestTimeout   time.Duration
+	ShutdownTimeout  time.Duration
+}
+
+// Load reads the configuration from the environment. DATABASE_URL is required;
+// everything else has a safe default.
+func Load() (Config, error) {
+	cfg := Config{
+		DatabaseURL:      os.Getenv("DATABASE_URL"),
+		HTTPAddr:         envOr("HTTP_ADDR", ":8080"),
+		MaxUploadBytes:   10 << 20,
+		MaxImportRecords: 20_000,
+		RequestTimeout:   30 * time.Second,
+		ShutdownTimeout:  15 * time.Second,
+	}
+
+	var errs []error
+	if cfg.DatabaseURL == "" {
+		errs = append(errs, errors.New("DATABASE_URL is required"))
+	}
+	if err := cfg.LogLevel.UnmarshalText([]byte(envOr("LOG_LEVEL", "info"))); err != nil {
+		errs = append(errs, fmt.Errorf("LOG_LEVEL: %w", err))
+	}
+	if v, ok := os.LookupEnv("MAX_UPLOAD_BYTES"); ok {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 {
+			errs = append(errs, fmt.Errorf("MAX_UPLOAD_BYTES must be a positive integer, got %q", v))
+		}
+		cfg.MaxUploadBytes = n
+	}
+	if v, ok := os.LookupEnv("MAX_IMPORT_RECORDS"); ok {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			errs = append(errs, fmt.Errorf("MAX_IMPORT_RECORDS must be a positive integer, got %q", v))
+		}
+		cfg.MaxImportRecords = n
+	}
+
+	if err := errors.Join(errs...); err != nil {
+		return Config{}, fmt.Errorf("loading config: %w", err)
+	}
+	return cfg, nil
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
