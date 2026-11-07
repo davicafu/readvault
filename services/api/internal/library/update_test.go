@@ -4,6 +4,7 @@ package library_test
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -228,6 +229,32 @@ func TestUpdate_ConcurrentEditsOfDifferentArticlesDoNotDeadlock(t *testing.T) {
 		for range 2 {
 			if err := <-errs; err != nil {
 				t.Fatalf("round %d: Update() error: %v", round, err)
+			}
+		}
+	}
+}
+
+func TestUpdate_ConcurrentImportAndEditDoNotDeadlock(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
+	ids := seed(t, pool, owner, seedArticle{url: "https://a.example/edited", title: "edited", created: base})
+
+	for round := range 20 {
+		tags := make([]string, 30)
+		for i := range tags {
+			tags[i] = fmt.Sprintf("r%02d-%02d", round, i)
+		}
+		descending := slices.Clone(tags)
+		slices.Reverse(descending)
+		file := fmt.Sprintf(`<DL><DT><A HREF="https://a.example/imported-%d" TAGS="%s">imported</A></DL>`, round, strings.Join(descending, ","))
+
+		errs := make(chan error, 2)
+		go func() { _, err := imports.Import(t.Context(), owner, strings.NewReader(file)); errs <- err }()
+		go func() { _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Tags: &tags}); errs <- err }()
+		for range 2 {
+			if err := <-errs; err != nil {
+				t.Fatalf("round %d: %v", round, err)
 			}
 		}
 	}
