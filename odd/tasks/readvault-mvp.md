@@ -61,7 +61,7 @@ Assumptions:
 | 5 | `feat/readvault-05-import-service` | 446ed5f | T6 |
 | 6 | `feat/readvault-06-import-http` | 8266325, chore commit for `.atl/` | T7 |
 | 7 | `feat/readvault-07-library-read` | 96c0211 | T8a |
-| 8 | `feat/readvault-08-library-edit` | (this commit) | T8b |
+| 8 | `feat/readvault-08-library-edit` | 3e59447, deadlock fix (this commit) | T8b |
 
 `main` has no commits yet. Before opening PR 1, `main` needs a base commit (for example, the product spec); that is the user's decision.
 
@@ -93,3 +93,4 @@ Assumptions:
 - L24 (2026-11-08, user): "Si porque no se lo que tiene ni si aporta algo de verdad". `.atl/` holds the gentle-ai skill registry, generated with absolute home paths; added to `.gitignore`.
 - L25: T7 re-assessed after ignoring `.atl/`: medium, 452 changed lines, review not due (`under_budget`). T8 split into T8a (read) and T8b (edit) so each slice stays near the budget. Tag rules moved to the shared `internal/tag` package (Normalize, Slugify), so imports and edits normalize tags the same way; import tests stay green. Search combines full-text words on title and URL (`simple` config) with case-insensitive substring matches on title, URL and tag names; LIKE wildcards are escaped. "Filtrar por ... estado de importación cuando corresponda" does not apply: articles have no import status (no `import_jobs`, A8). Request and response schemas (§8 "Documentar esquemas") go to the API docs in T11.
 - L26: T8a commit 96c0211 (916 insertions, 31 deletions; medium, `under_budget`). T8b: PATCH takes `{"title"?, "tags"?}`; unknown fields are rejected, so URLs cannot change through it (RF-07 "Preservar las URL originales salvo que una operación explícita permita cambiarlas"). Tags replace the whole set (RF-07 "Añadir y eliminar etiquetas"); orphan tags stay in `tags` for reuse. The edit locks the article row first; a differential run without the lock failed the concurrency test with mixed tag sets. Next: T9 export.
+- L27 (2026-11-08, user): consent for the native review of T8b = "Revisar este cambio". T8b commit 3e59447 assessed high (item 4 escalation). Native review with lenses resilience and reliability: approved and acknowledged (lineage review-8c533b9eed0e9d71). Advisory findings: two WARNINGs that concurrent PATCHes on different articles (or a PATCH next to an import) can deadlock on the unique tag index when they insert the same new tags in different orders, and one SUGGESTION to read the result inside the transaction. The deadlock was reproduced (40P01 in rounds 1-2 of a new test), then fixed: one shared `createTags` helper inserts tags in slug order for both imports and edits; the edit reads its result inside its transaction. Concurrency tests pass with `-count=3`.

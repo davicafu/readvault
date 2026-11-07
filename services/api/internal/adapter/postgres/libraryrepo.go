@@ -85,7 +85,16 @@ func (r *LibraryRepository) List(ctx context.Context, userID string, q library.Q
 
 // Get implements library.Repository.
 func (r *LibraryRepository) Get(ctx context.Context, userID, articleID string) (library.Article, error) {
-	rows, err := r.pool.Query(ctx, selectArticle+" WHERE a.user_id = $1 AND a.id = $2", userID, articleID)
+	return getArticle(ctx, r.pool, userID, articleID)
+}
+
+// querier is what a pool and a transaction share for reads.
+type querier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+func getArticle(ctx context.Context, q querier, userID, articleID string) (library.Article, error) {
+	rows, err := q.Query(ctx, selectArticle+" WHERE a.user_id = $1 AND a.id = $2", userID, articleID)
 	if err != nil {
 		return library.Article{}, fmt.Errorf("querying article: %w", err)
 	}
@@ -122,6 +131,7 @@ func escapeLike(s string) string {
 // Update implements library.Repository. The article row is locked first, so
 // concurrent edits of the same article apply one after the other.
 func (r *LibraryRepository) Update(ctx context.Context, userID, articleID string, c library.Change) (library.Article, error) {
+	var updated library.Article
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		var title string
 		err := tx.QueryRow(ctx, `SELECT title FROM articles WHERE user_id = $1 AND id = $2 FOR UPDATE`, userID, articleID).Scan(&title)
@@ -151,25 +161,24 @@ func (r *LibraryRepository) Update(ctx context.Context, userID, articleID string
 				return fmt.Errorf("touching article: %w", err)
 			}
 		}
-		return nil
+		// Read the result inside the transaction, so the response is the
+		// state this edit wrote, not a later writer's.
+		updated, err = getArticle(ctx, tx, userID, articleID)
+		return err
 	})
 	if err != nil {
-		if errors.Is(err, library.ErrNotFound) {
-			return library.Article{}, err
-		}
-		return library.Article{}, fmt.Errorf("updating article: %w", err)
+		return library.Article{}, err
 	}
-	return r.Get(ctx, userID, articleID)
+	return updated, nil
 }
 
 // replaceTags makes tags the article's whole tag set. Missing tags are
 // created; an existing tag keeps its stored spelling. It reports whether
 // any link was added or removed.
 func replaceTags(ctx context.Context, tx pgx.Tx, userID, articleID string, tags []tag.Tag) (bool, error) {
-	names := make([]string, len(tags))
 	slugs := make([]string, len(tags))
 	for i, t := range tags {
-		names[i], slugs[i] = t.Name, t.Slug
+		slugs[i] = t.Slug
 	}
 
 	removed, err := tx.Exec(ctx, `DELETE FROM article_tags at USING tags t
@@ -180,10 +189,8 @@ func replaceTags(ctx context.Context, tx pgx.Tx, userID, articleID string, tags 
 	if len(tags) == 0 {
 		return removed.RowsAffected() > 0, nil
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO tags (user_id, name, slug)
-		SELECT $1, name, slug FROM unnest($2::text[], $3::text[]) AS t (name, slug)
-		ON CONFLICT (user_id, slug) DO NOTHING`, userID, names, slugs); err != nil {
-		return false, fmt.Errorf("creating tags: %w", err)
+	if err := createTags(ctx, tx, userID, tags); err != nil {
+		return false, err
 	}
 	added, err := tx.Exec(ctx, `INSERT INTO article_tags (user_id, article_id, tag_id)
 		SELECT $1, $2, id FROM tags WHERE user_id = $1 AND slug = ANY($3::text[])

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"readvault/api/internal/importing"
+	"readvault/api/internal/tag"
 )
 
 // ImportRepository persists imported articles. It implements importing.Repository.
@@ -167,13 +168,14 @@ func fillExisting(ctx context.Context, tx pgx.Tx, userID string, articles []impo
 // linkTags creates missing tags and links them to the articles. Existing
 // links are never removed. It returns the positions that gained a tag.
 func linkTags(ctx context.Context, tx pgx.Tx, userID string, articles []importing.NewArticle, ids []string) (map[int]bool, error) {
-	var names, slugs []string
+	var unique []tag.Tag
+	var slugs []string
 	seen := map[string]bool{}
 	for _, a := range articles {
 		for _, t := range a.Tags {
 			if !seen[t.Slug] {
 				seen[t.Slug] = true
-				names = append(names, t.Name)
+				unique = append(unique, t)
 				slugs = append(slugs, t.Slug)
 			}
 		}
@@ -183,10 +185,8 @@ func linkTags(ctx context.Context, tx pgx.Tx, userID string, articles []importin
 		return gained, nil
 	}
 
-	if _, err := tx.Exec(ctx, `INSERT INTO tags (user_id, name, slug)
-		SELECT $1, name, slug FROM unnest($2::text[], $3::text[]) AS t (name, slug)
-		ON CONFLICT (user_id, slug) DO NOTHING`, userID, names, slugs); err != nil {
-		return nil, fmt.Errorf("creating tags: %w", err)
+	if err := createTags(ctx, tx, userID, unique); err != nil {
+		return nil, err
 	}
 	rows, err := tx.Query(ctx, `SELECT slug, id FROM tags WHERE user_id = $1 AND slug = ANY($2)`, userID, slugs)
 	if err != nil {

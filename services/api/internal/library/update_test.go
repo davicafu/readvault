@@ -205,3 +205,30 @@ func TestUpdate_ConcurrentEditsApplyOneAfterTheOther(t *testing.T) {
 		t.Errorf("tags = %v, want exactly one writer's set, not a mix", slugs)
 	}
 }
+
+func TestUpdate_ConcurrentEditsOfDifferentArticlesDoNotDeadlock(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	ids := seed(t, pool, owner,
+		seedArticle{url: "https://a.example/1", title: "one", created: base},
+		seedArticle{url: "https://a.example/2", title: "two", created: base},
+	)
+
+	for round := range 20 {
+		tags := make([]string, 30)
+		for i := range tags {
+			tags[i] = "r" + strings.Repeat("x", round) + "-" + string(rune('a'+i%26)) + strings.Repeat("y", i/26)
+		}
+		reversed := slices.Clone(tags)
+		slices.Reverse(reversed)
+
+		errs := make(chan error, 2)
+		go func() { _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Tags: &tags}); errs <- err }()
+		go func() { _, err := svc.Update(t.Context(), owner, ids[1], library.Patch{Tags: &reversed}); errs <- err }()
+		for range 2 {
+			if err := <-errs; err != nil {
+				t.Fatalf("round %d: Update() error: %v", round, err)
+			}
+		}
+	}
+}
