@@ -17,6 +17,7 @@ The source of truth is `PRODUCT_SPEC.md`. Each spec quotes the product spec verb
 - **S8 (RF-06, RF-07)** Library: "Permitir búsquedas por título, etiquetas y URL.", "Ordenar por título y fecha de creación.", "Permitir editar títulos y etiquetas."
 - **S9 (RF-09)** Export: "Exportar los artículos del usuario actual a JSON.", "Conservar URL originales y canónicas, títulos, etiquetas y metadatos."
 - **S10 (§10)** Frontend screens: Library, Import, Article detail, visual design.
+- **S11 (spec change, L19-L21)** Article content: store each article's full Markdown, fetched through a link the user will provide. User: "como tenemos la URL vamos a guardarla para quitar las imágenes de ahí y no almacenarlas, siempre las podríamos generar después". Images are stripped and not stored; the article URL is kept so content and images can be fetched again later. The authorization clause ("contenido cuyo procesamiento esté autorizado") is waived by the user for private use (L21). Scheduled after T11 (assumption: the user did not pick MVP vs. after; the recommended option was taken). Fetch link pending from the user.
 
 Decisions (L2–L4): screaming-by-domain packages with light hexagonal naming (`ports.go` per domain, `internal/adapter/{http,postgres}`); manual constructor DI; test seams 1–4 (see L4).
 
@@ -41,11 +42,12 @@ Assumptions:
 | T4 | S4 | — | dropped (L16) | commit 5b8737b removed from the stack |
 | T5 | S5 | inline (Risk 1: schema, needs human review) | done (schema approved by user, L14) | RED: users relation missing; GREEN: up/down/up, dev owner, 6 invariants (`-tags=integration`); commit 8431f13 |
 | T6 | S6 | inline | done | RED: 4 service tests failed on stubs; GREEN: preview classification, idempotent re-import, edited title kept, missing title filled, tags only added, record limit, 4 concurrent imports with no duplicates (`-count=3`); branch feat/readvault-05-import-service |
-| T7 | S7 | inline | pending | |
+| T7 | S7 (import endpoints) | inline | done | RED: 2 handler tests failed with 404 before the routes existed; GREEN: owner from server not client, file at limit ok, over limit 413 `file_too_large`, non-multipart 400 `invalid_upload`, no file 400 `missing_file`, too many records 422, internal 500 without SQL details; integration preview→import→re-import→preview via HTTP; curl smoke on the real binary; branch feat/readvault-06-import-http |
 | T8 | S8 | inline | pending | |
 | T9 | S9 | inline | pending | |
 | T10 | S10 | inline | pending (Node 22 at ~/.local/node/bin) | |
 | T11 | S1 | inline | pending | |
+| T12 | S11 | inline (Risk 2: server-side fetch, SSRF allowlist) | pending, after T11; needs the fetch link | |
 
 ## Slices (stacked to main)
 
@@ -55,7 +57,8 @@ Assumptions:
 | 2 | `feat/readvault-02-urlnorm` | 197161f | T2 |
 | 3 | `feat/readvault-03-html-import` | 0d77c0b | T3 |
 | 4 | `feat/readvault-04-schema` | 8431f13 | T5 |
-| 5 | `feat/readvault-05-import-service` | see git log | T6 |
+| 5 | `feat/readvault-05-import-service` | 446ed5f | T6 |
+| 6 | `feat/readvault-06-import-http` | (this commit) | T7 |
 
 `main` has no commits yet. Before opening PR 1, `main` needs a base commit (for example, the product spec); that is the user's decision.
 
@@ -78,3 +81,8 @@ Assumptions:
 - L15: an amend accidentally included the user's staged `PRODUCT_SPEC.md`. It was removed from the commit and its staged blob (9fba4bc) restored. The schema commit is now 8431f13. Next: T6.
 - L16 (2026-11-07, user): "si ,quita la importacion csv porque no tengo fuentes con ese tipo. dale a t6, si necesitas enlaces de prueba avisame". Dropped the CSV slice from the unpublished stack (the schema commit was replayed onto the HTML slice as 8431f13; the branch was renamed to feat/readvault-04-schema). S4 is out of scope. CSV column mapping in the import screen (§10) is out of scope too.
 - L17: T6 done. One test input was wrong (`https://go.dev/blog` without a trailing slash is a different canonical URL by design, L7); the test was fixed, not the code. Saves run in transactions of 500 articles with pgx batches. A failing batch is reported as `storage_error` while the other batches are kept.
+- L18: T6 commit 446ed5f (972 changed lines; a cohesive unit, since the service tests need the adapter at seam 3, so it is over the 400 budget: recommend `size:exception` for PR 5). gentle-ai assess: medium, review not due (`under_budget`). Risk item 4 (row locks and concurrent imports): an independent verifier is planned at the feature end, covering all inline deliveries. Next: T7 HTTP import endpoints.
+- L19 (2026-11-08, user): "con respecto a la regla de no almancenar archivos subidos, aunque sea el markdown, cuanto ocuparia una biblioteca con 100 articulos de markdown estandar de meddium?" Estimated about 1-2 MB of text for 100 articles (images would add 30-300 MB). Rule §6 "No conservar indefinidamente los archivos subidos" is about the uploaded import file, not article content.
+- L20 (2026-11-08, user): "para el muro de pago te pasara un enlace con el que podras sacar el md entero, por eso igual cunde guardarlo y si tal se cambia la spec"
+- L21 (2026-11-08, user): "Una vez se tuviera el acceso el repo será de forma privada así que vamos a saltarnos eso, como tenemos la URL vamos a guardarla para quitar las imágenes de ahí y no almacenarlas, siempre las podríamos generar después". Added S11 and T12, after T11. Next: T7.
+- L22: T7 done. The upload is streamed from the multipart reader (no `ParseMultipartForm`, so nothing is written to a temp file), capped at MAX_UPLOAD_BYTES plus 64 KiB of multipart overhead. Upload read errors are told apart from service errors by the reader wrapper, not by string matching. The rest of S7 (library, export endpoints) lands with T8 and T9. Next: T8.

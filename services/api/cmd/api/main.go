@@ -15,6 +15,7 @@ import (
 	apihttp "readvault/api/internal/adapter/http"
 	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/config"
+	"readvault/api/internal/importing"
 )
 
 func main() {
@@ -41,7 +42,14 @@ func run() error {
 	}
 	defer pool.Close()
 
-	handler := apihttp.NewHandler(apihttp.Deps{DB: pool, Logger: logger})
+	handler := apihttp.NewHandler(apihttp.Deps{
+		DB:               pool,
+		Logger:           logger,
+		Imports:          importing.NewService(postgres.NewImportRepository(pool), cfg.MaxImportRecords),
+		OwnerID:          postgres.DevOwnerID,
+		MaxUploadBytes:   cfg.MaxUploadBytes,
+		MaxImportRecords: cfg.MaxImportRecords,
+	})
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           http.TimeoutHandler(handler, cfg.RequestTimeout, `{"error":{"code":"timeout","message":"request timed out"}}`),

@@ -21,6 +21,17 @@ type Pinger interface {
 type Deps struct {
 	DB     Pinger
 	Logger *slog.Logger
+
+	// Imports serves the import endpoints; they are not mounted when nil.
+	Imports ImportService
+	// OwnerID is the user every request acts for until authentication
+	// exists. It is never taken from the client.
+	OwnerID string
+	// MaxUploadBytes bounds an uploaded bookmarks file.
+	MaxUploadBytes int64
+	// MaxImportRecords is the record limit the import service enforces,
+	// reported back to clients that exceed it.
+	MaxImportRecords int
 }
 
 // NewHandler returns the API router wrapped in the common middleware.
@@ -32,6 +43,17 @@ func NewHandler(deps Deps) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
 	mux.HandleFunc("GET /readyz", handleReadyz(deps.DB, deps.Logger))
+	if deps.Imports != nil {
+		h := &importHandler{
+			svc:        deps.Imports,
+			ownerID:    deps.OwnerID,
+			maxBytes:   deps.MaxUploadBytes,
+			maxRecords: deps.MaxImportRecords,
+			logger:     deps.Logger,
+		}
+		mux.HandleFunc("POST /api/imports/preview", h.preview)
+		mux.HandleFunc("POST /api/imports", h.run)
+	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "route not found")
 	})
