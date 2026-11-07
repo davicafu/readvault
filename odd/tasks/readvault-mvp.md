@@ -58,7 +58,7 @@ Assumptions:
 | 3 | `feat/readvault-03-html-import` | 0d77c0b | T3 |
 | 4 | `feat/readvault-04-schema` | 8431f13 | T5 |
 | 5 | `feat/readvault-05-import-service` | 446ed5f | T6 |
-| 6 | `feat/readvault-06-import-http` | (this commit) | T7 |
+| 6 | `feat/readvault-06-import-http` | 8266325 | T7 |
 
 `main` has no commits yet. Before opening PR 1, `main` needs a base commit (for example, the product spec); that is the user's decision.
 
@@ -86,3 +86,5 @@ Assumptions:
 - L20 (2026-11-08, user): "para el muro de pago te pasara un enlace con el que podras sacar el md entero, por eso igual cunde guardarlo y si tal se cambia la spec"
 - L21 (2026-11-08, user): "Una vez se tuviera el acceso el repo será de forma privada así que vamos a saltarnos eso, como tenemos la URL vamos a guardarla para quitar las imágenes de ahí y no almacenarlas, siempre las podríamos generar después". Added S11 and T12, after T11. Next: T7.
 - L22: T7 done. The upload is streamed from the multipart reader (no `ParseMultipartForm`, so nothing is written to a temp file), capped at MAX_UPLOAD_BYTES plus 64 KiB of multipart overhead. Upload read errors are told apart from service errors by the reader wrapper, not by string matching. The rest of S7 (library, export endpoints) lands with T8 and T9. Next: T8.
+- L23: T7 commit 8266325 (444 insertions, 3 deletions). gentle-ai assess returned `high` with reason `unassessable`, not a real risk tier: the untracked `.atl/` needs an explicit declaration, the same blocker as L13. Native review is unavailable until `.atl/` is ignored or declared (user decision). Risk item 2 (upload size guard and server-side owner), covered by the end-of-feature verifier.
+- L24 (2026-11-08, user): "Si porque no se lo que tiene ni si aporta algo de verdad". `.atl/` holds the gentle-ai skill registry, generated with absolute home paths; added to `.gitignore`.
