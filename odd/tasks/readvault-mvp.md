@@ -10,7 +10,7 @@ The source of truth is `PRODUCT_SPEC.md`. Each spec quotes the product spec verb
 - **S1 (§12, §13)** Repo and local dev: "Configuración de Docker Compose.", "Archivo .env.example.", "Makefile con objetivos dev, test, migrate y lint.", "Fixtures HTML y CSV representativos.", "README con instrucciones de instalación y resolución de problemas."
 - **S2 (RF-05)** URL normalization: "Normalizar las mayúsculas del host.", "Eliminar fragmentos de la identidad canónica.", "Eliminar únicamente parámetros de seguimiento reconocidos.", "Conservar parámetros que puedan afectar a la identidad o al contenido.", "Mantener la URL original para mostrarla y navegar."
 - **S3 (RF-01)** HTML import: "Conservar las rutas de carpetas anidadas cuando existan.", "Tolerar títulos ausentes y registros malformados.", "Rechazar esquemas no admitidos, incluidos javascript: y file:.", "No ejecutar ni renderizar el HTML importado como contenido confiable."
-- **S4 (RF-02)** CSV import: "Detectar nombres habituales de columnas cuando sea posible.", "Permitir asignación manual de columnas si la detección es ambigua.", "Admitir UTF-8, comillas y campos con saltos de línea.", "Informar de los registros inválidos sin descartar los válidos.", "Aplicar límites de tamaño de archivo y número de registros."
+- **S4 (RF-02)** CSV import: removed by the user (L16).
 - **S5 (§7, RNF-01)** Schema: users, articles, tags, article_tags; "URL canónica única por usuario."; "Si el MVP utiliza un propietario fijo de desarrollo, debe representarse explícitamente."; "No crear tablas que no se utilicen".
 - **S6 (RF-03, RF-04, §9)** Preview and import execution: "Reimportar el mismo archivo no debe generar registros duplicados.", "No sobrescribir un título editado por el usuario.", "No eliminar etiquetas existentes.", "Informar de registros insertados, omitidos, actualizados y fallidos."
 - **S7 (§8)** HTTP API: the endpoints listed in §8; "Devolver estructuras de error consistentes.", "Admitir paginación limitada.", "No exponer trazas de ejecución ni detalles internos de la base de datos."
@@ -27,6 +27,8 @@ Assumptions:
 - A4: until authentication exists, a fixed development owner is seeded explicitly by migration.
 - A5: no `articles.source` column (user decision L14, overriding §7).
 - A6: schema additions not listed in §7, each needed by a quoted spec: `title_edited_at` (S6 "No sobrescribir un título editado por el usuario"), `bookmarked_at` (S9 metadata), `search` tsvector (§6 full-text search), `article_tags.user_id` with composite FKs (RNF-03 cross-user access). IDs are UUIDs.
+- A8: the import is stateless. `POST /api/imports` re-uploads the same file confirmed in the preview, so nothing uploaded is stored (RF-04 "No conservar indefinidamente los archivos subidos"). `GET /api/imports/{id}` is dropped (§8 "Adaptar los endpoints"), because `import_jobs` is a future table. The import id is returned in the report and logged.
+- A9: a title is completed only when it is empty and was never edited. Folder and bookmark date are completed only when absent. Tags are only added. The original URL of the first import is kept.
 - A7: the agent cannot write `.env` (deny rule); the user copies `.env.example`. Agent checks pass the variables to the process instead.
 
 ## Tasks
@@ -36,9 +38,9 @@ Assumptions:
 | T1 | S1 | inline | done | RED: 3 health tests failed on empty mux; GREEN; smoke: /healthz 200, /readyz 200→503 after stopping db, 404 JSON, SIGINT graceful shutdown; commit f5e31f3 |
 | T2 | S2 | inline | done | RED: tests failed against stub; GREEN: `go test ./internal/urlnorm/` ok; fuzz 20s clean; commit 197161f |
 | T3 | S3 | inline | done | RED: 4 tests failed against stub; GREEN: `go test ./internal/importing/` ok; fuzz 20s clean; commit 0d77c0b |
-| T4 | S4 | inline | done | RED: 4 tests failed against stub; GREEN: ok; fuzz 20s clean; `go vet` clean; commit 5b8737b |
-| T5 | S5 | inline (Risk 1: schema, needs human review) | done (awaiting user SQL review) | RED: users relation missing; GREEN: up/down/up, dev owner, 6 invariants (`-tags=integration`); commit 27143a4 |
-| T6 | S6 | inline | pending | |
+| T4 | S4 | — | dropped (L16) | commit 5b8737b removed from the stack |
+| T5 | S5 | inline (Risk 1: schema, needs human review) | done (schema approved by user, L14) | RED: users relation missing; GREEN: up/down/up, dev owner, 6 invariants (`-tags=integration`); commit 8431f13 |
+| T6 | S6 | inline | done | RED: 4 service tests failed on stubs; GREEN: preview classification, idempotent re-import, edited title kept, missing title filled, tags only added, record limit, 4 concurrent imports with no duplicates (`-count=3`); branch feat/readvault-05-import-service |
 | T7 | S7 | inline | pending | |
 | T8 | S8 | inline | pending | |
 | T9 | S9 | inline | pending | |
@@ -52,8 +54,8 @@ Assumptions:
 | 1 | `feat/readvault-01-scaffold` | f5e31f3 | T1 |
 | 2 | `feat/readvault-02-urlnorm` | 197161f | T2 |
 | 3 | `feat/readvault-03-html-import` | 0d77c0b | T3 |
-| 4 | `feat/readvault-04-csv-import` | 5b8737b | T4 |
-| 5 | `feat/readvault-05-schema` | 27143a4 | T5 |
+| 4 | `feat/readvault-04-schema` | 8431f13 | T5 |
+| 5 | `feat/readvault-05-import-service` | see git log | T6 |
 
 `main` has no commits yet. Before opening PR 1, `main` needs a base commit (for example, the product spec); that is the user's decision.
 
@@ -71,5 +73,8 @@ Assumptions:
 - L10 (2026-11-07, user): "no, comproueba primero orbstack y si no tiramos con docker desktop". OrbStack needs macOS 14.0+ (docs.orbstack.dev/faq), so we use Docker Desktop; started it.
 - L11: T1 and T5 done. Migrations use golang-migrate v4.20.1 (iofs + pgx5 driver); pgx v5.12.0. Integration tests create a throwaway database per test from TEST_DATABASE_URL. Authored lines so far: about 2,000, over budget, so the chain strategy is asked before the first commit. Next: T6 (import service).
 - L12 (2026-11-07, user): chain strategy = "Stacked a main". Each slice was built and verified alone in a worktree (`go mod tidy`, gofmt, vet, `go test -race`).
-- L13: RDD is on. Schema commit 27143a4 assessed `high` (item 1 escalation and a Makefile config change), so review was due. Native review was not started: the STATUS preflight asks for an intended-untracked selection (the user's untracked `.atl/`), and the CLI publishes no schema for that input. Slices 1-4 were not assessed, because an orphan root has no base ref. Recorded as unavailable proof. The human SQL review of `services/api/migrations/000001_init.up.sql` is pending.
+- L13: RDD is on. Schema commit 8431f13 assessed `high` (item 1 escalation and a Makefile config change), so review was due. Native review was not started: the STATUS preflight asks for an intended-untracked selection (the user's untracked `.atl/`), and the CLI publishes no schema for that input. Slices 1-4 were not assessed, because an orphan root has no base ref. Recorded as unavailable proof. The human SQL review of `services/api/migrations/000001_init.up.sql` is pending.
 - L14 (2026-11-07, user): "lo de source no hace falta, siempre será html, lo demas doy por bueno y puedes hacer commit". Removed `articles.source`; the rest of the schema is approved. The CSV import (RF-02, T4) is kept; the user was told it also exists. Amended the unpublished schema commit.
+- L15: an amend accidentally included the user's staged `PRODUCT_SPEC.md`. It was removed from the commit and its staged blob (9fba4bc) restored. The schema commit is now 8431f13. Next: T6.
+- L16 (2026-11-07, user): "si ,quita la importacion csv porque no tengo fuentes con ese tipo. dale a t6, si necesitas enlaces de prueba avisame". Dropped the CSV slice from the unpublished stack (the schema commit was replayed onto the HTML slice as 8431f13; the branch was renamed to feat/readvault-04-schema). S4 is out of scope. CSV column mapping in the import screen (§10) is out of scope too.
+- L17: T6 done. One test input was wrong (`https://go.dev/blog` without a trailing slash is a different canonical URL by design, L7); the test was fixed, not the code. Saves run in transactions of 500 articles with pgx batches. A failing batch is reported as `storage_error` while the other batches are kept.

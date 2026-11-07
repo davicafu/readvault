@@ -1,4 +1,4 @@
-// Package importing turns browser bookmark exports and CSV files into
+// Package importing turns browser bookmark exports into
 // validated import candidates and persists them idempotently.
 package importing
 
