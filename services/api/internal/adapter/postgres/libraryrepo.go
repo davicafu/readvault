@@ -118,3 +118,78 @@ func scanListed(row pgx.CollectableRow) (library.Listed, error) {
 func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
+
+// Update implements library.Repository. The article row is locked first, so
+// concurrent edits of the same article apply one after the other.
+func (r *LibraryRepository) Update(ctx context.Context, userID, articleID string, c library.Change) (library.Article, error) {
+	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		var title string
+		err := tx.QueryRow(ctx, `SELECT title FROM articles WHERE user_id = $1 AND id = $2 FOR UPDATE`, userID, articleID).Scan(&title)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return library.ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("locking article: %w", err)
+		}
+
+		changed := false
+		if c.Title != nil && *c.Title != title {
+			if _, err := tx.Exec(ctx, `UPDATE articles SET title = $2, title_edited_at = now() WHERE id = $1`, articleID, *c.Title); err != nil {
+				return fmt.Errorf("updating title: %w", err)
+			}
+			changed = true
+		}
+		if c.Tags != nil {
+			tagsChanged, err := replaceTags(ctx, tx, userID, articleID, *c.Tags)
+			if err != nil {
+				return err
+			}
+			changed = changed || tagsChanged
+		}
+		if changed {
+			if _, err := tx.Exec(ctx, `UPDATE articles SET updated_at = now() WHERE id = $1`, articleID); err != nil {
+				return fmt.Errorf("touching article: %w", err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, library.ErrNotFound) {
+			return library.Article{}, err
+		}
+		return library.Article{}, fmt.Errorf("updating article: %w", err)
+	}
+	return r.Get(ctx, userID, articleID)
+}
+
+// replaceTags makes tags the article's whole tag set. Missing tags are
+// created; an existing tag keeps its stored spelling. It reports whether
+// any link was added or removed.
+func replaceTags(ctx context.Context, tx pgx.Tx, userID, articleID string, tags []tag.Tag) (bool, error) {
+	names := make([]string, len(tags))
+	slugs := make([]string, len(tags))
+	for i, t := range tags {
+		names[i], slugs[i] = t.Name, t.Slug
+	}
+
+	removed, err := tx.Exec(ctx, `DELETE FROM article_tags at USING tags t
+		WHERE at.tag_id = t.id AND at.article_id = $1 AND NOT (t.slug = ANY($2::text[]))`, articleID, slugs)
+	if err != nil {
+		return false, fmt.Errorf("removing tags: %w", err)
+	}
+	if len(tags) == 0 {
+		return removed.RowsAffected() > 0, nil
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO tags (user_id, name, slug)
+		SELECT $1, name, slug FROM unnest($2::text[], $3::text[]) AS t (name, slug)
+		ON CONFLICT (user_id, slug) DO NOTHING`, userID, names, slugs); err != nil {
+		return false, fmt.Errorf("creating tags: %w", err)
+	}
+	added, err := tx.Exec(ctx, `INSERT INTO article_tags (user_id, article_id, tag_id)
+		SELECT $1, $2, id FROM tags WHERE user_id = $1 AND slug = ANY($3::text[])
+		ON CONFLICT (article_id, tag_id) DO NOTHING`, userID, articleID, slugs)
+	if err != nil {
+		return false, fmt.Errorf("linking tags: %w", err)
+	}
+	return removed.RowsAffected() > 0 || added.RowsAffected() > 0, nil
+}

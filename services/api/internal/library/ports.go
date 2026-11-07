@@ -16,6 +16,18 @@ type Repository interface {
 
 	// Get returns one article of the user, or ErrNotFound.
 	Get(ctx context.Context, userID, articleID string) (Article, error)
+
+	// Update applies a validated change to one article of the user in one
+	// transaction and returns the result, or ErrNotFound. A changed title
+	// is marked as edited, so imports never overwrite it.
+	Update(ctx context.Context, userID, articleID string, c Change) (Article, error)
+}
+
+// Change is a validated edit. Nil fields are left as they are; Tags
+// replaces the whole tag set.
+type Change struct {
+	Title *string
+	Tags  *[]tag.Tag
 }
 
 // Article is a saved bookmark with its tags and provenance.

@@ -19,6 +19,15 @@ type stubLibrary struct {
 	gotUser   string
 	gotParams library.ListParams
 	gotID     string
+	gotPatch  library.Patch
+}
+
+func (s *stubLibrary) Update(_ context.Context, userID, id string, p library.Patch) (library.Article, error) {
+	s.gotUser, s.gotID, s.gotPatch = userID, id, p
+	if s.err != nil {
+		return library.Article{}, s.err
+	}
+	return library.Article{ID: id, Title: *p.Title}, nil
 }
 
 func (s *stubLibrary) List(_ context.Context, userID string, p library.ListParams) (library.Page, error) {
@@ -121,5 +130,79 @@ func TestGetArticle_ReturnsTheArticle(t *testing.T) {
 	}
 	if svc.gotID != "a1" || svc.gotUser != testOwner {
 		t.Errorf("got id %q user %q", svc.gotID, svc.gotUser)
+	}
+}
+
+func patch(t *testing.T, svc *stubLibrary, target, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	h := apihttp.NewHandler(apihttp.Deps{Library: svc, OwnerID: testOwner})
+	req := httptest.NewRequest(http.MethodPatch, target, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestPatchArticle_PassesTheEditForTheServerOwner(t *testing.T) {
+	t.Parallel()
+	svc := &stubLibrary{}
+
+	rec := patch(t, svc, "/api/articles/a1", `{"title":"New title","tags":["go","news"]}`)
+
+	if rec.Code != http.StatusOK || decode(t, rec)["title"] != "New title" {
+		t.Fatalf("status = %d; body %s", rec.Code, rec.Body.String())
+	}
+	if svc.gotUser != testOwner || svc.gotID != "a1" {
+		t.Errorf("user %q id %q", svc.gotUser, svc.gotID)
+	}
+	if svc.gotPatch.Title == nil || *svc.gotPatch.Title != "New title" || svc.gotPatch.Tags == nil || !slices.Equal(*svc.gotPatch.Tags, []string{"go", "news"}) {
+		t.Errorf("patch = %+v", svc.gotPatch)
+	}
+}
+
+func TestPatchArticle_MapsErrors(t *testing.T) {
+	t.Parallel()
+
+	validation := &library.ValidationError{Problems: []library.FieldProblem{{Field: "title", Code: "required", Message: "empty"}}}
+	tests := []struct {
+		name           string
+		body           string
+		err            error
+		expectedStatus int
+		expectedCode   string
+	}{
+		{"malformed json", `{"title":`, nil, http.StatusBadRequest, "invalid_json"},
+		{"unknown field", `{"title":"x","originalUrl":"https://evil.example"}`, nil, http.StatusBadRequest, "invalid_json"},
+		{"two json values", `{"title":"x"}{"title":"y"}`, nil, http.StatusBadRequest, "invalid_json"},
+		{"body too large", `{"title":"` + strings.Repeat("a", 70<<10) + `"}`, nil, http.StatusRequestEntityTooLarge, "body_too_large"},
+		{"invalid edit", `{"title":" "}`, validation, http.StatusUnprocessableEntity, "validation_failed"},
+		{"article not found", `{"title":"x"}`, library.ErrNotFound, http.StatusNotFound, "not_found"},
+		{"update fails", `{"title":"x"}`, errors.New(`ERROR: deadlock detected (SQLSTATE 40P01)`), http.StatusInternalServerError, "internal"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			svc := &stubLibrary{err: tt.err}
+			rec := patch(t, svc, "/api/articles/a1", tt.body)
+
+			if rec.Code != tt.expectedStatus {
+				t.Fatalf("status = %d, want %d; body %s", rec.Code, tt.expectedStatus, rec.Body.String())
+			}
+			errBody, _ := decode(t, rec)["error"].(map[string]any)
+			if errBody["code"] != tt.expectedCode {
+				t.Errorf("code = %v, want %q", errBody["code"], tt.expectedCode)
+			}
+			if tt.expectedCode == "validation_failed" {
+				if details, _ := errBody["details"].([]any); len(details) != 1 {
+					t.Errorf("details = %v, want one field problem", errBody["details"])
+				}
+			}
+			if tt.err == nil && svc.gotID != "" {
+				t.Error("the service was called for a rejected body")
+			}
+			if strings.Contains(rec.Body.String(), "SQLSTATE") {
+				t.Errorf("body leaks internal details: %s", rec.Body.String())
+			}
+		})
 	}
 }

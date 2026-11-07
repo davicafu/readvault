@@ -44,7 +44,7 @@ Assumptions:
 | T6 | S6 | inline | done | RED: 4 service tests failed on stubs; GREEN: preview classification, idempotent re-import, edited title kept, missing title filled, tags only added, record limit, 4 concurrent imports with no duplicates (`-count=3`); branch feat/readvault-05-import-service |
 | T7 | S7 (import endpoints) | inline | done | RED: 2 handler tests failed with 404 before the routes existed; GREEN: owner from server not client, file at limit ok, over limit 413 `file_too_large`, non-multipart 400 `invalid_upload`, no file 400 `missing_file`, too many records 422, internal 500 without SQL details; integration preview→import→re-import→preview via HTTP; curl smoke on the real binary; branch feat/readvault-06-import-http |
 | T8a | S7, S8 (list and get) | inline | done | RED: 6 library integration tests and 3 handler tests failed on stubs; GREEN: 4 sorts paged with limit 2 (keyset, title ties by id), search by title words, title/URL substring, tag name and literal `%`, AND filter by tag slugs, user isolation, get with tags sorted by slug and provenance, malformed id 404, invalid params 400 `invalid_query` with field details; curl smoke; branch feat/readvault-07-library-read |
-| T8b | S8 (edit title and tags) | inline | pending | |
+| T8b | S8 (edit title and tags) | inline (Risk 4: row lock) | done | RED: 6 update integration tests and 2 handler tests failed on stubs; GREEN: title trimmed and marked edited, tag set replaced (stored spelling kept, empty list clears), 6 invalid edits rejected with the data snapshot unchanged, other user and malformed id 404, edited title kept and tags only added by a re-import, 8 concurrent tag edits end in one writer's set (`-count=3`; fails with mixed sets when the row lock is removed); PATCH maps invalid/unknown-field/double JSON 400, body over 64 KiB 413, validation 422, 404, 500 without SQL details; curl smoke; branch feat/readvault-08-library-edit |
 | T9 | S9 | inline | pending | |
 | T10 | S10 | inline | pending (Node 22 at ~/.local/node/bin) | |
 | T11 | S1 | inline | pending | |
@@ -60,7 +60,8 @@ Assumptions:
 | 4 | `feat/readvault-04-schema` | 8431f13 | T5 |
 | 5 | `feat/readvault-05-import-service` | 446ed5f | T6 |
 | 6 | `feat/readvault-06-import-http` | 8266325, chore commit for `.atl/` | T7 |
-| 7 | `feat/readvault-07-library-read` | (this commit) | T8a |
+| 7 | `feat/readvault-07-library-read` | 96c0211 | T8a |
+| 8 | `feat/readvault-08-library-edit` | (this commit) | T8b |
 
 `main` has no commits yet. Before opening PR 1, `main` needs a base commit (for example, the product spec); that is the user's decision.
 
@@ -91,3 +92,4 @@ Assumptions:
 - L23: T7 commit 8266325 (444 insertions, 3 deletions). gentle-ai assess returned `high` with reason `unassessable`, not a real risk tier: the untracked `.atl/` needs an explicit declaration, the same blocker as L13. Native review is unavailable until `.atl/` is ignored or declared (user decision). Risk item 2 (upload size guard and server-side owner), covered by the end-of-feature verifier.
 - L24 (2026-11-08, user): "Si porque no se lo que tiene ni si aporta algo de verdad". `.atl/` holds the gentle-ai skill registry, generated with absolute home paths; added to `.gitignore`.
 - L25: T7 re-assessed after ignoring `.atl/`: medium, 452 changed lines, review not due (`under_budget`). T8 split into T8a (read) and T8b (edit) so each slice stays near the budget. Tag rules moved to the shared `internal/tag` package (Normalize, Slugify), so imports and edits normalize tags the same way; import tests stay green. Search combines full-text words on title and URL (`simple` config) with case-insensitive substring matches on title, URL and tag names; LIKE wildcards are escaped. "Filtrar por ... estado de importación cuando corresponda" does not apply: articles have no import status (no `import_jobs`, A8). Request and response schemas (§8 "Documentar esquemas") go to the API docs in T11.
+- L26: T8a commit 96c0211 (916 insertions, 31 deletions; medium, `under_budget`). T8b: PATCH takes `{"title"?, "tags"?}`; unknown fields are rejected, so URLs cannot change through it (RF-07 "Preservar las URL originales salvo que una operación explícita permita cambiarlas"). Tags replace the whole set (RF-07 "Añadir y eliminar etiquetas"); orphan tags stay in `tags` for reuse. The edit locks the article row first; a differential run without the lock failed the concurrency test with mixed tag sets. Next: T9 export.

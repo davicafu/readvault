@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -19,6 +20,9 @@ const (
 	maxLimit       = 100
 	maxSearchRunes = 200
 	maxFilterTags  = 10
+	maxArticleTags = 50
+	// maxTitleRunes matches the articles.title check constraint.
+	maxTitleRunes = 500
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -62,6 +66,84 @@ type Service struct {
 
 // NewService returns a library service.
 func NewService(repo Repository) *Service { return &Service{repo: repo} }
+
+// Patch is an edit as the client sent it. Nil fields are left as they are.
+type Patch struct {
+	Title *string   `json:"title"`
+	Tags  *[]string `json:"tags"`
+}
+
+// Update edits the title and tags of one of the user's articles. The title
+// is trimmed and its spaces collapsed; tags replace the whole set and follow
+// the same rules as imported tags. The URLs are never changed.
+func (s *Service) Update(ctx context.Context, userID, articleID string, p Patch) (Article, error) {
+	c, err := parsePatch(p)
+	if err != nil {
+		return Article{}, err
+	}
+	if !uuidPattern.MatchString(articleID) {
+		return Article{}, ErrNotFound
+	}
+	a, err := s.repo.Update(ctx, userID, articleID, c)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return Article{}, fmt.Errorf("updating article: %w", err)
+	}
+	return a, err
+}
+
+func parsePatch(p Patch) (Change, error) {
+	if p.Title == nil && p.Tags == nil {
+		return Change{}, &ValidationError{Problems: []FieldProblem{{"body", "empty", "send a title, tags or both"}}}
+	}
+	var problems []FieldProblem
+	var c Change
+
+	if p.Title != nil {
+		title := strings.Join(strings.Fields(*p.Title), " ")
+		switch {
+		case title == "":
+			problems = append(problems, FieldProblem{"title", "required", "the title cannot be empty"})
+		case utf8.RuneCountInString(title) > maxTitleRunes:
+			problems = append(problems, FieldProblem{"title", "too_long", fmt.Sprintf("the title is longer than %d characters", maxTitleRunes)})
+		default:
+			c.Title = &title
+		}
+	}
+
+	if p.Tags != nil {
+		tags, problem := parseTags(*p.Tags)
+		if problem != nil {
+			problems = append(problems, *problem)
+		}
+		c.Tags = &tags
+	}
+
+	if problems != nil {
+		return Change{}, &ValidationError{Problems: problems}
+	}
+	return c, nil
+}
+
+// parseTags normalizes a full tag set and drops tags that share a slug.
+func parseTags(names []string) ([]tag.Tag, *FieldProblem) {
+	if len(names) > maxArticleTags {
+		return nil, &FieldProblem{"tags", "too_many", fmt.Sprintf("an article can have at most %d tags", maxArticleTags)}
+	}
+	tags := []tag.Tag{}
+	for _, name := range names {
+		t, err := tag.Normalize(name)
+		switch {
+		case errors.Is(err, tag.ErrEmpty):
+			return nil, &FieldProblem{"tags", "empty", "a tag cannot be empty"}
+		case errors.Is(err, tag.ErrTooLong):
+			return nil, &FieldProblem{"tags", "too_long", fmt.Sprintf("a tag is longer than %d characters", tag.MaxRunes)}
+		}
+		if !slices.ContainsFunc(tags, func(seen tag.Tag) bool { return seen.Slug == t.Slug }) {
+			tags = append(tags, t)
+		}
+	}
+	return tags, nil
+}
 
 // List returns one page of the user's articles. A zero Limit means the
 // default page size; an empty Sort means newest first.

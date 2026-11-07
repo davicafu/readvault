@@ -2,8 +2,13 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 )
+
+// maxJSONBodyBytes bounds every JSON request body.
+const maxJSONBodyBytes = 64 << 10
 
 // errorBody is the single error shape returned by every endpoint:
 //
@@ -33,4 +38,27 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 
 func writeErrorDetails(w http.ResponseWriter, status int, code, message string, details any) {
 	writeJSON(w, status, errorBody{Error: errorDetail{Code: code, Message: message, Details: details}})
+}
+
+// decodeJSONBody decodes exactly one JSON object into v, rejecting unknown
+// fields and bodies over maxJSONBodyBytes. On failure it writes the error
+// response and returns false.
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, v any) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxJSONBodyBytes))
+	dec.DisallowUnknownFields()
+	err := dec.Decode(v)
+	if err == nil && dec.Decode(&struct{}{}) != io.EOF {
+		err = errors.New("body must hold a single JSON object")
+	}
+	var maxBytesErr *http.MaxBytesError
+	switch {
+	case err == nil:
+		return true
+	case errors.As(err, &maxBytesErr):
+		writeErrorDetails(w, http.StatusRequestEntityTooLarge, "body_too_large", "the request body is too large",
+			map[string]int{"maxBytes": maxJSONBodyBytes})
+	default:
+		writeError(w, http.StatusBadRequest, "invalid_json", "the body must be one JSON object with only the documented fields")
+	}
+	return false
 }
