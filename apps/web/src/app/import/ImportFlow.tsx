@@ -181,7 +181,7 @@ function PreviewStep({
         <h2 id="preview-title">Check before importing {fileName}</h2>
         <p className="lede">
           New bookmarks are added. Bookmarks already in your library keep your edits and only gain missing details and
-          tags. Repeated and invalid entries are skipped.
+          tags (no tags where you edited them). Repeated and invalid entries are skipped.
         </p>
       </div>
 

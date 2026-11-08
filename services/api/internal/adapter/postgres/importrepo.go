@@ -166,12 +166,22 @@ func fillExisting(ctx context.Context, tx pgx.Tx, userID string, articles []impo
 }
 
 // linkTags creates missing tags and links them to the articles. Existing
-// links are never removed. It returns the positions that gained a tag.
+// links are never removed, and articles whose tags the user edited gain no
+// tag. It returns the positions that gained a tag.
 func linkTags(ctx context.Context, tx pgx.Tx, userID string, articles []importing.NewArticle, ids []string) (map[int]bool, error) {
+	gained := map[int]bool{}
+	open, err := taggableArticles(ctx, tx, articles, ids)
+	if err != nil || len(open) == 0 {
+		return gained, err
+	}
+
 	var unique []tag.Tag
 	var slugs []string
 	seen := map[string]bool{}
-	for _, a := range articles {
+	for i, a := range articles {
+		if !open[ids[i]] {
+			continue
+		}
 		for _, t := range a.Tags {
 			if !seen[t.Slug] {
 				seen[t.Slug] = true
@@ -180,7 +190,6 @@ func linkTags(ctx context.Context, tx pgx.Tx, userID string, articles []importin
 			}
 		}
 	}
-	gained := map[int]bool{}
 	if len(slugs) == 0 {
 		return gained, nil
 	}
@@ -204,6 +213,9 @@ func linkTags(ctx context.Context, tx pgx.Tx, userID string, articles []importin
 	var articleIDs, linkTagIDs []string
 	position := map[string]int{}
 	for i, a := range articles {
+		if !open[ids[i]] {
+			continue
+		}
 		position[ids[i]] = i
 		for _, t := range a.Tags {
 			articleIDs = append(articleIDs, ids[i])
@@ -225,6 +237,34 @@ func linkTags(ctx context.Context, tx pgx.Tx, userID string, articles []importin
 		return nil, fmt.Errorf("linking tags: %w", err)
 	}
 	return gained, nil
+}
+
+// taggableArticles returns the ids of the tagged articles whose tags the user
+// never edited. fillExisting already locked the existing rows, so a tag edit
+// in progress has committed by now and its mark is visible here.
+func taggableArticles(ctx context.Context, tx pgx.Tx, articles []importing.NewArticle, ids []string) (map[string]bool, error) {
+	var tagged []string
+	for i, a := range articles {
+		if len(a.Tags) > 0 && ids[i] != "" {
+			tagged = append(tagged, ids[i])
+		}
+	}
+	open := map[string]bool{}
+	if len(tagged) == 0 {
+		return open, nil
+	}
+	rows, err := tx.Query(ctx, `SELECT id FROM articles WHERE id = ANY($1) AND tags_edited_at IS NULL`, tagged)
+	if err != nil {
+		return nil, fmt.Errorf("checking edited tags: %w", err)
+	}
+	var id string
+	if _, err := pgx.ForEachRow(rows, []any{&id}, func() error {
+		open[id] = true
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("checking edited tags: %w", err)
+	}
+	return open, nil
 }
 
 // touchUpdated marks existing articles that changed as updated.

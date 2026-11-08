@@ -40,11 +40,14 @@ type Article struct {
 	CanonicalURL  string     `json:"canonicalUrl"`
 	Title         string     `json:"title"`
 	TitleEditedAt *time.Time `json:"titleEditedAt"`
-	Folder        []string   `json:"folder"`
-	BookmarkedAt  *time.Time `json:"bookmarkedAt"`
-	Tags          []tag.Tag  `json:"tags"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	UpdatedAt     time.Time  `json:"updatedAt"`
+	// TagsEditedAt is set when the user replaced the tags; imports then add
+	// no tags to the article.
+	TagsEditedAt *time.Time `json:"tagsEditedAt"`
+	Folder       []string   `json:"folder"`
+	BookmarkedAt *time.Time `json:"bookmarkedAt"`
+	Tags         []tag.Tag  `json:"tags"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
 }
 
 // Listed is an article of a list page with the key it was sorted by when

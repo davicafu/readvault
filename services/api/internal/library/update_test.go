@@ -59,6 +59,9 @@ func TestUpdate_EditsTheTitleAndMarksItEdited(t *testing.T) {
 	if got.OriginalURL != "https://go.dev/blog/" || !slices.Equal(slugsOf(got), []string{"go"}) {
 		t.Errorf("url %q and tags %v must not change", got.OriginalURL, got.Tags)
 	}
+	if got.TagsEditedAt != nil {
+		t.Errorf("tagsEditedAt = %v, want nil after a title-only edit", got.TagsEditedAt)
+	}
 
 	stored, err := svc.Get(t.Context(), owner, ids[0])
 	if err != nil || stored.Title != "Go blog" {
@@ -83,6 +86,9 @@ func TestUpdate_ReplacesTheTagSet(t *testing.T) {
 	}
 	if got.TitleEditedAt != nil || got.Title != "one" {
 		t.Errorf("a tag edit must not touch the title: %q, %v", got.Title, got.TitleEditedAt)
+	}
+	if got.TagsEditedAt == nil {
+		t.Error("tagsEditedAt = nil, want the tags marked as edited")
 	}
 	if !got.UpdatedAt.After(base) {
 		t.Errorf("updatedAt = %v, want it advanced", got.UpdatedAt)
@@ -148,7 +154,7 @@ func TestUpdate_OnlyFindsTheUsersOwnArticles(t *testing.T) {
 	}
 }
 
-func TestUpdate_EditedTitleSurvivesAReimport(t *testing.T) {
+func TestUpdate_EditedTitleAndTagsSurviveAReimport(t *testing.T) {
 	t.Parallel()
 	svc, pool := newService(t)
 	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
@@ -166,7 +172,8 @@ func TestUpdate_EditedTitleSurvivesAReimport(t *testing.T) {
 	}
 
 	time.Sleep(time.Millisecond)
-	if _, err := imports.Import(t.Context(), owner, strings.NewReader(file)); err != nil {
+	report, err := imports.Import(t.Context(), owner, strings.NewReader(file))
+	if err != nil {
 		t.Fatal(err)
 	}
 	got, err := svc.Get(t.Context(), owner, id)
@@ -176,8 +183,33 @@ func TestUpdate_EditedTitleSurvivesAReimport(t *testing.T) {
 	if got.Title != "My title" {
 		t.Errorf("title = %q, want the edit kept after a re-import", got.Title)
 	}
+	if !slices.Equal(slugsOf(got), []string{"news"}) {
+		t.Errorf("tags = %v, want the edited set kept: an import must not add back a tag the user removed", got.Tags)
+	}
+	if report.Totals.Skipped != 1 || report.Totals.Updated != 0 {
+		t.Errorf("report totals = %+v, want the article skipped", report.Totals)
+	}
+}
+
+func TestUpdate_ImportStillAddsTagsWhenOnlyTheTitleWasEdited(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
+	ids := seed(t, pool, owner, seedArticle{url: "https://go.dev/blog/", title: "one", created: base, tags: []string{"news"}})
+	if _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Title: ptr("My title")}); err != nil {
+		t.Fatal(err)
+	}
+
+	file := `<DL><DT><A HREF="https://go.dev/blog/" TAGS="go">Imported title</A></DL>`
+	if _, err := imports.Import(t.Context(), owner, strings.NewReader(file)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.Get(t.Context(), owner, ids[0])
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !slices.Equal(slugsOf(got), []string{"go", "news"}) {
-		t.Errorf("tags = %v, want the import to add go back without removing news", got.Tags)
+		t.Errorf("tags = %v, want the import to add go", got.Tags)
 	}
 }
 
@@ -259,5 +291,100 @@ func TestUpdate_ConcurrentImportAndEditDoNotDeadlock(t *testing.T) {
 				t.Fatalf("round %d: %v", round, err)
 			}
 		}
+	}
+}
+
+func TestUpdate_ConcurrentImportAndTagEditOfTheSameArticle(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
+
+	for round := range 20 {
+		url := fmt.Sprintf("https://a.example/same-%d", round)
+		ids := seed(t, pool, owner, seedArticle{url: url, title: "same", created: base})
+		tags := make([]string, 30)
+		for i := range tags {
+			tags[i] = fmt.Sprintf("s%02d-%02d", round, i)
+		}
+		descending := slices.Clone(tags)
+		slices.Reverse(descending)
+		file := fmt.Sprintf(`<DL><DT><A HREF="%s" TAGS="%s,imported-%d">same</A></DL>`, url, strings.Join(descending, ","), round)
+
+		errs := make(chan error, 2)
+		go func() { _, err := imports.Import(t.Context(), owner, strings.NewReader(file)); errs <- err }()
+		go func() { _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Tags: &tags}); errs <- err }()
+		for range 2 {
+			if err := <-errs; err != nil {
+				t.Fatalf("round %d: %v", round, err)
+			}
+		}
+
+		got, err := svc.Get(t.Context(), owner, ids[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(slugsOf(got), tags) {
+			t.Fatalf("round %d: tags = %v, want exactly the edited set whichever finished first", round, slugsOf(got))
+		}
+	}
+}
+
+// waitForLockWait waits until a session of the test database waits on a lock.
+func waitForLockWait(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		var waiting int
+		if err := pool.QueryRow(t.Context(), `SELECT count(*) FROM pg_stat_activity
+			WHERE datname = current_database() AND wait_event_type = 'Lock'`).Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("no session waited on a lock")
+}
+
+func TestImport_WaitsForATagEditInProgressAndKeepsIt(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
+	ids := seed(t, pool, owner, seedArticle{url: "https://go.dev/blog/", title: "one", created: base})
+
+	// A tag edit that has locked the article, as Update does first, and has
+	// not marked its tags yet.
+	edit, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = edit.Rollback(t.Context()) }()
+	if _, err := edit.Exec(t.Context(), `SELECT 1 FROM articles WHERE id = $1 FOR UPDATE`, ids[0]); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := imports.Import(t.Context(), owner, strings.NewReader(`<DL><DT><A HREF="https://go.dev/blog/" TAGS="go">x</A></DL>`))
+		done <- err
+	}()
+	waitForLockWait(t, pool)
+	if _, err := edit.Exec(t.Context(), `UPDATE articles SET tags_edited_at = now() WHERE id = $1`, ids[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := edit.Commit(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("Import() error: %v", err)
+	}
+
+	got, err := svc.Get(t.Context(), owner, ids[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Tags) != 0 {
+		t.Errorf("tags = %v, want none: the import ran after the edit committed", got.Tags)
 	}
 }

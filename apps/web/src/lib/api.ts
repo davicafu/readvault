@@ -9,6 +9,7 @@ export type Article = {
   canonicalUrl: string;
   title: string;
   titleEditedAt: string | null;
+  tagsEditedAt: string | null;
   folder: string[];
   bookmarkedAt: string | null;
   tags: Tag[];

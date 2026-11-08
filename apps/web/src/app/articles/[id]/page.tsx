@@ -84,6 +84,12 @@ export default async function ArticlePage({ params }: { params: Params }) {
             <dd>Edited by you on {formatDate(a.titleEditedAt)}; imports keep it</dd>
           </div>
         ) : null}
+        {a.tagsEditedAt ? (
+          <div>
+            <dt>Tags</dt>
+            <dd>Edited by you on {formatDate(a.tagsEditedAt)}; imports add none</dd>
+          </div>
+        ) : null}
       </dl>
     </article>
   );

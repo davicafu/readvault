@@ -75,7 +75,7 @@ Until accounts exist, everything belongs to a fixed development owner created by
 - The file is checked first. The preview shows what is new, what is already saved, what repeats inside the file and what cannot be imported, and nothing is written yet.
 - Uploaded files are never stored. Confirming the import uploads the file again.
 - Two bookmarks are the same article when their canonical URL matches: same address, ignoring the host's case, the `#fragment` and known tracking parameters such as `utm_*` and `fbclid`.
-- Importing the same file again creates nothing new. Titles you edited are kept. Missing titles, folders and dates are filled in. Tags are only ever added.
+- Importing the same file again creates nothing new. Titles you edited are kept. Missing titles, folders and dates are filled in. Tags are only ever added, and never to an article whose tags you edited.
 - Only `http` and `https` addresses are imported. `javascript:`, `file:` and others are reported and skipped.
 
 ## Backup and restore

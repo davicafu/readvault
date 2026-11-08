@@ -28,7 +28,7 @@ func NewLibraryRepository(pool *pgxpool.Pool) *LibraryRepository {
 
 // selectArticle reads an article with its tags, sorted by slug, and the
 // title key the title sorts use.
-const selectArticle = `SELECT a.id, a.original_url, a.canonical_url, a.title, a.title_edited_at,
+const selectArticle = `SELECT a.id, a.original_url, a.canonical_url, a.title, a.title_edited_at, a.tags_edited_at,
 	a.original_folder, a.bookmarked_at, a.created_at, a.updated_at,
 	ARRAY(SELECT t.name FROM article_tags at JOIN tags t ON t.id = at.tag_id WHERE at.article_id = a.id ORDER BY t.slug),
 	ARRAY(SELECT t.slug FROM article_tags at JOIN tags t ON t.id = at.tag_id WHERE at.article_id = a.id ORDER BY t.slug),
@@ -128,7 +128,7 @@ func getArticle(ctx context.Context, q querier, userID, articleID string) (libra
 func scanListed(row pgx.CollectableRow) (library.Listed, error) {
 	var l library.Listed
 	var names, slugs []string
-	err := row.Scan(&l.ID, &l.OriginalURL, &l.CanonicalURL, &l.Title, &l.TitleEditedAt,
+	err := row.Scan(&l.ID, &l.OriginalURL, &l.CanonicalURL, &l.Title, &l.TitleEditedAt, &l.TagsEditedAt,
 		&l.Folder, &l.BookmarkedAt, &l.CreatedAt, &l.UpdatedAt, &names, &slugs, &l.TitleKey)
 	if l.Folder == nil {
 		l.Folder = []string{}
@@ -170,6 +170,13 @@ func (r *LibraryRepository) Update(ctx context.Context, userID, articleID string
 			tagsChanged, err := replaceTags(ctx, tx, userID, articleID, *c.Tags)
 			if err != nil {
 				return err
+			}
+			// Only a changed set counts as the user's: the web app sends the
+			// tags with every save, including title-only edits.
+			if tagsChanged {
+				if _, err := tx.Exec(ctx, `UPDATE articles SET tags_edited_at = now() WHERE id = $1`, articleID); err != nil {
+					return fmt.Errorf("marking tags edited: %w", err)
+				}
 			}
 			changed = changed || tagsChanged
 		}

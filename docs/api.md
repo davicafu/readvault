@@ -102,7 +102,7 @@ Rules applied to existing articles:
 
 - A title is filled only when it is empty and the user never edited it.
 - The folder and bookmark date are filled only when missing.
-- Tags are only added, never removed.
+- Tags are only added, never removed, and never to an article whose tags the user edited (`tagsEditedAt`), so a tag the user removed does not come back.
 - The original URL of the first import is kept.
 
 ## Articles
@@ -116,6 +116,7 @@ An article:
   "canonicalUrl": "https://go.dev/blog/",
   "title": "The Go Blog",
   "titleEditedAt": null,
+  "tagsEditedAt": null,
   "folder": ["Bookmarks bar", "Go"],
   "bookmarkedAt": "2023-11-14T22:15:00Z",
   "tags": [{ "name": "go", "slug": "go" }],
@@ -155,7 +156,7 @@ Returns one article, or `404 not_found`.
 Send it as `application/json`. Both fields are optional, but at least one is required. Any other field, such as `originalUrl`, is rejected with `400 invalid_json`, so URLs cannot change here.
 
 - `title` is trimmed and inner spaces collapsed. It must not be empty and can be up to 500 characters. A changed title is marked as edited (`titleEditedAt`), and imports never overwrite it.
-- `tags` replaces the whole tag set: send `[]` to remove every tag. Up to 50 tags of up to 64 characters each. Tags that share a slug are merged, and an existing tag keeps its stored spelling.
+- `tags` replaces the whole tag set: send `[]` to remove every tag. When the set changes, the tags are marked as edited (`tagsEditedAt`), and imports add no tags to the article from then on; sending the same set marks nothing. Up to 50 tags of up to 64 characters each. Tags that share a slug are merged, and an existing tag keeps its stored spelling.
 
 Returns the updated article. Field problem codes: `body/empty`, `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
 
