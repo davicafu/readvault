@@ -294,3 +294,31 @@ func TestGet_ReportsTimesInUTC(t *testing.T) {
 		}
 	}
 }
+
+func TestArticles_ReportTheSavedTextStatus(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	ids := seed(t, pool, owner,
+		seedArticle{url: "https://a.example/1", title: "with text", created: base},
+		seedArticle{url: "https://a.example/2", title: "without text", created: base.Add(time.Hour)},
+	)
+	if _, err := pool.Exec(t.Context(), `INSERT INTO article_contents (article_id, user_id, status, source, markdown, words)
+		VALUES ($1, $2, 'incomplete', 'fetched', 'start', 1)`, ids[0], owner); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := svc.List(t.Context(), owner, library.ListParams{Sort: "created_asc"})
+	if err != nil || len(page.Items) != 2 {
+		t.Fatalf("List() = %+v, %v", page, err)
+	}
+	if s := page.Items[0].ContentStatus; s == nil || *s != "incomplete" {
+		t.Errorf("first article contentStatus = %v, want incomplete", s)
+	}
+	if s := page.Items[1].ContentStatus; s != nil {
+		t.Errorf("second article contentStatus = %q, want nil", *s)
+	}
+	got, err := svc.Get(t.Context(), owner, ids[0])
+	if err != nil || got.ContentStatus == nil || *got.ContentStatus != "incomplete" {
+		t.Errorf("Get() contentStatus = %v, %v", got.ContentStatus, err)
+	}
+}

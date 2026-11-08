@@ -30,6 +30,7 @@ func NewLibraryRepository(pool *pgxpool.Pool) *LibraryRepository {
 // title key the title sorts use.
 const selectArticle = `SELECT a.id, a.original_url, a.canonical_url, a.title, a.title_edited_at, a.tags_edited_at,
 	a.original_folder, a.bookmarked_at, a.created_at, a.updated_at,
+	(SELECT c.status FROM article_contents c WHERE c.article_id = a.id),
 	ARRAY(SELECT t.name FROM article_tags at JOIN tags t ON t.id = at.tag_id WHERE at.article_id = a.id ORDER BY t.slug),
 	ARRAY(SELECT t.slug FROM article_tags at JOIN tags t ON t.id = at.tag_id WHERE at.article_id = a.id ORDER BY t.slug),
 	lower(a.title)
@@ -129,7 +130,7 @@ func scanListed(row pgx.CollectableRow) (library.Listed, error) {
 	var l library.Listed
 	var names, slugs []string
 	err := row.Scan(&l.ID, &l.OriginalURL, &l.CanonicalURL, &l.Title, &l.TitleEditedAt, &l.TagsEditedAt,
-		&l.Folder, &l.BookmarkedAt, &l.CreatedAt, &l.UpdatedAt, &names, &slugs, &l.TitleKey)
+		&l.Folder, &l.BookmarkedAt, &l.CreatedAt, &l.UpdatedAt, &l.ContentStatus, &names, &slugs, &l.TitleKey)
 	if l.Folder == nil {
 		l.Folder = []string{}
 	}

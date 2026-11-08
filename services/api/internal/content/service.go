@@ -1,0 +1,235 @@
+package content
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"path"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+	"unicode/utf8"
+)
+
+// Limits on what an article may hold. They bound memory per request and the
+// size of the database.
+const (
+	maxImages          = 30
+	maxImageBytes      = 5 << 20
+	maxTotalImageBytes = 30 << 20
+	imageWorkers       = 4
+
+	pageTimeout   = 10 * time.Second
+	imagesTimeout = 15 * time.Second
+)
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// storableImageTypes are sniffed from the bytes, never taken from the
+// server's header. SVG is left out: it can carry scripts.
+var storableImageTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true}
+
+// Service saves the text and images of articles.
+type Service struct {
+	repo         Repository
+	fetcher      Fetcher
+	maxPageBytes int64
+}
+
+// NewService returns a Service. maxPageBytes bounds an uploaded file and a
+// downloaded page.
+func NewService(repo Repository, fetcher Fetcher, maxPageBytes int64) *Service {
+	return &Service{repo: repo, fetcher: fetcher, maxPageBytes: maxPageBytes}
+}
+
+// Get returns the saved text of an article.
+func (s *Service) Get(ctx context.Context, userID, articleID string) (Content, error) {
+	if !uuidPattern.MatchString(articleID) {
+		return Content{}, ErrNotFound
+	}
+	return s.repo.Get(ctx, userID, articleID)
+}
+
+// Image returns a stored image of an article.
+func (s *Service) Image(ctx context.Context, userID, articleID, imageID string) (Image, error) {
+	if !uuidPattern.MatchString(articleID) || !uuidPattern.MatchString(imageID) {
+		return Image{}, ErrNotFound
+	}
+	return s.repo.Image(ctx, userID, articleID, imageID)
+}
+
+// Upload saves the text of a file the user chose: HTML is converted to
+// Markdown, Markdown is kept as is. The user picked the file, so the text
+// counts as complete. Body images are downloaded and stored.
+func (s *Service) Upload(ctx context.Context, userID, articleID, fileName string, file io.Reader) (Content, error) {
+	if !uuidPattern.MatchString(articleID) {
+		return Content{}, ErrNotFound
+	}
+	base, err := s.articleBase(ctx, userID, articleID)
+	if err != nil {
+		return Content{}, err
+	}
+	data, err := io.ReadAll(io.LimitReader(file, s.maxPageBytes+1))
+	if err != nil {
+		return Content{}, fmt.Errorf("reading upload: %w", err)
+	}
+	if int64(len(data)) > s.maxPageBytes {
+		return Content{}, ErrTooLarge
+	}
+	data = cleanText(data)
+
+	var ex Extracted
+	source := SourceUploadedMarkdown
+	if isMarkdownFile(fileName, data) {
+		ex = FromMarkdown(string(data), base)
+	} else {
+		source = SourceUploadedHTML
+		if ex, err = FromHTML(bytes.NewReader(data), base); err != nil {
+			return Content{}, err
+		}
+	}
+	if ex.Words == 0 {
+		return Content{}, ErrNoText
+	}
+	return s.save(ctx, userID, articleID, ex, StatusComplete, source)
+}
+
+// Fetch downloads the article from its original URL and saves its text. A
+// page that says it is a paid preview is saved as incomplete. A failed
+// download keeps any saved text, is recorded and is returned as *FetchError.
+func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content, error) {
+	if !uuidPattern.MatchString(articleID) {
+		return Content{}, ErrNotFound
+	}
+	rawURL, err := s.repo.ArticleURL(ctx, userID, articleID)
+	if err != nil {
+		return Content{}, err
+	}
+
+	pageCtx, cancel := context.WithTimeout(ctx, pageTimeout)
+	page, err := s.fetcher.Fetch(pageCtx, rawURL, s.maxPageBytes, []string{"text/html", "application/xhtml+xml"})
+	cancel()
+	var ex Extracted
+	if err == nil {
+		base, _ := url.Parse(page.URL)
+		ex, err = FromHTML(bytes.NewReader(cleanText(page.Body)), base)
+		if err == nil && ex.Words == 0 {
+			err = &FetchError{Problem: ProblemNoText}
+		}
+	}
+	if err != nil {
+		var fe *FetchError
+		if !errors.As(err, &fe) {
+			fe = &FetchError{Problem: ProblemNotHTML, Err: err}
+		}
+		if serr := s.repo.SaveFailure(ctx, userID, articleID, fe.Problem); serr != nil {
+			return Content{}, serr
+		}
+		return Content{}, fe
+	}
+
+	status := StatusComplete
+	if ex.Paywalled {
+		status = StatusIncomplete
+	}
+	return s.save(ctx, userID, articleID, ex, status, SourceFetched)
+}
+
+func (s *Service) articleBase(ctx context.Context, userID, articleID string) (*url.URL, error) {
+	rawURL, err := s.repo.ArticleURL(ctx, userID, articleID)
+	if err != nil {
+		return nil, err
+	}
+	base, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, nil
+	}
+	return base, nil
+}
+
+func (s *Service) save(ctx context.Context, userID, articleID string, ex Extracted, status Status, source Source) (Content, error) {
+	images, missing := s.downloadImages(ctx, ex.Images)
+	return s.repo.Save(ctx, userID, articleID, NewContent{
+		Status: status, Source: source, Markdown: ex.Markdown, Words: ex.Words,
+		Images: images, MissingImages: missing,
+	})
+}
+
+// downloadImages fetches up to maxImages body images with a few workers and
+// keeps those whose bytes are a raster image. It returns them in text order
+// and how many could not be kept. It never fails the save.
+func (s *Service) downloadImages(ctx context.Context, refs []ImageRef) ([]NewImage, int) {
+	missing := 0
+	if len(refs) > maxImages {
+		missing = len(refs) - maxImages
+		refs = refs[:maxImages]
+	}
+	ctx, cancel := context.WithTimeout(ctx, imagesTimeout)
+	defer cancel()
+
+	results := make([]*NewImage, len(refs))
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	for range min(imageWorkers, len(refs)) {
+		wg.Go(func() {
+			for i := range jobs {
+				got, err := s.fetcher.Fetch(ctx, refs[i].URL, maxImageBytes, []string{"image/*", "application/octet-stream", "binary/octet-stream"})
+				if err != nil {
+					continue
+				}
+				if ct := http.DetectContentType(got.Body); storableImageTypes[ct] {
+					results[i] = &NewImage{SourceURL: refs[i].URL, ContentType: ct, Data: got.Body}
+				}
+			}
+		})
+	}
+	for i := range refs {
+		jobs <- i
+	}
+	close(jobs)
+	wg.Wait()
+
+	var images []NewImage
+	total := 0
+	for _, img := range results {
+		if img == nil || total+len(img.Data) > maxTotalImageBytes {
+			missing++
+			continue
+		}
+		total += len(img.Data)
+		images = append(images, *img)
+	}
+	return images, missing
+}
+
+// isMarkdownFile decides by the file name, then by whether the bytes look
+// like an HTML document.
+func isMarkdownFile(name string, data []byte) bool {
+	switch strings.ToLower(path.Ext(name)) {
+	case ".md", ".markdown", ".txt":
+		return true
+	case ".html", ".htm", ".xhtml":
+		return false
+	}
+	head := strings.ToLower(string(data[:min(len(data), 2048)]))
+	for _, tag := range []string{"<!doctype html", "<html", "<body", "<article", "<p>", "<div"} {
+		if strings.Contains(head, tag) {
+			return false
+		}
+	}
+	return true
+}
+
+// cleanText makes text storable in Postgres: invalid UTF-8 becomes U+FFFD
+// and NUL bytes are dropped.
+func cleanText(b []byte) []byte {
+	if utf8.Valid(b) && bytes.IndexByte(b, 0) < 0 {
+		return b
+	}
+	return bytes.ReplaceAll(bytes.ToValidUTF8(b, []byte("�")), []byte{0}, nil)
+}

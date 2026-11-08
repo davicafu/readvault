@@ -43,11 +43,14 @@ type Article struct {
 	// TagsEditedAt is set when the user replaced the tags; imports then add
 	// no tags to the article.
 	TagsEditedAt *time.Time `json:"tagsEditedAt"`
-	Folder       []string   `json:"folder"`
-	BookmarkedAt *time.Time `json:"bookmarkedAt"`
-	Tags         []tag.Tag  `json:"tags"`
-	CreatedAt    time.Time  `json:"createdAt"`
-	UpdatedAt    time.Time  `json:"updatedAt"`
+	// ContentStatus is the state of the saved text: "complete",
+	// "incomplete" or "failed"; nil when no text was saved.
+	ContentStatus *string    `json:"contentStatus"`
+	Folder        []string   `json:"folder"`
+	BookmarkedAt  *time.Time `json:"bookmarkedAt"`
+	Tags          []tag.Tag  `json:"tags"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
 }
 
 // Listed is an article of a list page with the key it was sorted by when
