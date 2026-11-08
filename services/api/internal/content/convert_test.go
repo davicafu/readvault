@@ -147,6 +147,29 @@ func TestFromHTML_KeepsOnlyTheArticleImages(t *testing.T) {
 	}
 }
 
+// Medium pages put the image address only in the <source> of a <picture>;
+// the <img> has no src.
+func TestFromHTML_TakesAPictureImageFromItsSource(t *testing.T) {
+	t.Parallel()
+	page := `<body><article>
+  <p>Intro.</p>
+  <figure><picture>
+    <source srcSet="https://miro.example/fit:640/a.png 640w, https://miro.example/fit:1400/a.png 1400w" type="image/webp">
+    <img alt="Flow" width="700" height="379" loading="eager" role="presentation">
+  </picture></figure>
+</article></body>`
+
+	got := fromHTML(t, page)
+
+	expected := []content.ImageRef{{URL: "https://miro.example/fit:1400/a.png", Alt: "Flow"}}
+	if !slices.Equal(got.Images, expected) {
+		t.Errorf("images = %+v, want %+v", got.Images, expected)
+	}
+	if md := "![Flow](https://miro.example/fit:1400/a.png)"; !strings.Contains(got.Markdown, md) {
+		t.Errorf("markdown lacks %q:\n%s", md, got.Markdown)
+	}
+}
+
 func TestFromHTML_UnsafeLinksBecomeText(t *testing.T) {
 	t.Parallel()
 	got := fromHTML(t, `<article><p><a href="javascript:alert(1)">click</a> and <a href="mailto:a@b.example">mail</a></p></article>`)

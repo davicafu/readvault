@@ -411,12 +411,21 @@ func (c *converter) inline(n *html.Node) string {
 		}
 		return wrapKeepingSpace(inner, "[", "]("+markdownURL(u)+")")
 	case atom.Img:
-		return c.image(n)
+		return c.image(n, "")
 	case atom.Picture:
+		// The <img> may have no address of its own (Medium puts it only in
+		// the <source> elements); the widest source is the fallback.
+		var sources []string
+		walk(n, func(ch *html.Node) {
+			if ch.DataAtom == atom.Source {
+				sources = append(sources, attr(ch, "srcset"))
+			}
+		})
+		fallback := largestFromSrcset(strings.Join(sources, ","))
 		var img string
 		walk(n, func(ch *html.Node) {
 			if ch.DataAtom == atom.Img && img == "" {
-				img = c.image(ch)
+				img = c.image(ch, fallback)
 			}
 		})
 		return img
@@ -427,8 +436,8 @@ func (c *converter) inline(n *html.Node) string {
 
 // image renders an article image and records it. Images without a usable
 // web address, data URIs and small images (icons, avatars, tracking pixels)
-// are left out.
-func (c *converter) image(n *html.Node) string {
+// are left out. fallback is used when the element has no address.
+func (c *converter) image(n *html.Node, fallback string) string {
 	if tooSmall(attr(n, "width")) || tooSmall(attr(n, "height")) {
 		return ""
 	}
@@ -438,6 +447,9 @@ func (c *converter) image(n *html.Node) string {
 	}
 	if src == "" {
 		src = largestFromSrcset(attr(n, "srcset"))
+	}
+	if src == "" {
+		src = fallback
 	}
 	u, ok := absoluteWebURL(c.base, src)
 	if !ok {
