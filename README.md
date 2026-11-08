@@ -51,6 +51,7 @@ Everything is configured with environment variables. `make` reads them from `.en
 | `LOG_LEVEL` | API | `info` | `debug`, `info`, `warn` or `error`; logs are JSON on stdout |
 | `MAX_UPLOAD_BYTES` | API | `10485760` | Largest bookmarks file accepted (10 MiB) |
 | `MAX_IMPORT_RECORDS` | API | `20000` | Most bookmarks accepted in one file |
+| `MAX_ARTICLE_BYTES` | API | `5242880` | Largest article page or Markdown file uploaded or downloaded (5 MiB) |
 | `API_ORIGIN` | Web app | `http://127.0.0.1:8080` | Where the web app's server reaches the API. Read at runtime. Set it when the API is not on port 8080 |
 | `TEST_DATABASE_URL` | Integration tests | `DATABASE_URL` | A server where the tests may create and drop throwaway databases |
 
@@ -77,6 +78,10 @@ Until accounts exist, everything belongs to a fixed development owner created by
 - Two bookmarks are the same article when their canonical URL matches: same address, ignoring the host's case, the `#fragment` and known tracking parameters such as `utm_*` and `fbclid`.
 - Importing the same file again creates nothing new. Titles you edited are kept. Missing titles, folders and dates are filled in. Tags are only ever added, and never to an article whose tags you edited.
 - Only `http` and `https` addresses are imported. `javascript:`, `file:` and others are reported and skipped.
+
+## Article text
+
+Each article can keep its text as Markdown, with the images of its body, for reading later. On the article page, **Download text** fetches it from the article's address; **Upload page** takes an HTML page you saved from your browser, or a Markdown file. When a download fails (Medium refuses servers) or saves only a paid preview, the library and the article page show a warning so you can upload the page instead. Downloads only reach public addresses on ports 80 and 443. See `docs/api.md` for the details.
 
 ## Backup and restore
 

@@ -32,7 +32,7 @@ type importHandler struct {
 }
 
 func (h *importHandler) preview(w http.ResponseWriter, r *http.Request) {
-	file, ok := h.openUpload(w, r)
+	file, _, ok := openUpload(w, r, h.maxBytes, importUpload)
 	if !ok {
 		return
 	}
@@ -45,7 +45,7 @@ func (h *importHandler) preview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *importHandler) run(w http.ResponseWriter, r *http.Request) {
-	file, ok := h.openUpload(w, r)
+	file, _, ok := openUpload(w, r, h.maxBytes, importUpload)
 	if !ok {
 		return
 	}
@@ -57,30 +57,41 @@ func (h *importHandler) run(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, report)
 }
 
-// openUpload streams the "file" part of a multipart form. The file is never
-// buffered to disk: the service reads it once, and nothing uploaded is kept.
-func (h *importHandler) openUpload(w http.ResponseWriter, r *http.Request) (*upload, bool) {
-	r.Body = http.MaxBytesReader(w, r.Body, h.maxBytes+multipartOverhead)
+// uploadKind names what an endpoint receives, for its error messages.
+type uploadKind struct {
+	// noun completes "send the <noun> as multipart/form-data".
+	noun string
+	// tooLarge is the file_too_large message.
+	tooLarge string
+}
+
+var importUpload = uploadKind{noun: "bookmarks file", tooLarge: "the file is larger than an import allows"}
+
+// openUpload streams the "file" part of a multipart form and returns it with
+// the file name the client sent. The file is never buffered to disk: the
+// service reads it once.
+func openUpload(w http.ResponseWriter, r *http.Request, maxBytes int64, kind uploadKind) (*upload, string, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes+multipartOverhead)
 	mr, err := r.MultipartReader()
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_upload", `send the bookmarks file as multipart/form-data in the "file" field`)
-		return nil, false
+		writeError(w, http.StatusBadRequest, "invalid_upload", "send the "+kind.noun+` as multipart/form-data in the "file" field`)
+		return nil, "", false
 	}
 	for parts := 0; ; parts++ {
 		part, err := mr.NextPart()
 		switch {
 		case errors.Is(err, io.EOF) && parts == 0:
 			// No part at all: the body is not the form its header announced.
-			writeError(w, http.StatusBadRequest, "invalid_upload", `send the bookmarks file as multipart/form-data in the "file" field`)
-			return nil, false
+			writeError(w, http.StatusBadRequest, "invalid_upload", "send the "+kind.noun+` as multipart/form-data in the "file" field`)
+			return nil, "", false
 		case errors.Is(err, io.EOF):
 			writeError(w, http.StatusBadRequest, "missing_file", `the form has no "file" field`)
-			return nil, false
+			return nil, "", false
 		case err != nil:
-			h.writeUploadError(w, err)
-			return nil, false
+			writeUploadError(w, err, maxBytes, kind)
+			return nil, "", false
 		case part.FormName() == "file":
-			return &upload{r: io.LimitReader(part, h.maxBytes+1), max: h.maxBytes}, true
+			return &upload{r: io.LimitReader(part, maxBytes+1), max: maxBytes}, part.FileName(), true
 		}
 	}
 }
@@ -93,18 +104,18 @@ func (h *importHandler) fail(w http.ResponseWriter, r *http.Request, file *uploa
 		writeErrorDetails(w, http.StatusUnprocessableEntity, "too_many_records",
 			"the file has more bookmarks than an import allows", map[string]int{"maxRecords": h.maxRecords})
 	case file.err != nil:
-		h.writeUploadError(w, file.err)
+		writeUploadError(w, file.err, h.maxBytes, importUpload)
 	default:
 		h.logger.ErrorContext(r.Context(), "import request failed", slog.String("path", r.URL.Path), slog.String("error", err.Error()))
 		writeError(w, http.StatusInternalServerError, "internal", "the import could not be completed; retry later")
 	}
 }
 
-func (h *importHandler) writeUploadError(w http.ResponseWriter, err error) {
+func writeUploadError(w http.ResponseWriter, err error, maxBytes int64, kind uploadKind) {
 	var maxBytesErr *http.MaxBytesError
 	if errors.Is(err, errFileTooLarge) || errors.As(err, &maxBytesErr) {
 		writeErrorDetails(w, http.StatusRequestEntityTooLarge, "file_too_large",
-			"the file is larger than an import allows", map[string]int64{"maxBytes": h.maxBytes})
+			kind.tooLarge, map[string]int64{"maxBytes": maxBytes})
 		return
 	}
 	writeError(w, http.StatusBadRequest, "invalid_upload", "the uploaded form could not be read")

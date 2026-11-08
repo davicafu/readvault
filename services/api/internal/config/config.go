@@ -17,8 +17,10 @@ type Config struct {
 	LogLevel         slog.Level
 	MaxUploadBytes   int64
 	MaxImportRecords int
-	RequestTimeout   time.Duration
-	ShutdownTimeout  time.Duration
+	// MaxArticleBytes bounds an uploaded article file and a downloaded page.
+	MaxArticleBytes int64
+	RequestTimeout  time.Duration
+	ShutdownTimeout time.Duration
 }
 
 // Load reads the configuration from the environment. DATABASE_URL is required;
@@ -29,6 +31,7 @@ func Load() (Config, error) {
 		HTTPAddr:         envOr("HTTP_ADDR", ":8080"),
 		MaxUploadBytes:   10 << 20,
 		MaxImportRecords: 20_000,
+		MaxArticleBytes:  5 << 20,
 		RequestTimeout:   30 * time.Second,
 		ShutdownTimeout:  15 * time.Second,
 	}
@@ -53,6 +56,14 @@ func Load() (Config, error) {
 			errs = append(errs, fmt.Errorf("MAX_IMPORT_RECORDS must be a positive integer, got %q", v))
 		}
 		cfg.MaxImportRecords = n
+	}
+
+	if v, ok := os.LookupEnv("MAX_ARTICLE_BYTES"); ok {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 {
+			errs = append(errs, fmt.Errorf("MAX_ARTICLE_BYTES must be a positive integer, got %q", v))
+		}
+		cfg.MaxArticleBytes = n
 	}
 
 	if err := errors.Join(errs...); err != nil {

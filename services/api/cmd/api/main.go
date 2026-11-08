@@ -12,9 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"readvault/api/internal/adapter/fetch"
 	apihttp "readvault/api/internal/adapter/http"
 	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/config"
+	"readvault/api/internal/content"
 	"readvault/api/internal/importing"
 	"readvault/api/internal/library"
 )
@@ -51,6 +53,8 @@ func run() error {
 		OwnerID:          postgres.DevOwnerID,
 		MaxUploadBytes:   cfg.MaxUploadBytes,
 		MaxImportRecords: cfg.MaxImportRecords,
+		Content:          content.NewService(postgres.NewContentRepository(pool), fetch.New(fetch.PublicAddr), cfg.MaxArticleBytes),
+		MaxArticleBytes:  cfg.MaxArticleBytes,
 	})
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

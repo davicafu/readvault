@@ -34,6 +34,11 @@ type Deps struct {
 	// MaxImportRecords is the record limit the import service enforces,
 	// reported back to clients that exceed it.
 	MaxImportRecords int
+
+	// Content serves the article text endpoints; they are not mounted when nil.
+	Content ContentService
+	// MaxArticleBytes bounds an uploaded article page or Markdown file.
+	MaxArticleBytes int64
 }
 
 // NewHandler returns the API router wrapped in the common middleware.
@@ -62,6 +67,13 @@ func NewHandler(deps Deps) http.Handler {
 		mux.HandleFunc("GET /api/articles/{id}", h.get)
 		mux.HandleFunc("PATCH /api/articles/{id}", h.update)
 		mux.HandleFunc("GET /api/export", h.export)
+	}
+	if deps.Content != nil {
+		h := &contentHandler{svc: deps.Content, ownerID: deps.OwnerID, maxBytes: deps.MaxArticleBytes, logger: deps.Logger}
+		mux.HandleFunc("GET /api/articles/{id}/content", h.get)
+		mux.HandleFunc("POST /api/articles/{id}/content", h.upload)
+		mux.HandleFunc("POST /api/articles/{id}/content/fetch", h.fetch)
+		mux.HandleFunc("GET /api/articles/{id}/images/{imageId}", h.image)
 	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "route not found")

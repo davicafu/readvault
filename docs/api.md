@@ -21,12 +21,15 @@ Every error has the same shape:
 | 400 | `invalid_query` | A list parameter is invalid, or the query string is malformed (for example pairs separated by `;`); `details` is a list of field problems |
 | 400 | `invalid_json` | The body is not one JSON object with only the documented fields, spelled exactly (`Title` is not `title`) |
 | 404 | `not_found` | Unknown route, or an article that does not exist for this user (including malformed ids) |
+| 404 | `content_not_found` | No text has been saved for the article yet |
 | 413 | `file_too_large` | The upload is larger than `MAX_UPLOAD_BYTES`; `details.maxBytes` |
 | 413 | `body_too_large` | A JSON body is larger than 64 KiB; `details.maxBytes` |
 | 415 | `unsupported_media_type` | A JSON endpoint received a body whose `Content-Type` is not `application/json` |
 | 422 | `too_many_records` | The file has more bookmarks than `MAX_IMPORT_RECORDS`; `details.maxRecords` |
+| 422 | `no_text` | An uploaded article file holds no text |
 | 422 | `validation_failed` | An article edit is invalid; `details` is a list of field problems |
 | 500 | `internal` | Anything unexpected; retry later |
+| 502 | `fetch_failed` | The article could not be downloaded from its URL; `details.problem` says why (see Article text) |
 | 503 | `timeout` | The request took longer than the server's request timeout |
 
 A field problem is `{ "field": "limit", "code": "out_of_range", "message": "limit must be between 1 and 100" }`.
@@ -117,6 +120,7 @@ An article:
   "title": "The Go Blog",
   "titleEditedAt": null,
   "tagsEditedAt": null,
+  "contentStatus": "complete",
   "folder": ["Bookmarks bar", "Go"],
   "bookmarkedAt": "2023-11-14T22:15:00Z",
   "tags": [{ "name": "go", "slug": "go" }],
@@ -160,6 +164,54 @@ Send it as `application/json`. Both fields are optional, but at least one is req
 
 Returns the updated article. Field problem codes: `body/empty`, `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
 
+## Article text
+
+An article can keep its text as Markdown, with the images of its body. The text comes from the article's own URL or from a file the user uploads. `contentStatus` on an article is `complete`, `incomplete` (the page said it is a paid preview), `failed` (the download failed and no text was saved yet) or `null` (nothing tried yet). The web app warns about `incomplete` and `failed` so the user can upload the page.
+
+### `GET /api/articles/{id}/content`
+
+```json
+{
+  "articleId": "ad28cff6-c943-4457-ae8c-ea9097845a5c",
+  "status": "complete",
+  "source": "uploaded_html",
+  "markdown": "# Pipelines\n\nGo's concurrency primitives ...\n\n![Diagram](https://cdn.example/diagram.png)\n",
+  "words": 3005,
+  "problem": null,
+  "images": [{ "id": "5b0b0c43-3a43-4f3e-9d0a-8f2b8f6f2f10", "sourceUrl": "https://cdn.example/diagram.png" }],
+  "missingImages": 0,
+  "savedAt": "2026-11-08T13:12:46Z"
+}
+```
+
+`source` is `fetched`, `uploaded_html` or `uploaded_markdown`. The Markdown keeps the original image addresses; `images` maps each one to a stored copy. `missingImages` counts body images that could not be stored. `problem` is the code of the last failed download, also when older text was kept. `404 content_not_found` when nothing was saved.
+
+### `POST /api/articles/{id}/content`
+
+Saves the text of a file the user chose, sent as `multipart/form-data` in the `file` field: an HTML page (for example one saved from the browser) or a Markdown file (`.md`, `.markdown`, `.txt`). HTML is reduced to the article body (the `<article>` element, or the block with the most paragraph text) and converted to Markdown; navigation, scripts, forms and small images (avatars, icons, tracking pixels) are left out. Markdown is kept as is. The text counts as `complete` and replaces any saved text and images. Up to `MAX_ARTICLE_BYTES` (default 5 MiB): `413 file_too_large`; no text: `422 no_text`.
+
+### `POST /api/articles/{id}/content/fetch`
+
+Downloads the article from its original URL and saves its text the same way. A page whose schema.org data says `isAccessibleForFree: false`, or that shows Medium's "Member-only story" label, is saved as `incomplete`. On failure the answer is `502 fetch_failed` with `details.problem`:
+
+| Problem | Meaning |
+|---|---|
+| `blocked_address` | The address is not a public `http` or `https` address on port 80 or 443 (private, local and metadata addresses are refused, also after redirects) |
+| `unreachable` | DNS or connection failure, more than 5 redirects, or a redirect to another scheme |
+| `timeout` | No complete answer within 10 s |
+| `http_status` | The site answered with another status; `details.status` holds it (Medium answers 403 to servers) |
+| `not_html` | The answer is not an HTML page |
+| `too_large` | The page is larger than `MAX_ARTICLE_BYTES` |
+| `no_text` | The page holds no article text |
+
+A failed download keeps any saved text. Requests identify themselves as `ReadVault/0.1`.
+
+Images: up to 30 per article, 5 MiB each and 30 MiB in total, downloaded with the same address rules. Only PNG, JPEG, GIF and WebP are kept, recognized from their bytes; SVG and anything else are counted in `missingImages`.
+
+### `GET /api/articles/{id}/images/{imageId}`
+
+Returns a stored image with its type, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox` and `Cache-Control: private, max-age=86400`.
+
 ## Export
 
 ### `GET /api/export`
@@ -174,4 +226,4 @@ Downloads every article of the user, oldest first, as `readvault-export-<date>-<
 }
 ```
 
-`schemaVersion` changes when a field is removed or changes meaning. A new optional field does not change it. The export holds only the current user's articles.
+`schemaVersion` changes when a field is removed or changes meaning. A new optional field does not change it. The export holds only the current user's articles. Saved article text and images are not part of it; the database backup keeps them.
