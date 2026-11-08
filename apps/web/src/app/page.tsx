@@ -4,6 +4,8 @@ import { ApiError, hostname, type Article, type ArticlePage, type Sort } from "@
 import { formatDate } from "@/lib/format";
 import { apiGet } from "@/lib/server-api";
 
+import { AddLink } from "./AddLink";
+
 const PAGE_SIZE = 25;
 
 const sortLabels: Record<Sort, string> = {
@@ -63,6 +65,8 @@ export default async function LibraryPage({ searchParams }: { searchParams: Sear
         <h1 className="page-title">Library</h1>
         <p className="lede">Search by title, address or tag. Select a tag on any article to narrow the list to it.</p>
       </div>
+
+      <AddLink />
 
       <form className="finder" action="/" method="get" role="search">
         <div className="field">

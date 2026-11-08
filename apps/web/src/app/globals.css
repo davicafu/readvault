@@ -793,3 +793,23 @@ a.tag:hover {
   font-family: var(--font-ui);
   font-size: var(--step--1);
 }
+
+/* Add a link */
+
+.add-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  max-width: var(--measure);
+  margin-bottom: 2rem;
+}
+
+.add-link .field {
+  flex: 1 1 18rem;
+}
+
+.add-link .field-error {
+  flex-basis: 100%;
+  margin: 0;
+}
