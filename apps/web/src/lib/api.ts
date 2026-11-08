@@ -10,11 +10,37 @@ export type Article = {
   title: string;
   titleEditedAt: string | null;
   tagsEditedAt: string | null;
+  contentStatus: ContentStatus | null;
   folder: string[];
   bookmarkedAt: string | null;
   tags: Tag[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type ContentStatus = "complete" | "incomplete" | "failed";
+
+export type ArticleContent = {
+  articleId: string;
+  status: ContentStatus;
+  source: "fetched" | "uploaded_html" | "uploaded_markdown";
+  markdown: string;
+  words: number;
+  problem: string | null;
+  images: { id: string; sourceUrl: string }[];
+  missingImages: number;
+  savedAt: string;
+};
+
+// Why a download failed, for people. Keys are the API's problem codes.
+export const downloadProblems: Record<string, string> = {
+  blocked_address: "its address is not a public web address",
+  unreachable: "the site could not be reached",
+  timeout: "the site took too long to answer",
+  http_status: "the site refused to send it to a server",
+  not_html: "the address is not a web page",
+  too_large: "the page is too large",
+  no_text: "the page holds no article text",
 };
 
 export type ArticlePage = { items: Article[]; nextCursor: string | null };

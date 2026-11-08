@@ -143,6 +143,11 @@ function Entry({ article: a, filters }: { article: Article; filters: Filters }) 
         <Link href={`/articles/${a.id}`} className="entry-title">
           {a.title ? a.title : <span className="entry-untitled">Untitled bookmark</span>}
         </Link>
+        {a.contentStatus === "incomplete" ? (
+          <span className="badge badge-warn">Text incomplete</span>
+        ) : a.contentStatus === "failed" ? (
+          <span className="badge badge-bad">Text not downloaded</span>
+        ) : null}
         <div className="entry-facts">
           {a.folder.length > 0 ? (
             <ul className="folder-path" aria-label="Original folder">

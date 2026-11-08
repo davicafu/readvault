@@ -400,6 +400,34 @@ a.tag:hover {
   border-color: var(--bad);
 }
 
+.notice-warn {
+  border-color: var(--warn);
+}
+
+.notice h3 {
+  font-family: var(--font-read);
+  font-size: var(--step-1);
+  margin-bottom: 0.5rem;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 0.6rem;
+  padding: 0.05rem 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--step--1);
+  vertical-align: 0.15em;
+}
+
+.badge-warn {
+  color: var(--warn);
+}
+
+.badge-bad {
+  color: var(--bad);
+}
+
 /* Import */
 
 .steps {
@@ -669,4 +697,99 @@ a.tag:hover {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* Saved article text */
+
+.reading {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.reading-head {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.prose {
+  font-family: var(--font-read);
+  font-size: 1.075rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.prose > * + * {
+  margin-top: 1.1em;
+}
+
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  line-height: 1.3;
+  margin-top: 1.8em;
+}
+
+.prose h2 {
+  font-size: var(--step-2);
+}
+
+.prose h3 {
+  font-size: var(--step-1);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.4em;
+}
+
+.prose li + li {
+  margin-top: 0.3em;
+}
+
+.prose blockquote {
+  margin-left: 0;
+  padding-left: 1rem;
+  border-left: 3px solid var(--rule);
+  color: var(--ink-soft);
+}
+
+.prose pre {
+  overflow-x: auto;
+  padding: 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.prose code {
+  font-size: 0.9em;
+}
+
+.prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.missing-image {
+  display: block;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
 }

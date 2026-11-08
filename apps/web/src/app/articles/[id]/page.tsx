@@ -4,11 +4,12 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { brand } from "@/config/brand";
-import { ApiError, isWebUrl, type Article } from "@/lib/api";
+import { ApiError, isWebUrl, type Article, type ArticleContent } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { apiGet } from "@/lib/server-api";
 
 import { ArticleEditor } from "./ArticleEditor";
+import { ArticleText } from "./ArticleText";
 
 type Params = Promise<{ id: string }>;
 
@@ -27,13 +28,25 @@ const loadArticle = cache(async (id: string): Promise<Loaded> => {
   }
 });
 
+// loadContent returns the saved text, or null when none was saved. Other
+// failures leave the text out; the article itself still shows.
+async function loadContent(id: string): Promise<ArticleContent | null | undefined> {
+  try {
+    return await apiGet<ArticleContent>(`/api/articles/${encodeURIComponent(id)}/content`);
+  } catch (err) {
+    if (err instanceof ApiError && err.code === "content_not_found") return null;
+    return undefined;
+  }
+}
+
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { article } = await loadArticle((await params).id);
   return { title: article ? article.title || "Untitled bookmark" : "Article unavailable" };
 }
 
 export default async function ArticlePage({ params }: { params: Params }) {
-  const { article: a, error } = await loadArticle((await params).id);
+  const { id } = await params;
+  const [{ article: a, error }, content] = await Promise.all([loadArticle(id), loadContent(id)]);
   if (!a) return <ArticleError error={error} />;
 
   return (
@@ -49,6 +62,13 @@ export default async function ArticlePage({ params }: { params: Params }) {
           </a>
         ) : null}
         <ArticleEditor id={a.id} title={a.title} tags={a.tags.map((t) => t.name)} />
+        {content === undefined ? (
+          <p className="field-error" role="alert">
+            The saved text could not be loaded. Reload the page to try again.
+          </p>
+        ) : (
+          <ArticleText articleId={a.id} articleUrl={a.originalUrl} content={content} />
+        )}
       </div>
 
       <dl className="facts">

@@ -5,7 +5,13 @@
 import { apiOrigin } from "@/lib/server-api";
 
 const forwardedRequestHeaders = ["accept", "content-type"];
-const forwardedResponseHeaders = ["content-type", "content-disposition", "x-content-type-options"];
+const forwardedResponseHeaders = [
+  "content-type",
+  "content-disposition",
+  "x-content-type-options",
+  "content-security-policy",
+  "cache-control",
+];
 
 async function proxy(req: Request, { params }: { params: Promise<{ path: string[] }> }): Promise<Response> {
   const { path } = await params;
