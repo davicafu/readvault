@@ -18,6 +18,7 @@ type LibraryService interface {
 	Get(ctx context.Context, userID, articleID string) (library.Article, error)
 	Update(ctx context.Context, userID, articleID string, p library.Patch) (library.Article, error)
 	Export(ctx context.Context, userID string) (library.Export, error)
+	Tags(ctx context.Context, userID string) ([]library.TagCount, error)
 }
 
 type articleHandler struct {
@@ -53,6 +54,16 @@ func (h *articleHandler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, page)
+}
+
+// tags serves GET /api/tags.
+func (h *articleHandler) tags(w http.ResponseWriter, r *http.Request) {
+	tags, err := h.svc.Tags(r.Context(), h.ownerID)
+	if err != nil {
+		h.fail(w, r, err, http.StatusBadRequest, "invalid_query", "the query parameters are not valid")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"tags": tags})
 }
 
 // get serves GET /api/articles/{id}.

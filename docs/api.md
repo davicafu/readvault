@@ -164,6 +164,14 @@ Send it as `application/json`. Both fields are optional, but at least one is req
 
 Returns the updated article. Field problem codes: `body/empty`, `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
 
+### `GET /api/tags`
+
+Returns every tag that has at least one article, with how many articles carry it: most articles first, then by name. Filter the library by a tag with `GET /api/articles?tag=<slug>`.
+
+```json
+{ "tags": [{ "name": "Go", "slug": "go", "articles": 12 }] }
+```
+
 ## Article text
 
 An article can keep its text as Markdown, with the images of its body. The text comes from the article's own URL or from a file the user uploads. `contentStatus` on an article is `complete`, `incomplete` (the page said it is a paid preview), `failed` (the download failed and no text was saved yet) or `null` (nothing tried yet). The web app warns about `incomplete` and `failed` so the user can upload the page.

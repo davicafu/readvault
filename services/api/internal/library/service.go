@@ -91,6 +91,19 @@ func (s *Service) Export(ctx context.Context, userID string) (Export, error) {
 	return Export{SchemaVersion: ExportSchemaVersion, ExportedAt: time.Now().UTC(), Articles: articles}, nil
 }
 
+// Tags lists the user's tags with the number of articles of each, most
+// articles first. Tags without articles are left out.
+func (s *Service) Tags(ctx context.Context, userID string) ([]TagCount, error) {
+	tags, err := s.repo.Tags(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("listing tags: %w", err)
+	}
+	if tags == nil {
+		tags = []TagCount{}
+	}
+	return tags, nil
+}
+
 // Patch is an edit as the client sent it. Nil fields are left as they are.
 type Patch struct {
 	Title *string   `json:"title"`

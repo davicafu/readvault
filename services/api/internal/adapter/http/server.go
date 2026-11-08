@@ -67,6 +67,7 @@ func NewHandler(deps Deps) http.Handler {
 		mux.HandleFunc("GET /api/articles/{id}", h.get)
 		mux.HandleFunc("PATCH /api/articles/{id}", h.update)
 		mux.HandleFunc("GET /api/export", h.export)
+		mux.HandleFunc("GET /api/tags", h.tags)
 	}
 	if deps.Content != nil {
 		h := &contentHandler{svc: deps.Content, ownerID: deps.OwnerID, maxBytes: deps.MaxArticleBytes, logger: deps.Logger}

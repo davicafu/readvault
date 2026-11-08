@@ -24,6 +24,16 @@ type Repository interface {
 	// transaction and returns the result, or ErrNotFound. A changed title
 	// is marked as edited, so imports never overwrite it.
 	Update(ctx context.Context, userID, articleID string, c Change) (Article, error)
+
+	// Tags returns the user's tags that have articles, with how many each
+	// has: most articles first, then by name.
+	Tags(ctx context.Context, userID string) ([]TagCount, error)
+}
+
+// TagCount is a tag and the number of the user's articles that carry it.
+type TagCount struct {
+	tag.Tag
+	Articles int `json:"articles"`
 }
 
 // Change is a validated edit. Nil fields are left as they are; Tags

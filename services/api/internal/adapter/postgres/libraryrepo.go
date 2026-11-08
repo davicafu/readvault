@@ -101,6 +101,27 @@ func (r *LibraryRepository) All(ctx context.Context, userID string) ([]library.A
 	return articles, nil
 }
 
+// Tags implements library.Repository.
+func (r *LibraryRepository) Tags(ctx context.Context, userID string) ([]library.TagCount, error) {
+	rows, err := r.pool.Query(ctx, `SELECT t.name, t.slug, count(*) AS articles
+		FROM tags t JOIN article_tags at ON at.tag_id = t.id
+		WHERE t.user_id = $1
+		GROUP BY t.id
+		ORDER BY articles DESC, lower(t.name), t.slug`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("querying tags: %w", err)
+	}
+	tags, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (library.TagCount, error) {
+		var c library.TagCount
+		err := row.Scan(&c.Name, &c.Slug, &c.Articles)
+		return c, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading tags: %w", err)
+	}
+	return tags, nil
+}
+
 // Get implements library.Repository.
 func (r *LibraryRepository) Get(ctx context.Context, userID, articleID string) (library.Article, error) {
 	return getArticle(ctx, r.pool, userID, articleID)

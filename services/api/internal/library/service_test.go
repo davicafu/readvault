@@ -13,6 +13,7 @@ import (
 
 	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/library"
+	"readvault/api/internal/tag"
 	"readvault/api/internal/testdb"
 )
 
@@ -320,5 +321,46 @@ func TestArticles_ReportTheSavedTextStatus(t *testing.T) {
 	got, err := svc.Get(t.Context(), owner, ids[0])
 	if err != nil || got.ContentStatus == nil || *got.ContentStatus != "incomplete" {
 		t.Errorf("Get() contentStatus = %v, %v", got.ContentStatus, err)
+	}
+}
+
+func TestTags_CountsTheArticlesOfEachTag(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	user, other := newUser(t, pool), newUser(t, pool)
+	seed(t, pool, user,
+		seedArticle{url: "https://a.example/1", title: "one", created: base, tags: []string{"Go", "news"}},
+		seedArticle{url: "https://a.example/2", title: "two", created: base, tags: []string{"Go"}},
+		seedArticle{url: "https://a.example/3", title: "three", created: base, tags: []string{"api"}},
+	)
+	seed(t, pool, other, seedArticle{url: "https://a.example/1", title: "theirs", created: base, tags: []string{"secret", "Go"}})
+	// A tag left without articles after an edit is not listed.
+	if _, err := pool.Exec(t.Context(), `INSERT INTO tags (user_id, name, slug) VALUES ($1, 'orphan', 'orphan')`, user); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := svc.Tags(t.Context(), user)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := []library.TagCount{
+		{Tag: tag.Tag{Name: "Go", Slug: "go"}, Articles: 2},
+		{Tag: tag.Tag{Name: "api", Slug: "api"}, Articles: 1},
+		{Tag: tag.Tag{Name: "news", Slug: "news"}, Articles: 1},
+	}
+	if !slices.Equal(got, expected) {
+		t.Errorf("tags = %+v, want %+v", got, expected)
+	}
+}
+
+func TestTags_EmptyLibraryHasNoTags(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+
+	got, err := svc.Tags(t.Context(), newUser(t, pool))
+
+	if err != nil || got == nil || len(got) != 0 {
+		t.Errorf("tags = %#v, err %v; want an empty, non-nil list", got, err)
 	}
 }

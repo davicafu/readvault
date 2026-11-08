@@ -11,6 +11,7 @@ import (
 
 	apihttp "readvault/api/internal/adapter/http"
 	"readvault/api/internal/library"
+	"readvault/api/internal/tag"
 )
 
 // stubLibrary records the request the handler passed to the library service.
@@ -53,6 +54,14 @@ func (s *stubLibrary) Get(_ context.Context, userID, id string) (library.Article
 		return library.Article{}, s.err
 	}
 	return library.Article{ID: id, Title: "one"}, nil
+}
+
+func (s *stubLibrary) Tags(_ context.Context, userID string) ([]library.TagCount, error) {
+	s.gotUser = userID
+	if s.err != nil {
+		return nil, s.err
+	}
+	return []library.TagCount{{Tag: tag.Tag{Name: "Go", Slug: "go"}, Articles: 2}}, nil
 }
 
 func get(t *testing.T, svc *stubLibrary, target string) *httptest.ResponseRecorder {
@@ -300,5 +309,30 @@ func TestExport_FailureHidesInternalDetails(t *testing.T) {
 	}
 	if rec.Header().Get("Content-Disposition") != "" {
 		t.Error("a failed export must not be offered as a download")
+	}
+}
+
+func TestListTags_ReturnsTheOwnersTagsWithCounts(t *testing.T) {
+	t.Parallel()
+	svc := &stubLibrary{}
+
+	rec := get(t, svc, "/api/tags")
+
+	if rec.Code != http.StatusOK || svc.gotUser != testOwner {
+		t.Fatalf("status = %d user %q; body %s", rec.Code, svc.gotUser, rec.Body.String())
+	}
+	tags, _ := decode(t, rec)["tags"].([]any)
+	first, _ := tags[0].(map[string]any)
+	if len(tags) != 1 || first["name"] != "Go" || first["slug"] != "go" || first["articles"] != float64(2) {
+		t.Errorf("body = %s", rec.Body.String())
+	}
+}
+
+func TestListTags_HidesInternalFailures(t *testing.T) {
+	t.Parallel()
+	rec := get(t, &stubLibrary{err: errors.New("ERROR: boom (SQLSTATE XX000)")}, "/api/tags")
+
+	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "SQLSTATE") {
+		t.Errorf("status = %d; body %s", rec.Code, rec.Body.String())
 	}
 }
