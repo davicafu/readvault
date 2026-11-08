@@ -15,13 +15,12 @@ You need:
 Then:
 
 ```bash
-cp .env.example .env        # then set POSTGRES_PASSWORD in .env
 make dev                    # Postgres, migrations, API on :8080, web app on :3000
 ```
 
 Open http://localhost:3000 and choose **Import bookmarks**. To try it without your own export, import `fixtures/bookmarks.html`.
 
-`make dev` installs the web app's dependencies the first time and stops everything with Ctrl+C. Postgres keeps running in Docker; stop it with `make db-down`. The data stays in the `db-data` volume.
+The first `make` run creates `.env` with a random database password; edit it to change ports or limits (`.env.example` lists every variable). `make dev` checks that Node.js 22 or later comes first on `PATH`, installs the web app's dependencies the first time and stops everything with Ctrl+C. Postgres keeps running in Docker; stop it with `make db-down`. The data stays in the `db-data` volume.
 
 ## Commands
 
@@ -39,7 +38,7 @@ Open http://localhost:3000 and choose **Import bookmarks**. To try it without yo
 
 ## Configuration
 
-Everything is configured with environment variables. `make` reads them from `.env`; `.env` is not committed.
+Everything is configured with environment variables. `make` reads them from `.env` (or the file named by `ENV_FILE`); `.env` is not committed.
 
 | Variable | Used by | Default | Meaning |
 |---|---|---|---|
@@ -105,14 +104,14 @@ The JSON export (**Export JSON** in the web app, or `GET /api/export`) is a read
 
 | Problem | Fix |
 |---|---|
-| `.env not found` | Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD` |
-| `set POSTGRES_PASSWORD in .env` | Same; Compose refuses to start Postgres without a password |
+| `set POSTGRES_PASSWORD in .env` | Add `POSTGRES_PASSWORD` to `.env`, or delete `.env` so `make` creates a new one. Compose refuses to start Postgres without a password |
+| `Node.js 22 or later is required` | An older `node` comes first on `PATH`. Put Node 22 first, for example `export PATH="$HOME/.local/node/bin:$PATH"` in your shell profile |
 | `make db-up` waits forever | Start Docker Desktop. Then check `docker-compose -f deploy/compose.yaml --env-file .env logs db` |
 | `port is already allocated` on 5432 | Another Postgres is running. Set `POSTGRES_PORT=55432` in `.env` and use the same port in `DATABASE_URL` |
 | `address already in use` on 8080 | Set `HTTP_ADDR=:8081` and `API_ORIGIN=http://127.0.0.1:8081` in `.env` |
 | The library says the API is not reachable | The API is not running or `API_ORIGIN` points elsewhere. Check `curl http://localhost:8080/readyz` |
 | `/readyz` answers `unavailable` | The API cannot reach Postgres. Check `DATABASE_URL` and `make db-up` |
 | `password authentication failed` | The volume was created with another password. Use that password, or remove the volume with `docker-compose -f deploy/compose.yaml --env-file .env down -v`. This deletes all data |
-| `npm: command not found` or Node too old | Install Node.js 22 or later and make sure it is on `PATH` |
+| `npm: command not found` | Install Node.js 22 or later and make sure it is on `PATH` |
 | The import says the file is too large | Raise `MAX_UPLOAD_BYTES`, or export a smaller bookmarks folder |
 | Integration tests fail with `TEST_DATABASE_URL (or DATABASE_URL) must be set` | Run them with `make test-integration`, which reads `.env`, or set `TEST_DATABASE_URL` to a database whose user may create databases |
