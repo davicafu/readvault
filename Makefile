@@ -3,7 +3,7 @@
 SHELL := /bin/bash
 COMPOSE := docker-compose -f deploy/compose.yaml --env-file .env
 API_DIR := services/api
-WEB_DIR := services/web
+WEB_DIR := apps/web
 
 # Load .env when present so DATABASE_URL and friends reach the Go commands.
 ifneq (,$(wildcard .env))
@@ -36,29 +36,36 @@ migrate: db-up ## Apply pending database migrations
 migrate-down: db-up ## Roll back the last migration
 	cd $(API_DIR) && go run ./cmd/migrate down
 
+.PHONY: web-install
+web-install: ## Install the web app dependencies from the lockfile
+	cd $(WEB_DIR) && npm ci
+
+$(WEB_DIR)/node_modules:
+	cd $(WEB_DIR) && npm ci
+
 .PHONY: dev
-dev: migrate ## Run Postgres, migrations and the API (and the web app when present)
-	@if [ -d $(WEB_DIR) ]; then \
-		trap 'kill 0' EXIT; \
-		(cd $(API_DIR) && go run ./cmd/api) & \
-		(cd $(WEB_DIR) && npm run dev) & \
-		wait; \
-	else \
-		cd $(API_DIR) && go run ./cmd/api; \
-	fi
+dev: migrate $(WEB_DIR)/node_modules ## Run Postgres, migrations, the API on :8080 and the web app on :3000
+	@trap 'kill 0' EXIT; \
+	(cd $(API_DIR) && go run ./cmd/api) & \
+	(cd $(WEB_DIR) && npm run dev) & \
+	wait
+
+.PHONY: build
+build: $(WEB_DIR)/node_modules ## Build the API binaries and the production web app
+	cd $(API_DIR) && go build -o bin/api ./cmd/api && go build -o bin/migrate ./cmd/migrate
+	cd $(WEB_DIR) && npm run build
 
 .PHONY: test
 test: ## Run unit tests (no database needed)
 	cd $(API_DIR) && go test -race ./...
-	@if [ -d $(WEB_DIR) ]; then cd $(WEB_DIR) && npm test; fi
 
 .PHONY: test-integration
 test-integration: db-up ## Run integration tests against the compose Postgres
 	cd $(API_DIR) && go test -race -tags=integration -p 1 ./...
 
 .PHONY: lint
-lint: ## Check formatting and run static analysis
+lint: $(WEB_DIR)/node_modules ## Check formatting, run static analysis and typecheck the web app
 	@cd $(API_DIR) && test -z "$$(gofmt -l .)" || { gofmt -l .; echo "run gofmt -w"; exit 1; }
 	cd $(API_DIR) && go vet ./... && go vet -tags=integration ./...
 	@if command -v golangci-lint >/dev/null; then cd $(API_DIR) && golangci-lint run ./...; else echo "golangci-lint not installed, skipped"; fi
-	@if [ -d $(WEB_DIR) ]; then cd $(WEB_DIR) && npm run lint && npm run typecheck; fi
+	cd $(WEB_DIR) && npm run typecheck

@@ -21,3 +21,5 @@ next-env.d.ts
 
 # gentle-ai local skill registry (generated, machine-specific paths)
 .atl/
+*.tsbuildinfo
+next-env.d.ts
