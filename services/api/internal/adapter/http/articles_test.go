@@ -119,6 +119,7 @@ func TestArticleEndpoints_MapErrors(t *testing.T) {
 		expectedCode   string
 	}{
 		{"limit is not a number", "/api/articles?limit=ten", nil, http.StatusBadRequest, "invalid_query"},
+		{"semicolon in the query", "/api/articles?q=go;tag=news", nil, http.StatusBadRequest, "invalid_query"},
 		{"invalid list query", "/api/articles?sort=popular", validation, http.StatusBadRequest, "invalid_query"},
 		{"list fails", "/api/articles", errors.New(`ERROR: syntax error at or near "WHERE" (SQLSTATE 42601)`), http.StatusInternalServerError, "internal"},
 		{"article not found", "/api/articles/missing", library.ErrNotFound, http.StatusNotFound, "not_found"},
@@ -202,6 +203,7 @@ func TestPatchArticle_MapsErrors(t *testing.T) {
 	}{
 		{"malformed json", `{"title":`, nil, http.StatusBadRequest, "invalid_json"},
 		{"unknown field", `{"title":"x","originalUrl":"https://evil.example"}`, nil, http.StatusBadRequest, "invalid_json"},
+		{"field name in another case", `{"Title":"x"}`, nil, http.StatusBadRequest, "invalid_json"},
 		{"two json values", `{"title":"x"}{"title":"y"}`, nil, http.StatusBadRequest, "invalid_json"},
 		{"body too large", `{"title":"` + strings.Repeat("a", 70<<10) + `"}`, nil, http.StatusRequestEntityTooLarge, "body_too_large"},
 		{"invalid edit", `{"title":" "}`, validation, http.StatusUnprocessableEntity, "validation_failed"},
@@ -233,6 +235,37 @@ func TestPatchArticle_MapsErrors(t *testing.T) {
 				t.Errorf("body leaks internal details: %s", rec.Body.String())
 			}
 		})
+	}
+}
+
+func TestPatchArticle_RequiresAJSONContentType(t *testing.T) {
+	t.Parallel()
+
+	for _, contentType := range []string{"", "text/plain", "application/x-www-form-urlencoded"} {
+		svc := &stubLibrary{}
+		h := apihttp.NewHandler(apihttp.Deps{Library: svc, OwnerID: testOwner})
+		req := httptest.NewRequest(http.MethodPatch, "/api/articles/a1", strings.NewReader(`{"title":"x"}`))
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnsupportedMediaType {
+			t.Errorf("%q: status = %d, want 415; body %s", contentType, rec.Code, rec.Body.String())
+			continue
+		}
+		if errBody, _ := decode(t, rec)["error"].(map[string]any); errBody["code"] != "unsupported_media_type" {
+			t.Errorf("%q: code = %v, want unsupported_media_type", contentType, errBody["code"])
+		}
+		if svc.gotID != "" {
+			t.Errorf("%q: the service was called", contentType)
+		}
+	}
+
+	rec := patch(t, &stubLibrary{}, "/api/articles/a1", `{"title":"x"}`)
+	if rec.Code != http.StatusOK {
+		t.Errorf("application/json: status = %d, want 200", rec.Code)
 	}
 }
 

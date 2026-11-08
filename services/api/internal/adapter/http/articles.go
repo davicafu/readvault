@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"readvault/api/internal/library"
@@ -27,7 +28,14 @@ type articleHandler struct {
 
 // list serves GET /api/articles?q=&tag=&tag=&sort=&limit=&cursor=
 func (h *articleHandler) list(w http.ResponseWriter, r *http.Request) {
-	v := r.URL.Query()
+	// url.ParseQuery reports what r.URL.Query() silently drops, such as a
+	// pair separated by ";" instead of "&".
+	v, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		writeErrorDetails(w, http.StatusBadRequest, "invalid_query", "the query parameters are not valid",
+			[]library.FieldProblem{{Field: "query", Code: "invalid", Message: `the query string is malformed; separate parameters with "&"`}})
+		return
+	}
 	p := library.ListParams{Search: v.Get("q"), Tags: v["tag"], Sort: v.Get("sort"), Cursor: v.Get("cursor")}
 	if raw := v.Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)

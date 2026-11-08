@@ -185,6 +185,16 @@ function PreviewStep({
         </p>
       </div>
 
+      {t.detected === 0 ? (
+        <div className="notice notice-error" role="alert">
+          <h3>No bookmarks were found in {fileName}</h3>
+          <p>
+            Choose the HTML file your browser exports from its bookmarks manager (Export bookmarks). Other files, and
+            exports with no bookmarks, have nothing to import.
+          </p>
+        </div>
+      ) : null}
+
       <dl className="summary">
         {counts.map(([key, label, n]) => (
           <div key={key}>

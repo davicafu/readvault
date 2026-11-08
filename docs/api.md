@@ -16,13 +16,14 @@ Every error has the same shape:
 
 | Status | Code | When |
 |---|---|---|
-| 400 | `invalid_upload` | The import request is not `multipart/form-data`, or the form cannot be read |
+| 400 | `invalid_upload` | The import request is not `multipart/form-data`, or the form cannot be read or holds no part at all |
 | 400 | `missing_file` | The form has no `file` field |
-| 400 | `invalid_query` | A list parameter is invalid; `details` is a list of field problems |
-| 400 | `invalid_json` | The body is not one JSON object with only the documented fields |
+| 400 | `invalid_query` | A list parameter is invalid, or the query string is malformed (for example pairs separated by `;`); `details` is a list of field problems |
+| 400 | `invalid_json` | The body is not one JSON object with only the documented fields, spelled exactly (`Title` is not `title`) |
 | 404 | `not_found` | Unknown route, or an article that does not exist for this user (including malformed ids) |
 | 413 | `file_too_large` | The upload is larger than `MAX_UPLOAD_BYTES`; `details.maxBytes` |
 | 413 | `body_too_large` | A JSON body is larger than 64 KiB; `details.maxBytes` |
+| 415 | `unsupported_media_type` | A JSON endpoint received a body whose `Content-Type` is not `application/json` |
 | 422 | `too_many_records` | The file has more bookmarks than `MAX_IMPORT_RECORDS`; `details.maxRecords` |
 | 422 | `validation_failed` | An article edit is invalid; `details` is a list of field problems |
 | 500 | `internal` | Anything unexpected; retry later |
@@ -123,7 +124,7 @@ An article:
 }
 ```
 
-`canonicalUrl` identifies the article: the host is lowercased, the fragment and known tracking parameters (`utm_*`, `fbclid`, `gclid` and similar) are removed, and everything else is kept. Tags are sorted by slug; a tag's slug is its lowercase name with spaces turned into hyphens, and it is unique per user.
+Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lowercased, the fragment and known tracking parameters (`utm_*`, `fbclid`, `gclid` and similar) are removed, and everything else is kept. Tags are sorted by slug; a tag's slug is its lowercase name with spaces turned into hyphens, and it is unique per user.
 
 ### `GET /api/articles`
 
@@ -151,7 +152,7 @@ Returns one article, or `404 not_found`.
 { "title": "My title", "tags": ["go", "Concurrency"] }
 ```
 
-Both fields are optional, but at least one is required. Any other field, such as `originalUrl`, is rejected with `400 invalid_json`, so URLs cannot change here.
+Send it as `application/json`. Both fields are optional, but at least one is required. Any other field, such as `originalUrl`, is rejected with `400 invalid_json`, so URLs cannot change here.
 
 - `title` is trimmed and inner spaces collapsed. It must not be empty and can be up to 500 characters. A changed title is marked as edited (`titleEditedAt`), and imports never overwrite it.
 - `tags` replaces the whole tag set: send `[]` to remove every tag. Up to 50 tags of up to 64 characters each. Tags that share a slug are merged, and an existing tag keeps its stored spelling.

@@ -152,6 +152,7 @@ func TestImportEndpoints_RejectBadUploads(t *testing.T) {
 		name            string
 		fields          map[string]string
 		rawBody         string
+		rawContentType  string
 		serviceErr      error
 		expectedStatus  int
 		expectedCode    string
@@ -160,6 +161,10 @@ func TestImportEndpoints_RejectBadUploads(t *testing.T) {
 		{name: "file exactly at the size limit", fields: map[string]string{"file": atLimit}, expectedStatus: http.StatusOK},
 		{name: "not a multipart form", rawBody: `{"file":"x"}`, expectedStatus: http.StatusBadRequest, expectedCode: "invalid_upload"},
 		{name: "form without a file", fields: map[string]string{"other": "x"}, expectedStatus: http.StatusBadRequest, expectedCode: "missing_file"},
+		{
+			name: "multipart body without any part", rawBody: "not a form at all", rawContentType: "multipart/form-data; boundary=xyz",
+			expectedStatus: http.StatusBadRequest, expectedCode: "invalid_upload",
+		},
 		{
 			name: "file over the size limit", fields: map[string]string{"file": atLimit + "a"},
 			expectedStatus: http.StatusRequestEntityTooLarge, expectedCode: "file_too_large",
@@ -182,6 +187,9 @@ func TestImportEndpoints_RejectBadUploads(t *testing.T) {
 			t.Run(path+"/"+tt.name, func(t *testing.T) {
 				t.Parallel()
 				body, ct := io.Reader(strings.NewReader(tt.rawBody)), "application/json"
+				if tt.rawContentType != "" {
+					ct = tt.rawContentType
+				}
 				if tt.fields != nil {
 					body, ct = multipartBody(t, tt.fields)
 				}

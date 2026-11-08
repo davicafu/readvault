@@ -66,9 +66,13 @@ func (h *importHandler) openUpload(w http.ResponseWriter, r *http.Request) (*upl
 		writeError(w, http.StatusBadRequest, "invalid_upload", `send the bookmarks file as multipart/form-data in the "file" field`)
 		return nil, false
 	}
-	for {
+	for parts := 0; ; parts++ {
 		part, err := mr.NextPart()
 		switch {
+		case errors.Is(err, io.EOF) && parts == 0:
+			// No part at all: the body is not the form its header announced.
+			writeError(w, http.StatusBadRequest, "invalid_upload", `send the bookmarks file as multipart/form-data in the "file" field`)
+			return nil, false
 		case errors.Is(err, io.EOF):
 			writeError(w, http.StatusBadRequest, "missing_file", `the form has no "file" field`)
 			return nil, false

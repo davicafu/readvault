@@ -12,23 +12,29 @@ import { ArticleEditor } from "./ArticleEditor";
 
 type Params = Promise<{ id: string }>;
 
-// Metadata and the page share one request per render.
-const loadArticle = cache(async (id: string): Promise<Article> => {
+type Loaded = { article: Article; error?: never } | { article?: never; error: ApiError };
+
+// Metadata and the page share one request per render. A missing article is a
+// 404 page; any other failure is shown on the page instead of a server error.
+const loadArticle = cache(async (id: string): Promise<Loaded> => {
   try {
-    return await apiGet<Article>(`/api/articles/${encodeURIComponent(id)}`);
+    return { article: await apiGet<Article>(`/api/articles/${encodeURIComponent(id)}`) };
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) notFound();
-    throw err;
+    return {
+      error: err instanceof ApiError ? err : new ApiError(0, "unreachable", "The ReadVault API is not reachable."),
+    };
   }
 });
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const article = await loadArticle((await params).id);
-  return { title: article.title || "Untitled bookmark" };
+  const { article } = await loadArticle((await params).id);
+  return { title: article ? article.title || "Untitled bookmark" : "Article unavailable" };
 }
 
 export default async function ArticlePage({ params }: { params: Params }) {
-  const a = await loadArticle((await params).id);
+  const { article: a, error } = await loadArticle((await params).id);
+  if (!a) return <ArticleError error={error} />;
 
   return (
     <article className="article">
@@ -80,5 +86,21 @@ export default async function ArticlePage({ params }: { params: Params }) {
         ) : null}
       </dl>
     </article>
+  );
+}
+
+function ArticleError({ error }: { error: ApiError }) {
+  return (
+    <section className="notice notice-error" role="alert">
+      <h2>The article could not be loaded</h2>
+      <p>
+        {error.code === "unreachable"
+          ? `The ${brand.name} API is not running or not reachable. Start it with make dev and reload this page.`
+          : "The server could not answer this time. Reload the page to try again."}
+      </p>
+      <Link className="button button-quiet" href="/">
+        Back to the library
+      </Link>
+    </section>
   );
 }

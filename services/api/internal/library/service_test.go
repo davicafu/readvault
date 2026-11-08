@@ -278,3 +278,19 @@ func TestGet_ReturnsTheArticleWithTagsAndProvenance(t *testing.T) {
 		}
 	}
 }
+
+func TestGet_ReportsTimesInUTC(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	ids := seed(t, pool, owner, seedArticle{url: "https://a.example/1", title: "one", created: base})
+
+	got, err := svc.Get(t.Context(), owner, ids[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, ts := range map[string]time.Time{"createdAt": got.CreatedAt, "updatedAt": got.UpdatedAt} {
+		if ts.Location() != time.UTC {
+			t.Errorf("%s = %s, want UTC whatever the process time zone", name, ts)
+		}
+	}
+}
