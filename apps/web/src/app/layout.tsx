@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <Link href="/">Library</Link>
                 </li>
                 <li>
-                  <Link href="/import">Import bookmarks</Link>
+                  <Link href="/add">Add articles</Link>
                 </li>
                 <li>
                   <a href="/api/export" download>

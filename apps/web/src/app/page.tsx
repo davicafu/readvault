@@ -1,10 +1,8 @@
 import Link from "next/link";
 
-import { ApiError, hostname, type Article, type ArticlePage, type Sort } from "@/lib/api";
+import { ApiError, hostname, type Article, type ArticlePage, type Sort, type TagCount } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { apiGet } from "@/lib/server-api";
-
-import { AddLink } from "./AddLink";
 
 const PAGE_SIZE = 25;
 
@@ -51,29 +49,38 @@ export default async function LibraryPage({ searchParams }: { searchParams: Sear
   for (const t of filters.tags) qs.append("tag", t);
   if (filters.cursor) qs.set("cursor", filters.cursor);
 
-  let page: ArticlePage | null = null;
-  let failure: ApiError | null = null;
-  try {
-    page = await apiGet<ArticlePage>(`/api/articles?${qs}`);
-  } catch (err) {
-    failure = err instanceof ApiError ? err : new ApiError(0, "unreachable", "The ReadVault API is not reachable.");
-  }
+  // The tag panel is optional: the list still shows when tags fail to load.
+  const [listed, tagList] = await Promise.allSettled([
+    apiGet<ArticlePage>(`/api/articles?${qs}`),
+    apiGet<{ tags: TagCount[] }>("/api/tags"),
+  ]);
+  const page = listed.status === "fulfilled" ? listed.value : null;
+  const failure =
+    listed.status === "fulfilled"
+      ? null
+      : listed.reason instanceof ApiError
+        ? listed.reason
+        : new ApiError(0, "unreachable", "The ReadVault API is not reachable.");
+  const tags = tagList.status === "fulfilled" ? tagList.value.tags : [];
 
   return (
     <>
-      <div className="page-head">
-        <h1 className="page-title">Library</h1>
-        <p className="lede">Search by title, address or tag. Select a tag on any article to narrow the list to it.</p>
-      </div>
-
-      <AddLink />
-
+      <h1 className="visually-hidden">Library</h1>
       <form className="finder" action="/" method="get" role="search">
         <div className="field">
           <label className="field-label" htmlFor="q">
-            Search
+            Search your library
           </label>
-          <input className="input" id="q" name="q" type="search" defaultValue={filters.q} maxLength={200} />
+          <input
+            className="input input-search"
+            id="q"
+            name="q"
+            type="search"
+            placeholder="Title, address or tag"
+            defaultValue={filters.q}
+            maxLength={200}
+            autoFocus={!filtered}
+          />
         </div>
         <div className="field">
           <label className="field-label" htmlFor="sort">
@@ -110,32 +117,68 @@ export default async function LibraryPage({ searchParams }: { searchParams: Sear
         </div>
       ) : null}
 
-      {failure ? (
-        <LibraryError error={failure} firstPage={libraryHref(filters)} />
-      ) : page && page.items.length === 0 ? (
-        <EmptyLibrary filtered={filtered} clearHref={libraryHref({ ...filters, q: "", tags: [] })} />
-      ) : page ? (
-        <>
-          <ol className="shelf">
-            {page.items.map((a) => (
-              <Entry key={a.id} article={a} filters={filters} />
-            ))}
-          </ol>
-          <nav className="pager" aria-label="Pages">
-            {filters.cursor ? (
-              <Link className="button button-quiet" href={libraryHref(filters)}>
-                First page
-              </Link>
-            ) : null}
-            {page.nextCursor ? (
-              <Link className="button button-quiet" href={libraryHref(filters, { cursor: page.nextCursor })}>
-                Next page
-              </Link>
-            ) : null}
-          </nav>
-        </>
-      ) : null}
+      <div className="library">
+        <div className="library-results">
+          {failure ? (
+            <LibraryError error={failure} firstPage={libraryHref(filters)} />
+          ) : page && page.items.length === 0 ? (
+            <EmptyLibrary filtered={filtered} clearHref={libraryHref({ ...filters, q: "", tags: [] })} />
+          ) : page ? (
+            <>
+              <ol className="shelf">
+                {page.items.map((a) => (
+                  <Entry key={a.id} article={a} filters={filters} />
+                ))}
+              </ol>
+              <nav className="pager" aria-label="Pages">
+                {filters.cursor ? (
+                  <Link className="button button-quiet" href={libraryHref(filters)}>
+                    First page
+                  </Link>
+                ) : null}
+                {page.nextCursor ? (
+                  <Link className="button button-quiet" href={libraryHref(filters, { cursor: page.nextCursor })}>
+                    Next page
+                  </Link>
+                ) : null}
+              </nav>
+            </>
+          ) : null}
+        </div>
+        {tags.length > 0 ? <TagPanel tags={tags} filters={filters} /> : null}
+      </div>
     </>
+  );
+}
+
+// TagPanel lists every tag with its number of articles. Selecting a tag adds
+// it to the filters; selecting a selected tag removes it.
+function TagPanel({ tags, filters }: { tags: TagCount[]; filters: Filters }) {
+  return (
+    <nav className="tag-panel" aria-labelledby="tag-panel-heading">
+      <h2 id="tag-panel-heading">Tags</h2>
+      <ul>
+        {tags.map((t) => {
+          const selected = filters.tags.includes(t.slug);
+          return (
+            <li key={t.slug}>
+              <Link
+                href={libraryHref(filters, {
+                  tags: selected ? filters.tags.filter((x) => x !== t.slug) : [...filters.tags, t.slug],
+                })}
+                aria-current={selected ? "true" : undefined}
+              >
+                <span className="tag-panel-name">{t.name}</span>
+                <span className="tag-panel-count">
+                  {t.articles}
+                  <span className="visually-hidden"> {t.articles === 1 ? "article" : "articles"}</span>
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
 
@@ -200,9 +243,9 @@ function EmptyLibrary({ filtered, clearHref }: { filtered: boolean; clearHref: s
   return (
     <section className="notice">
       <h2>Your library is empty</h2>
-      <p>Export your bookmarks from Chrome, Firefox, Safari or Edge as an HTML file, then import it here.</p>
-      <Link className="button" href="/import">
-        Import bookmarks
+      <p>Save a link, or export your bookmarks from Chrome, Firefox, Safari or Edge as an HTML file and import them.</p>
+      <Link className="button" href="/add">
+        Add articles
       </Link>
     </section>
   );

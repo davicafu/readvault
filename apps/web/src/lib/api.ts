@@ -3,6 +3,9 @@
 
 export type Tag = { name: string; slug: string };
 
+/** A tag with the number of articles that carry it (GET /api/tags). */
+export type TagCount = Tag & { articles: number };
+
 export type Article = {
   id: string;
   originalUrl: string;

@@ -58,7 +58,7 @@ export function AddLink() {
     <form className="add-link" onSubmit={submit}>
       <div className="field">
         <label className="field-label" htmlFor="add-url">
-          Add a link
+          Address
         </label>
         <input
           id="add-url"
