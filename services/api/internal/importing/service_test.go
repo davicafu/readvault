@@ -250,3 +250,46 @@ func TestImport_ConcurrentImportsDoNotDuplicate(t *testing.T) {
 		t.Errorf("article_tags = %d, want 2", n)
 	}
 }
+
+func TestImport_RepairsInvalidTextInsteadOfFailingTheBatch(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	// Latin-1 bytes (\xe9) and a NUL byte, as old browser exports can hold.
+	file := "<DL><p>" +
+		`<DT><A HREF="https://example.org/l1">Good</A>` +
+		"<DT><A HREF=\"https://example.org/l2\">Caf\xe9 latin1</A>" +
+		"<DT><A HREF=\"https://example.org/l3\" TAGS=\"r\xe9sum\xe9\">t</A>" +
+		"<DT><A HREF=\"https://example.org/l4\">nul\x00title</A>" +
+		"</DL>"
+
+	preview, err := svc.Preview(t.Context(), owner, strings.NewReader(file))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var repaired []int
+	for _, c := range preview.Candidates {
+		for _, w := range c.Warnings {
+			if w.Code == "text_repaired" {
+				repaired = append(repaired, c.Position)
+			}
+		}
+	}
+	if !slices.Equal(repaired, []int{2, 3, 4}) {
+		t.Errorf("text_repaired warnings on %v, want [2 3 4]", repaired)
+	}
+
+	report, err := svc.Import(t.Context(), owner, strings.NewReader(file))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expected := (importing.ReportTotals{Inserted: 4}); report.Totals != expected {
+		t.Errorf("totals = %+v, want %+v", report.Totals, expected)
+	}
+	var title string
+	if err := pool.QueryRow(t.Context(), `SELECT title FROM articles WHERE canonical_url = 'https://example.org/l2'`).Scan(&title); err != nil {
+		t.Fatal(err)
+	}
+	if title != "Caf� latin1" {
+		t.Errorf("title = %q, want the invalid byte replaced", title)
+	}
+}

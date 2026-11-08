@@ -36,7 +36,7 @@ func (h *articleHandler) list(w http.ResponseWriter, r *http.Request) {
 				[]library.FieldProblem{{Field: "limit", Code: "invalid", Message: "limit must be a whole number"}})
 			return
 		}
-		p.Limit = n
+		p.Limit = &n
 	}
 
 	page, err := h.svc.List(r.Context(), h.ownerID, p)

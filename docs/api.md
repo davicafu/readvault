@@ -58,8 +58,8 @@ curl -F file=@fixtures/bookmarks.html http://localhost:8080/api/imports/preview
     {
       "position": 1,
       "status": "valid",
-      "originalUrl": "https://medium.com/@example/understanding-go-interfaces-1a2b3c4d5e6f?source=rss&utm_source=newsletter",
-      "canonicalUrl": "https://medium.com/@example/understanding-go-interfaces-1a2b3c4d5e6f?source=rss",
+      "originalUrl": "https://medium.com/@example/understanding-go-interfaces-1a2b3c4d5e6f?source=rss----5517fd7b58a6---4&utm_source=newsletter&utm_medium=email",
+      "canonicalUrl": "https://medium.com/@example/understanding-go-interfaces-1a2b3c4d5e6f?source=rss----5517fd7b58a6---4",
       "title": "Understanding Go interfaces",
       "folder": ["Bookmarks bar", "Reading", "Go"],
       "tags": ["go", "interfaces"],
@@ -79,7 +79,7 @@ curl -F file=@fixtures/bookmarks.html http://localhost:8080/api/imports/preview
 | `duplicate_in_file` | Its canonical URL appears earlier in the file; the first one wins |
 | `invalid` | It cannot be imported; see `errors` |
 
-Error codes: `missing_url`, `url_too_long` (over 2,048 bytes), `unsupported_scheme` (anything but http and https), `invalid_url`. Warning codes: `duplicate_in_file`, `missing_title`, `title_truncated` (over 500 characters), `tag_too_long` (over 64 characters; the tag is skipped).
+Error codes: `missing_url`, `url_too_long` (over 2,048 bytes), `unsupported_scheme` (anything but http and https), `invalid_url`. Warning codes: `duplicate_in_file`, `missing_title`, `title_truncated` (over 500 characters), `tag_too_long` (over 64 characters; the tag is skipped), `text_repaired` (bytes that are not valid UTF-8, as in exports saved in a legacy encoding, became U+FFFD, and NUL bytes were dropped).
 
 ### `POST /api/imports`
 
@@ -132,14 +132,14 @@ An article:
 | `q` | Matches words of the title and URL, and any part of the title, URL or a tag name. Up to 200 characters |
 | `tag` | Keeps articles that have this tag (name or slug). Repeat it to require several tags, up to 10 |
 | `sort` | `created_desc` (default), `created_asc`, `title_asc`, `title_desc` |
-| `limit` | 1 to 100, default 25 |
+| `limit` | 1 to 100; 25 when absent |
 | `cursor` | The `nextCursor` of the previous page |
 
 ```json
 { "items": [ /* articles */ ], "nextCursor": "eyJzIjoiY3JlYXRlZF9kZXNjIiwiay..." }
 ```
 
-`nextCursor` is `null` on the last page. A cursor only works with the `sort` it came from.
+`nextCursor` is `null` on the last page. A cursor only works with the `sort` it came from. `q` and `tag` must be valid UTF-8 without NUL bytes (`invalid`).
 
 ### `GET /api/articles/{id}`
 
@@ -156,7 +156,7 @@ Both fields are optional, but at least one is required. Any other field, such as
 - `title` is trimmed and inner spaces collapsed. It must not be empty and can be up to 500 characters. A changed title is marked as edited (`titleEditedAt`), and imports never overwrite it.
 - `tags` replaces the whole tag set: send `[]` to remove every tag. Up to 50 tags of up to 64 characters each. Tags that share a slug are merged, and an existing tag keeps its stored spelling.
 
-Returns the updated article. Field problem codes: `body/empty`, `title/required`, `title/too_long`, `tags/empty`, `tags/too_long`, `tags/too_many`.
+Returns the updated article. Field problem codes: `body/empty`, `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
 
 ## Export
 

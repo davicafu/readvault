@@ -35,7 +35,8 @@ type ListParams struct {
 	Search string
 	Tags   []string
 	Sort   string
-	Limit  int
+	// Limit is nil when the client sent none.
+	Limit  *int
 	Cursor string
 }
 
@@ -124,6 +125,8 @@ func parsePatch(p Patch) (Change, error) {
 	if p.Title != nil {
 		title := strings.Join(strings.Fields(*p.Title), " ")
 		switch {
+		case !validText(title):
+			problems = append(problems, FieldProblem{"title", "invalid", "the title must be valid UTF-8 text"})
 		case title == "":
 			problems = append(problems, FieldProblem{"title", "required", "the title cannot be empty"})
 		case utf8.RuneCountInString(title) > maxTitleRunes:
@@ -151,6 +154,9 @@ func parsePatch(p Patch) (Change, error) {
 func parseTags(names []string) ([]tag.Tag, *FieldProblem) {
 	if len(names) > maxArticleTags {
 		return nil, &FieldProblem{"tags", "too_many", fmt.Sprintf("an article can have at most %d tags", maxArticleTags)}
+	}
+	if slices.ContainsFunc(names, func(n string) bool { return !validText(n) }) {
+		return nil, &FieldProblem{"tags", "invalid", "tags must be valid UTF-8 text"}
 	}
 	tags := []tag.Tag{}
 	for _, name := range names {
@@ -210,9 +216,19 @@ func (s *Service) Get(ctx context.Context, userID, articleID string) (Article, e
 
 func parseQuery(p ListParams) (Query, error) {
 	var problems []FieldProblem
-	q := Query{Search: p.Search, Sort: Sort(p.Sort), Limit: p.Limit}
+	q := Query{Search: p.Search, Sort: Sort(p.Sort)}
+	if p.Limit != nil {
+		q.Limit = *p.Limit
+	}
 
-	if utf8.RuneCountInString(q.Search) > maxSearchRunes {
+	if !validText(q.Search) {
+		problems = append(problems, FieldProblem{"q", "invalid", "the search must be valid UTF-8 text"})
+	}
+	if slices.ContainsFunc(p.Tags, func(t string) bool { return !validText(t) }) {
+		problems = append(problems, FieldProblem{"tag", "invalid", "tags must be valid UTF-8 text"})
+	}
+
+	if validText(q.Search) && utf8.RuneCountInString(q.Search) > maxSearchRunes {
 		problems = append(problems, FieldProblem{"q", "too_long", fmt.Sprintf("the search is longer than %d characters", maxSearchRunes)})
 	}
 
@@ -235,7 +251,7 @@ func parseQuery(p ListParams) (Query, error) {
 	}
 
 	switch {
-	case q.Limit == 0:
+	case p.Limit == nil:
 		q.Limit = defaultLimit
 	case q.Limit < 1 || q.Limit > maxLimit:
 		problems = append(problems, FieldProblem{"limit", "out_of_range", fmt.Sprintf("limit must be between 1 and %d", maxLimit)})
@@ -283,4 +299,10 @@ func decodeCursor(raw string) (cursor, bool) {
 		}
 	}
 	return c, true
+}
+
+// validText reports whether s can be stored as Postgres text: valid UTF-8
+// without NUL bytes.
+func validText(s string) bool {
+	return utf8.ValidString(s) && !strings.ContainsRune(s, 0)
 }

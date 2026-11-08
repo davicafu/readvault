@@ -116,6 +116,8 @@ func TestUpdate_RejectsInvalidInputWithoutWriting(t *testing.T) {
 		{"blank tag", library.Patch{Tags: &[]string{"go", " "}}, "tags", "empty"},
 		{"tag too long", library.Patch{Tags: &[]string{strings.Repeat("a", 65)}}, "tags", "too_long"},
 		{"too many tags", library.Patch{Tags: &many}, "tags", "too_many"},
+		{"title with a NUL byte", library.Patch{Title: ptr("a\x00b")}, "title", "invalid"},
+		{"tag with invalid UTF-8", library.Patch{Tags: &[]string{"caf\xe9"}}, "tags", "invalid"},
 	}
 	for _, tt := range tests {
 		_, err := svc.Update(t.Context(), owner, ids[0], tt.patch)

@@ -121,7 +121,7 @@ func TestList_SortsAndPaginatesEveryOrder(t *testing.T) {
 		{"title_desc", []string{"date", "cherry", "banana", "apple", "apple"}},
 	}
 	for _, tt := range tests {
-		got, pages := listAll(t, svc, library.ListParams{Sort: tt.sort, Limit: 2})
+		got, pages := listAll(t, svc, library.ListParams{Sort: tt.sort, Limit: ptr(2)})
 		if pages != 3 || !slices.EqualFunc(got, tt.expected, strings.EqualFold) {
 			t.Errorf("sort %q: %v in %d pages, want %v in 3", tt.sort, got, pages, tt.expected)
 		}
@@ -196,7 +196,7 @@ func TestList_RejectsInvalidParameters(t *testing.T) {
 		seedArticle{url: "https://a.example/1", title: "one", created: base},
 		seedArticle{url: "https://a.example/2", title: "two", created: base.Add(time.Hour)},
 	)
-	first, err := svc.List(t.Context(), owner, library.ListParams{Limit: 1})
+	first, err := svc.List(t.Context(), owner, library.ListParams{Limit: ptr(1)})
 	if err != nil || first.NextCursor == nil {
 		t.Fatalf("first page: %+v, %v", first, err)
 	}
@@ -207,8 +207,12 @@ func TestList_RejectsInvalidParameters(t *testing.T) {
 		field    string
 		expected string
 	}{
-		{"limit too small", library.ListParams{Limit: -1}, "limit", "out_of_range"},
-		{"limit too large", library.ListParams{Limit: 101}, "limit", "out_of_range"},
+		{"limit too small", library.ListParams{Limit: ptr(-1)}, "limit", "out_of_range"},
+		{"limit too large", library.ListParams{Limit: ptr(101)}, "limit", "out_of_range"},
+		{"limit zero", library.ListParams{Limit: ptr(0)}, "limit", "out_of_range"},
+		{"search with a NUL byte", library.ListParams{Search: "go\x00"}, "q", "invalid"},
+		{"search with invalid UTF-8", library.ListParams{Search: "caf\xe9"}, "q", "invalid"},
+		{"tag with invalid UTF-8", library.ListParams{Tags: []string{"r\xe9sum\xe9"}}, "tag", "invalid"},
 		{"unknown sort", library.ListParams{Sort: "popular"}, "sort", "invalid"},
 		{"garbage cursor", library.ListParams{Cursor: "not-a-cursor"}, "cursor", "invalid"},
 		{"cursor of another sort", library.ListParams{Sort: "title_asc", Cursor: *first.NextCursor}, "cursor", "invalid"},

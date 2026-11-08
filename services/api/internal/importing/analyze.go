@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"unicode/utf8"
 
 	"readvault/api/internal/tag"
@@ -29,6 +30,7 @@ func analyze(records []Record) []analyzed {
 	out := make([]analyzed, 0, len(records))
 
 	for _, rec := range records {
+		rec, repaired := repairText(rec)
 		a := analyzed{Candidate: Candidate{
 			Position:    rec.Position,
 			Status:      StatusValid,
@@ -39,6 +41,10 @@ func analyze(records []Record) []analyzed {
 			Errors:      []Problem{},
 			Warnings:    []Problem{},
 		}}
+
+		if repaired {
+			a.Warnings = append(a.Warnings, Problem{Code: "text_repaired", Message: "characters that are not valid text were replaced"})
+		}
 
 		canonical, problem := canonicalize(rec.URL)
 		switch {
@@ -79,6 +85,29 @@ func analyze(records []Record) []analyzed {
 		out = append(out, a)
 	}
 	return out
+}
+
+// repairText makes every text field storable: invalid UTF-8 sequences, as
+// found in exports saved in a legacy encoding, become U+FFFD, and NUL bytes
+// are dropped. It reports whether anything changed.
+func repairText(rec Record) (Record, bool) {
+	changed := false
+	fix := func(s string) string {
+		clean := strings.ReplaceAll(strings.ToValidUTF8(s, "\uFFFD"), "\x00", "")
+		changed = changed || clean != s
+		return clean
+	}
+	rec.URL = fix(rec.URL)
+	rec.Title = fix(rec.Title)
+	rec.Folder = slices.Clone(rec.Folder)
+	for i := range rec.Folder {
+		rec.Folder[i] = fix(rec.Folder[i])
+	}
+	rec.Tags = slices.Clone(rec.Tags)
+	for i := range rec.Tags {
+		rec.Tags[i] = fix(rec.Tags[i])
+	}
+	return rec, changed
 }
 
 func canonicalize(raw string) (string, *Problem) {

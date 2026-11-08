@@ -72,9 +72,9 @@ func TestListArticles_PassesTheQueryForTheServerOwner(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d; body %s", rec.Code, rec.Body.String())
 	}
-	expected := library.ListParams{Search: "go blog", Tags: []string{"go", "news"}, Sort: "title_asc", Limit: 10, Cursor: "abc"}
+	expected := library.ListParams{Search: "go blog", Tags: []string{"go", "news"}, Sort: "title_asc", Cursor: "abc"}
 	if p := svc.gotParams; p.Search != expected.Search || !slices.Equal(p.Tags, expected.Tags) ||
-		p.Sort != expected.Sort || p.Limit != expected.Limit || p.Cursor != expected.Cursor {
+		p.Sort != expected.Sort || p.Limit == nil || *p.Limit != 10 || p.Cursor != expected.Cursor {
 		t.Errorf("params = %+v, want %+v", p, expected)
 	}
 	if svc.gotUser != testOwner {
@@ -85,6 +85,27 @@ func TestListArticles_PassesTheQueryForTheServerOwner(t *testing.T) {
 		t.Errorf("body = %s", rec.Body.String())
 	}
 }
+
+func TestListArticles_PassesAnExplicitZeroLimitAndOmitsAnAbsentOne(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		target   string
+		expected *int
+	}{
+		{"/api/articles?limit=0", ptrInt(0)},
+		{"/api/articles", nil},
+		{"/api/articles?limit=", nil},
+	}
+	for _, tt := range tests {
+		svc := &stubLibrary{}
+		get(t, svc, tt.target)
+		if got := svc.gotParams.Limit; (got == nil) != (tt.expected == nil) || (got != nil && *got != *tt.expected) {
+			t.Errorf("%s: limit = %v, want %v", tt.target, got, tt.expected)
+		}
+	}
+}
+
+func ptrInt(n int) *int { return &n }
 
 func TestArticleEndpoints_MapErrors(t *testing.T) {
 	t.Parallel()
