@@ -19,6 +19,9 @@ import (
 // Limits on what an article may hold. They bound memory per request and the
 // size of the database.
 const (
+	// maxMarkdownBytes and maxImageURLBytes match the database constraints.
+	maxMarkdownBytes   = 5 << 20
+	maxImageURLBytes   = 4096
 	maxImages          = 30
 	maxImageBytes      = 5 << 20
 	maxTotalImageBytes = 30 << 20
@@ -96,6 +99,11 @@ func (s *Service) Upload(ctx context.Context, userID, articleID, fileName string
 	if ex.Words == 0 {
 		return Content{}, ErrNoText
 	}
+	// Repaired text can be larger than the file: each invalid byte becomes
+	// a three-byte U+FFFD.
+	if len(ex.Markdown) > maxMarkdownBytes {
+		return Content{}, ErrTooLarge
+	}
 	return s.save(ctx, userID, articleID, ex, StatusComplete, source)
 }
 
@@ -115,18 +123,22 @@ func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content,
 	page, err := s.fetcher.Fetch(pageCtx, rawURL, s.maxPageBytes, []string{"text/html", "application/xhtml+xml"})
 	cancel()
 	var ex Extracted
-	if err == nil {
+	var fe *FetchError
+	if err != nil {
+		fe = asFetchError(err)
+	} else {
 		base, _ := url.Parse(page.URL)
 		ex, err = FromHTML(bytes.NewReader(cleanText(page.Body)), base)
-		if err == nil && ex.Words == 0 {
-			err = &FetchError{Problem: ProblemNoText}
+		switch {
+		case err != nil:
+			fe = &FetchError{Problem: ProblemNotHTML, Err: err}
+		case ex.Words == 0:
+			fe = &FetchError{Problem: ProblemNoText}
+		case len(ex.Markdown) > maxMarkdownBytes:
+			fe = &FetchError{Problem: ProblemTooLarge}
 		}
 	}
-	if err != nil {
-		var fe *FetchError
-		if !errors.As(err, &fe) {
-			fe = &FetchError{Problem: ProblemNotHTML, Err: err}
-		}
+	if fe != nil {
 		if serr := s.repo.SaveFailure(ctx, userID, articleID, fe.Problem); serr != nil {
 			return Content{}, serr
 		}
@@ -138,6 +150,20 @@ func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content,
 		status = StatusIncomplete
 	}
 	return s.save(ctx, userID, articleID, ex, status, SourceFetched)
+}
+
+// asFetchError keeps a *FetchError and classifies any other download error,
+// so a failure is never reported as a problem it is not.
+func asFetchError(err error) *FetchError {
+	var fe *FetchError
+	switch {
+	case errors.As(err, &fe):
+		return fe
+	case errors.Is(err, context.DeadlineExceeded):
+		return &FetchError{Problem: ProblemTimeout, Err: err}
+	default:
+		return &FetchError{Problem: ProblemUnreachable, Err: err}
+	}
 }
 
 func (s *Service) articleBase(ctx context.Context, userID, articleID string) (*url.URL, error) {
@@ -161,47 +187,60 @@ func (s *Service) save(ctx context.Context, userID, articleID string, ex Extract
 }
 
 // downloadImages fetches up to maxImages body images with a few workers and
-// keeps those whose bytes are a raster image. It returns them in text order
-// and how many could not be kept. It never fails the save.
+// keeps those whose bytes are a raster image, within maxTotalImageBytes in
+// all: memory holds at most the kept images plus one download per worker.
+// It returns them in text order and how many could not be kept. It never
+// fails the save.
 func (s *Service) downloadImages(ctx context.Context, refs []ImageRef) ([]NewImage, int) {
 	missing := 0
-	if len(refs) > maxImages {
-		missing = len(refs) - maxImages
-		refs = refs[:maxImages]
+	var usable []ImageRef
+	for _, ref := range refs {
+		if len(ref.URL) > maxImageURLBytes || len(usable) == maxImages {
+			missing++
+			continue
+		}
+		usable = append(usable, ref)
 	}
 	ctx, cancel := context.WithTimeout(ctx, imagesTimeout)
 	defer cancel()
 
-	results := make([]*NewImage, len(refs))
+	results := make([]*NewImage, len(usable))
+	var mu sync.Mutex
+	total := 0
 	jobs := make(chan int)
 	var wg sync.WaitGroup
-	for range min(imageWorkers, len(refs)) {
+	for range min(imageWorkers, len(usable)) {
 		wg.Go(func() {
 			for i := range jobs {
-				got, err := s.fetcher.Fetch(ctx, refs[i].URL, maxImageBytes, []string{"image/*", "application/octet-stream", "binary/octet-stream"})
+				got, err := s.fetcher.Fetch(ctx, usable[i].URL, maxImageBytes, []string{"image/*", "application/octet-stream", "binary/octet-stream"})
 				if err != nil {
 					continue
 				}
-				if ct := http.DetectContentType(got.Body); storableImageTypes[ct] {
-					results[i] = &NewImage{SourceURL: refs[i].URL, ContentType: ct, Data: got.Body}
+				ct := http.DetectContentType(got.Body)
+				if !storableImageTypes[ct] {
+					continue
 				}
+				mu.Lock()
+				if total+len(got.Body) <= maxTotalImageBytes {
+					total += len(got.Body)
+					results[i] = &NewImage{SourceURL: usable[i].URL, ContentType: ct, Data: got.Body}
+				}
+				mu.Unlock()
 			}
 		})
 	}
-	for i := range refs {
+	for i := range usable {
 		jobs <- i
 	}
 	close(jobs)
 	wg.Wait()
 
 	var images []NewImage
-	total := 0
 	for _, img := range results {
-		if img == nil || total+len(img.Data) > maxTotalImageBytes {
+		if img == nil {
 			missing++
 			continue
 		}
-		total += len(img.Data)
 		images = append(images, *img)
 	}
 	return images, missing

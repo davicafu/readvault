@@ -293,3 +293,44 @@ func TestContent_IsScopedToTheUser(t *testing.T) {
 		t.Errorf("Get() without saved text: %v, want ErrNoContent", err)
 	}
 }
+
+func TestUpload_SkipsAnImageWhoseAddressIsTooLongToStore(t *testing.T) {
+	t.Parallel()
+	svc, f, _, id := setup(t)
+	long := "https://cdn.example/" + strings.Repeat("a", 4100) + ".png"
+	f.responses[long] = content.Fetched{ContentType: "image/png", Body: pngBytes(t, 80)}
+
+	got, err := svc.Upload(t.Context(), owner, id, "a.md", strings.NewReader("Text ![x]("+long+")\n"))
+	if err != nil {
+		t.Fatalf("Upload() error: %v, want the text saved without that image", err)
+	}
+	if len(got.Images) != 0 || got.MissingImages != 1 {
+		t.Errorf("images %d missing %d, want 0 and 1", len(got.Images), got.MissingImages)
+	}
+}
+
+func TestUpload_TextTooLargeToStoreIsRejected(t *testing.T) {
+	t.Parallel()
+	pool := testdb.New(t)
+	svc := content.NewService(postgres.NewContentRepository(pool), &fakeFetcher{}, 8<<20)
+	id := newArticle(t, pool, owner, articleURL)
+
+	// 3 MiB where every other byte is invalid become 6 MiB once each one is
+	// U+FFFD: over what the text column holds.
+	_, err := svc.Upload(t.Context(), owner, id, "legacy.md", strings.NewReader("word "+strings.Repeat("\xffa", 3<<19)))
+	if !errors.Is(err, content.ErrTooLarge) {
+		t.Errorf("Upload() error = %v, want ErrTooLarge", err)
+	}
+}
+
+func TestFetch_ClassifiesErrorsThatAreNotFetchErrors(t *testing.T) {
+	t.Parallel()
+	svc, f, _, id := setup(t)
+	f.errs[articleURL] = context.DeadlineExceeded
+
+	_, err := svc.Fetch(t.Context(), owner, id)
+	var fe *content.FetchError
+	if !errors.As(err, &fe) || fe.Problem != content.ProblemTimeout {
+		t.Errorf("Fetch() error = %v, want timeout", err)
+	}
+}
