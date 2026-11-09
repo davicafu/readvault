@@ -18,6 +18,7 @@ ALTER TABLE articles ADD COLUMN collection_id uuid;
 
 -- Deleting a collection leaves its articles without one; it never deletes
 -- them. Only collection_id is cleared: user_id stays.
+-- SET NULL with a column list needs PostgreSQL 15 or later.
 ALTER TABLE articles ADD CONSTRAINT articles_collection_fkey
     FOREIGN KEY (collection_id, user_id) REFERENCES collections (id, user_id)
     ON DELETE SET NULL (collection_id);

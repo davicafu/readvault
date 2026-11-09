@@ -245,3 +245,51 @@ func TestList_FiltersByCollection(t *testing.T) {
 		}
 	}
 }
+
+func TestCollections_RenameChecksTheIDBeforeTheName(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+
+	_, err := svc.RenameCollection(t.Context(), newUser(t, pool), "not-a-uuid", "   ")
+
+	if !errors.Is(err, library.ErrCollectionNotFound) {
+		t.Errorf("err = %v, want ErrCollectionNotFound", err)
+	}
+}
+
+func TestList_ABlankCollectionFilterIsIgnored(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	user := newUser(t, pool)
+	seed(t, pool, user, seedArticle{url: "https://a.example/1", title: "one", created: base})
+
+	page, err := svc.List(t.Context(), user, library.ListParams{Collection: "   "})
+
+	if err != nil || !slices.Equal(titles(page.Items), []string{"one"}) {
+		t.Errorf("items = %v, err %v; want the whole library", titles(page.Items), err)
+	}
+}
+
+func TestExport_IncludesEachArticlesCollection(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	user := newUser(t, pool)
+	ids := seed(t, pool, user,
+		seedArticle{url: "https://a.example/1", title: "filed", created: base},
+		seedArticle{url: "https://a.example/2", title: "loose", created: base.Add(time.Hour)},
+	)
+	reading, _ := svc.CreateCollection(t.Context(), user, "Reading")
+	_, _ = svc.Update(t.Context(), user, ids[0], setCollection(&reading.ID))
+
+	exp, err := svc.Export(t.Context(), user)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := exp.Articles[0].Collection; c == nil || c.ID != reading.ID || c.Name != "Reading" {
+		t.Errorf("filed article collection = %+v", c)
+	}
+	if exp.Articles[1].Collection != nil {
+		t.Errorf("loose article collection = %+v, want nil", exp.Articles[1].Collection)
+	}
+}

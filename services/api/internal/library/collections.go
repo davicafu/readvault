@@ -73,12 +73,12 @@ func (s *Service) CreateCollection(ctx context.Context, userID, name string) (Co
 
 // RenameCollection renames one of the user's collections.
 func (s *Service) RenameCollection(ctx context.Context, userID, collectionID, name string) (Collection, error) {
+	if !uuidPattern.MatchString(collectionID) {
+		return Collection{}, ErrCollectionNotFound
+	}
 	n, err := parseCollectionName(name)
 	if err != nil {
 		return Collection{}, err
-	}
-	if !uuidPattern.MatchString(collectionID) {
-		return Collection{}, ErrCollectionNotFound
 	}
 	c, err := s.repo.RenameCollection(ctx, userID, collectionID, n)
 	if err != nil && !errors.Is(err, ErrCollectionNotFound) && !errors.Is(err, ErrCollectionExists) {

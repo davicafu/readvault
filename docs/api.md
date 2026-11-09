@@ -139,7 +139,7 @@ Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lo
 |---|---|
 | `q` | Matches words of the title and URL, and any part of the title, URL or a tag name. Up to 200 characters |
 | `tag` | Keeps articles that have this tag (name or slug). Repeat it to require several tags, up to 10 |
-| `collection` | Keeps the articles of this collection (name or slug); an unknown collection gives an empty list |
+| `collection` | Keeps the articles of this collection (name or slug); an unknown collection gives an empty list, and a blank value is ignored |
 | `sort` | `created_desc` (default), `created_asc`, `title_asc`, `title_desc` |
 | `limit` | 1 to 100; 25 when absent |
 | `cursor` | The `nextCursor` of the previous page |

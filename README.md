@@ -12,6 +12,8 @@ You need:
 - Docker with Compose (Docker Desktop on macOS; the `docker-compose` command)
 - Node.js 22 or later, with npm
 
+Compose runs PostgreSQL 17. To use your own server instead, it must be PostgreSQL 15 or later; set `DATABASE_URL` to point at it.
+
 Then:
 
 ```bash
