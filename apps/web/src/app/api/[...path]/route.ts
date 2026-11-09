@@ -50,4 +50,4 @@ async function proxy(req: Request, { params }: { params: Promise<{ path: string[
 }
 
 export const dynamic = "force-dynamic";
-export { proxy as GET, proxy as POST, proxy as PATCH };
+export { proxy as GET, proxy as POST, proxy as PATCH, proxy as DELETE };

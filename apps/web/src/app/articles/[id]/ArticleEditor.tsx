@@ -3,14 +3,30 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent, type KeyboardEvent } from "react";
 
-import { ApiError, readJSON, type Article, type FieldProblem } from "@/lib/api";
+import Link from "next/link";
 
-type Props = { id: string; title: string; tags: string[] };
+import { ApiError, readJSON, type Article, type Collection, type FieldProblem } from "@/lib/api";
 
-export function ArticleEditor({ id, title: initialTitle, tags: initialTags }: Props) {
+type Props = {
+  id: string;
+  title: string;
+  tags: string[];
+  collectionId: string | null;
+  // null when the list could not be loaded.
+  collections: Collection[] | null;
+};
+
+export function ArticleEditor({
+  id,
+  title: initialTitle,
+  tags: initialTags,
+  collectionId: initialCollection,
+  collections,
+}: Props) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [tags, setTags] = useState(initialTags);
+  const [collectionId, setCollectionId] = useState(initialCollection);
   const [draft, setDraft] = useState("");
   const [problems, setProblems] = useState<FieldProblem[]>([]);
   const [failure, setFailure] = useState<string | null>(null);
@@ -49,11 +65,14 @@ export function ArticleEditor({ id, title: initialTitle, tags: initialTags }: Pr
         const res = await fetch(`/api/articles/${encodeURIComponent(id)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, tags: pending }),
+          // Without the list the picker cannot change the collection, so
+          // the edit leaves it as it is.
+          body: JSON.stringify(collections ? { title, tags: pending, collectionId } : { title, tags: pending }),
         });
         const updated = await readJSON<Article>(res);
         setTitle(updated.title);
         setTags(updated.tags.map((t) => t.name));
+        setCollectionId(updated.collection?.id ?? null);
         setSaved(true);
         router.refresh();
       } catch (err) {
@@ -70,6 +89,7 @@ export function ArticleEditor({ id, title: initialTitle, tags: initialTags }: Pr
 
   const titleError = problemFor("title");
   const tagsError = problemFor("tags");
+  const collectionError = problemFor("collectionId");
 
   return (
     <form className="editor" onSubmit={save} noValidate>
@@ -121,6 +141,34 @@ export function ArticleEditor({ id, title: initialTitle, tags: initialTags }: Pr
           Press Enter or type a comma to add a tag.
         </p>
         {tagsError ? <p className="field-error">{tagsError}</p> : null}
+      </div>
+
+      <div className="field">
+        <label className="field-label" htmlFor="collection">
+          Collection
+        </label>
+        {collections ? (
+          <select
+            id="collection"
+            className="select"
+            value={collectionId ?? ""}
+            onChange={(e) => setCollectionId(e.target.value || null)}
+            aria-describedby="collection-help"
+          >
+            <option value="">No collection</option>
+            {collections.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="field-error">The collections could not be loaded. Reload the page to change the collection.</p>
+        )}
+        <p id="collection-help" className="fine-print">
+          An article is in one collection at most. <Link href="/collections">Manage collections</Link>
+        </p>
+        {collectionError ? <p className="field-error">{collectionError}</p> : null}
       </div>
 
       <div className="actions">

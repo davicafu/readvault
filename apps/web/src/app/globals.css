@@ -273,26 +273,39 @@ h3 {
   align-items: start;
 }
 
-.tag-panel {
+.library-side {
   position: sticky;
   top: 1.5rem;
+  display: grid;
+  gap: 1.75rem;
   max-height: calc(100vh - 3rem);
   overflow-y: auto;
+}
+
+.side-panel {
   font-size: var(--step--1);
 }
 
-.tag-panel h2 {
-  margin: 0 0 0.5rem;
+.side-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.side-panel h2 {
+  margin: 0;
   font-size: var(--step-0);
 }
 
-.tag-panel ul {
+.side-panel ul {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.tag-panel a {
+.side-panel li a {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
@@ -302,22 +315,29 @@ h3 {
   text-decoration: none;
 }
 
-.tag-panel a:hover {
+.side-panel li a:hover {
   background: var(--surface);
 }
 
-.tag-panel a[aria-current="true"] {
+.side-panel li a[aria-current="true"] {
   background: var(--accent);
   color: var(--accent-ink);
 }
 
-.tag-panel-name {
+.side-panel-name {
   overflow-wrap: anywhere;
 }
 
-.tag-panel-count {
+.side-panel-count {
   opacity: 0.75;
   font-variant-numeric: tabular-nums;
+}
+
+.entry-collection {
+  display: inline-block;
+  margin-right: 0.4rem;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
 }
 
 .active-filters {
@@ -736,7 +756,7 @@ a.tag:hover {
     grid-template-columns: 1fr;
   }
 
-  .tag-panel {
+  .library-side {
     position: static;
     max-height: none;
   }
@@ -861,6 +881,53 @@ a.tag:hover {
   color: var(--ink-soft);
   font-family: var(--font-ui);
   font-size: var(--step--1);
+}
+
+/* Collections */
+
+.collection-list {
+  max-width: var(--measure);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--rule);
+}
+
+.collection-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding-block: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.collection-name {
+  font-family: var(--font-read);
+  font-size: var(--step-1);
+  font-weight: 600;
+}
+
+.collection-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.collection-rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex: 1 1 100%;
+}
+
+.collection-rename .input {
+  flex: 1 1 14rem;
+}
+
+.collection-row .field-error {
+  flex-basis: 100%;
+  margin: 0;
 }
 
 /* Add articles */

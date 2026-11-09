@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { brand } from "@/config/brand";
-import { ApiError, isWebUrl, type Article, type ArticleContent } from "@/lib/api";
+import { ApiError, isWebUrl, type Article, type ArticleContent, type Collection } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { apiGet } from "@/lib/server-api";
 
@@ -39,6 +39,16 @@ async function loadContent(id: string): Promise<ArticleContent | null | undefine
   }
 }
 
+// The picker still works without the list: it then offers only the
+// article's current collection.
+async function loadCollections(): Promise<Collection[] | null> {
+  try {
+    return (await apiGet<{ collections: Collection[] }>("/api/collections")).collections;
+  } catch {
+    return null;
+  }
+}
+
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { article } = await loadArticle((await params).id);
   return { title: article ? article.title || "Untitled bookmark" : "Article unavailable" };
@@ -46,7 +56,11 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function ArticlePage({ params }: { params: Params }) {
   const { id } = await params;
-  const [{ article: a, error }, content] = await Promise.all([loadArticle(id), loadContent(id)]);
+  const [{ article: a, error }, content, collections] = await Promise.all([
+    loadArticle(id),
+    loadContent(id),
+    loadCollections(),
+  ]);
   if (!a) return <ArticleError error={error} />;
 
   return (
@@ -61,7 +75,13 @@ export default async function ArticlePage({ params }: { params: Params }) {
             Open the original article
           </a>
         ) : null}
-        <ArticleEditor id={a.id} title={a.title} tags={a.tags.map((t) => t.name)} />
+        <ArticleEditor
+          id={a.id}
+          title={a.title}
+          tags={a.tags.map((t) => t.name)}
+          collectionId={a.collection?.id ?? null}
+          collections={collections}
+        />
         {content === undefined ? (
           <p className="field-error" role="alert">
             The saved text could not be loaded. Reload the page to try again.

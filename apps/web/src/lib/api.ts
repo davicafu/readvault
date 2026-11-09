@@ -6,6 +6,12 @@ export type Tag = { name: string; slug: string };
 /** A tag with the number of articles that carry it (GET /api/tags). */
 export type TagCount = Tag & { articles: number };
 
+/** The collection an article is in. An article is in at most one. */
+export type CollectionRef = { id: string; name: string; slug: string };
+
+/** A collection with the number of its articles (GET /api/collections). */
+export type Collection = CollectionRef & { articles: number };
+
 export type Article = {
   id: string;
   originalUrl: string;
@@ -17,6 +23,7 @@ export type Article = {
   folder: string[];
   bookmarkedAt: string | null;
   tags: Tag[];
+  collection: CollectionRef | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -20,7 +20,7 @@ Then:
 make dev                    # Postgres, migrations, API on :8080, web app on :3000
 ```
 
-Open http://localhost:3000 and choose **Import bookmarks**. To try it without your own export, import `fixtures/bookmarks.html`.
+Open http://localhost:3000, choose **Add articles** and import a bookmarks file. To try it without your own export, import `fixtures/bookmarks.html`.
 
 The first `make` run creates `.env` with a random database password; edit it to change ports or limits (`.env.example` lists every variable). `make dev` checks that Node.js 22 or later comes first on `PATH`, installs the web app's dependencies the first time and stops everything with Ctrl+C. Postgres keeps running in Docker; stop it with `make db-down`. The data stays in the `db-data` volume.
 
@@ -80,6 +80,10 @@ Until accounts exist, everything belongs to a fixed development owner created by
 - Two bookmarks are the same article when their canonical URL matches: same address, ignoring the host's case, the `#fragment` and known tracking parameters such as `utm_*` and `fbclid`.
 - Importing the same file again creates nothing new. Titles you edited are kept. Missing titles, folders and dates are filled in. Tags are only ever added, and never to an article whose tags you edited.
 - Only `http` and `https` addresses are imported. `javascript:`, `file:` and others are reported and skipped.
+
+## Organizing the library
+
+The library page is for finding articles: search by title, address or tag, and narrow the list with the **Collections** and **Tags** panels beside the results. A collection groups articles; each article is in one collection at most and keeps its tags. Create, rename and delete collections on the **Collections** page, and pick an article's collection on its page. Deleting a collection keeps its articles. Adding articles (one link, or a bookmarks file) is on the **Add articles** page.
 
 ## Article text
 
