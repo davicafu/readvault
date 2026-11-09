@@ -28,6 +28,34 @@ type Repository interface {
 	// Tags returns the user's tags that have articles, with how many each
 	// has: most articles first, then by name.
 	Tags(ctx context.Context, userID string) ([]TagCount, error)
+
+	// Collections returns the user's collections by name, with their
+	// article counts.
+	Collections(ctx context.Context, userID string) ([]Collection, error)
+	// CreateCollection stores a new collection, or returns
+	// ErrCollectionExists when the user has one with the same slug.
+	CreateCollection(ctx context.Context, userID string, name tag.Tag) (Collection, error)
+	// RenameCollection renames one collection of the user, or returns
+	// ErrCollectionNotFound or ErrCollectionExists.
+	RenameCollection(ctx context.Context, userID, collectionID string, name tag.Tag) (Collection, error)
+	// DeleteCollection deletes one collection of the user; its articles
+	// stay, without a collection. Returns ErrCollectionNotFound.
+	DeleteCollection(ctx context.Context, userID, collectionID string) error
+}
+
+// Collection groups articles. An article is in at most one collection.
+type Collection struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Slug     string `json:"slug"`
+	Articles int    `json:"articles"`
+}
+
+// CollectionRef names the collection an article is in.
+type CollectionRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
 }
 
 // TagCount is a tag and the number of the user's articles that carry it.
@@ -41,6 +69,11 @@ type TagCount struct {
 type Change struct {
 	Title *string
 	Tags  *[]tag.Tag
+	// SetCollection moves the article to CollectionID, or out of any
+	// collection when CollectionID is nil. The repository returns
+	// ErrCollectionNotFound when the user has no such collection.
+	SetCollection bool
+	CollectionID  *string
 }
 
 // Article is a saved bookmark with its tags and provenance.
@@ -59,8 +92,10 @@ type Article struct {
 	Folder        []string   `json:"folder"`
 	BookmarkedAt  *time.Time `json:"bookmarkedAt"`
 	Tags          []tag.Tag  `json:"tags"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	UpdatedAt     time.Time  `json:"updatedAt"`
+	// Collection is nil when the article is in none.
+	Collection *CollectionRef `json:"collection"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
 }
 
 // Listed is an article of a list page with the key it was sorted by when
@@ -75,9 +110,11 @@ type Query struct {
 	Search string
 	// TagSlugs keeps articles that have every one of these tags.
 	TagSlugs []string
-	Sort     Sort
-	Limit    int
-	After    *Position
+	// CollectionSlug keeps the articles of that collection when set.
+	CollectionSlug string
+	Sort           Sort
+	Limit          int
+	After          *Position
 }
 
 // Position is the sort key and id of the last article of a page.

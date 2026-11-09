@@ -68,6 +68,10 @@ func NewHandler(deps Deps) http.Handler {
 		mux.HandleFunc("PATCH /api/articles/{id}", h.update)
 		mux.HandleFunc("GET /api/export", h.export)
 		mux.HandleFunc("GET /api/tags", h.tags)
+		mux.HandleFunc("GET /api/collections", h.collections)
+		mux.HandleFunc("POST /api/collections", h.createCollection)
+		mux.HandleFunc("PATCH /api/collections/{id}", h.renameCollection)
+		mux.HandleFunc("DELETE /api/collections/{id}", h.deleteCollection)
 	}
 	if deps.Content != nil {
 		h := &contentHandler{svc: deps.Content, ownerID: deps.OwnerID, maxBytes: deps.MaxArticleBytes, logger: deps.Logger}

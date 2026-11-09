@@ -19,6 +19,10 @@ type LibraryService interface {
 	Update(ctx context.Context, userID, articleID string, p library.Patch) (library.Article, error)
 	Export(ctx context.Context, userID string) (library.Export, error)
 	Tags(ctx context.Context, userID string) ([]library.TagCount, error)
+	Collections(ctx context.Context, userID string) ([]library.Collection, error)
+	CreateCollection(ctx context.Context, userID, name string) (library.Collection, error)
+	RenameCollection(ctx context.Context, userID, collectionID, name string) (library.Collection, error)
+	DeleteCollection(ctx context.Context, userID, collectionID string) error
 }
 
 type articleHandler struct {
@@ -37,7 +41,7 @@ func (h *articleHandler) list(w http.ResponseWriter, r *http.Request) {
 			[]library.FieldProblem{{Field: "query", Code: "invalid", Message: `the query string is malformed; separate parameters with "&"`}})
 		return
 	}
-	p := library.ListParams{Search: v.Get("q"), Tags: v["tag"], Sort: v.Get("sort"), Cursor: v.Get("cursor")}
+	p := library.ListParams{Search: v.Get("q"), Tags: v["tag"], Collection: v.Get("collection"), Sort: v.Get("sort"), Cursor: v.Get("cursor")}
 	if raw := v.Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil {
@@ -113,8 +117,65 @@ func (h *articleHandler) fail(w http.ResponseWriter, r *http.Request, err error,
 		writeErrorDetails(w, invalidStatus, invalidCode, invalidMessage, verr.Problems)
 	case errors.Is(err, library.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "article not found")
+	case errors.Is(err, library.ErrCollectionNotFound):
+		writeError(w, http.StatusNotFound, "not_found", "collection not found")
+	case errors.Is(err, library.ErrCollectionExists):
+		writeError(w, http.StatusConflict, "collection_exists", "a collection with this name already exists")
 	default:
 		h.logger.ErrorContext(r.Context(), "article request failed", slog.String("path", r.URL.Path), slog.String("error", err.Error()))
 		writeError(w, http.StatusInternalServerError, "internal", "the request could not be completed; retry later")
 	}
+}
+
+// collectionName is the body of POST and PATCH /api/collections.
+type collectionName struct {
+	Name string `json:"name"`
+}
+
+// collections serves GET /api/collections.
+func (h *articleHandler) collections(w http.ResponseWriter, r *http.Request) {
+	cs, err := h.svc.Collections(r.Context(), h.ownerID)
+	if err != nil {
+		h.fail(w, r, err, http.StatusBadRequest, "invalid_query", "the query parameters are not valid")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"collections": cs})
+}
+
+// createCollection serves POST /api/collections.
+func (h *articleHandler) createCollection(w http.ResponseWriter, r *http.Request) {
+	var body collectionName
+	if !decodeJSONBody(w, r, &body) {
+		return
+	}
+	c, err := h.svc.CreateCollection(r.Context(), h.ownerID, body.Name)
+	if err != nil {
+		h.fail(w, r, err, http.StatusUnprocessableEntity, "validation_failed", "the collection is not valid")
+		return
+	}
+	writeJSON(w, http.StatusCreated, c)
+}
+
+// renameCollection serves PATCH /api/collections/{id}.
+func (h *articleHandler) renameCollection(w http.ResponseWriter, r *http.Request) {
+	var body collectionName
+	if !decodeJSONBody(w, r, &body) {
+		return
+	}
+	c, err := h.svc.RenameCollection(r.Context(), h.ownerID, r.PathValue("id"), body.Name)
+	if err != nil {
+		h.fail(w, r, err, http.StatusUnprocessableEntity, "validation_failed", "the collection is not valid")
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+// deleteCollection serves DELETE /api/collections/{id}. The collection's
+// articles stay in the library.
+func (h *articleHandler) deleteCollection(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.DeleteCollection(r.Context(), h.ownerID, r.PathValue("id")); err != nil {
+		h.fail(w, r, err, http.StatusBadRequest, "invalid_request", "the request is not valid")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

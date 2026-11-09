@@ -33,8 +33,9 @@ const selectArticle = `SELECT a.id, a.original_url, a.canonical_url, a.title, a.
 	(SELECT c.status FROM article_contents c WHERE c.article_id = a.id),
 	ARRAY(SELECT t.name FROM article_tags at JOIN tags t ON t.id = at.tag_id WHERE at.article_id = a.id ORDER BY t.slug),
 	ARRAY(SELECT t.slug FROM article_tags at JOIN tags t ON t.id = at.tag_id WHERE at.article_id = a.id ORDER BY t.slug),
-	lower(a.title)
-	FROM articles a`
+	lower(a.title),
+	col.id, col.name, col.slug
+	FROM articles a LEFT JOIN collections col ON col.id = a.collection_id`
 
 // List implements library.Repository. Pages use keyset pagination on the
 // (sort key, id) indexes, so deep pages cost the same as the first one.
@@ -52,6 +53,9 @@ func (r *LibraryRepository) List(ctx context.Context, userID string, q library.Q
 			OR a.title ILIKE %[2]s OR a.canonical_url ILIKE %[2]s
 			OR EXISTS (SELECT 1 FROM article_tags at JOIN tags t ON t.id = at.tag_id
 				WHERE at.article_id = a.id AND t.name ILIKE %[2]s))`, text, pattern))
+	}
+	if q.CollectionSlug != "" {
+		where = append(where, fmt.Sprintf("a.collection_id = (SELECT id FROM collections WHERE user_id = $1 AND slug = %s)", arg(q.CollectionSlug)))
 	}
 	if len(q.TagSlugs) > 0 {
 		slugs := arg(q.TagSlugs)
@@ -150,8 +154,13 @@ func getArticle(ctx context.Context, q querier, userID, articleID string) (libra
 func scanListed(row pgx.CollectableRow) (library.Listed, error) {
 	var l library.Listed
 	var names, slugs []string
+	var colID, colName, colSlug *string
 	err := row.Scan(&l.ID, &l.OriginalURL, &l.CanonicalURL, &l.Title, &l.TitleEditedAt, &l.TagsEditedAt,
-		&l.Folder, &l.BookmarkedAt, &l.CreatedAt, &l.UpdatedAt, &l.ContentStatus, &names, &slugs, &l.TitleKey)
+		&l.Folder, &l.BookmarkedAt, &l.CreatedAt, &l.UpdatedAt, &l.ContentStatus, &names, &slugs, &l.TitleKey,
+		&colID, &colName, &colSlug)
+	if colID != nil && colName != nil && colSlug != nil {
+		l.Collection = &library.CollectionRef{ID: *colID, Name: *colName, Slug: *colSlug}
+	}
 	if l.Folder == nil {
 		l.Folder = []string{}
 	}
@@ -173,7 +182,8 @@ func (r *LibraryRepository) Update(ctx context.Context, userID, articleID string
 	var updated library.Article
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		var title string
-		err := tx.QueryRow(ctx, `SELECT title FROM articles WHERE user_id = $1 AND id = $2 FOR UPDATE`, userID, articleID).Scan(&title)
+		var collectionID *string
+		err := tx.QueryRow(ctx, `SELECT title, collection_id FROM articles WHERE user_id = $1 AND id = $2 FOR UPDATE`, userID, articleID).Scan(&title, &collectionID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return library.ErrNotFound
 		}
@@ -201,6 +211,17 @@ func (r *LibraryRepository) Update(ctx context.Context, userID, articleID string
 				}
 			}
 			changed = changed || tagsChanged
+		}
+		if c.SetCollection && !samePtr(c.CollectionID, collectionID) {
+			// The (collection_id, user_id) foreign key rejects another
+			// user's collection as well as a missing one.
+			if _, err := tx.Exec(ctx, `UPDATE articles SET collection_id = $2 WHERE id = $1`, articleID, c.CollectionID); err != nil {
+				if isViolation(err, pgerrcode.ForeignKeyViolation) {
+					return library.ErrCollectionNotFound
+				}
+				return fmt.Errorf("moving article to collection: %w", err)
+			}
+			changed = true
 		}
 		if changed {
 			if _, err := tx.Exec(ctx, `UPDATE articles SET updated_at = now() WHERE id = $1`, articleID); err != nil {

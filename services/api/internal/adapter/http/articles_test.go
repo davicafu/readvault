@@ -21,6 +21,7 @@ type stubLibrary struct {
 	gotParams library.ListParams
 	gotID     string
 	gotPatch  library.Patch
+	gotName   string
 }
 
 func (s *stubLibrary) Export(_ context.Context, userID string) (library.Export, error) {
@@ -36,7 +37,11 @@ func (s *stubLibrary) Update(_ context.Context, userID, id string, p library.Pat
 	if s.err != nil {
 		return library.Article{}, s.err
 	}
-	return library.Article{ID: id, Title: *p.Title}, nil
+	a := library.Article{ID: id}
+	if p.Title != nil {
+		a.Title = *p.Title
+	}
+	return a, nil
 }
 
 func (s *stubLibrary) List(_ context.Context, userID string, p library.ListParams) (library.Page, error) {

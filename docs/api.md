@@ -20,14 +20,15 @@ Every error has the same shape:
 | 400 | `missing_file` | The form has no `file` field |
 | 400 | `invalid_query` | A list parameter is invalid, or the query string is malformed (for example pairs separated by `;`); `details` is a list of field problems |
 | 400 | `invalid_json` | The body is not one JSON object with only the documented fields, spelled exactly (`Title` is not `title`) |
-| 404 | `not_found` | Unknown route, or an article that does not exist for this user (including malformed ids) |
+| 404 | `not_found` | Unknown route, or an article or collection that does not exist for this user (including malformed ids) |
 | 404 | `content_not_found` | No text has been saved for the article yet |
 | 413 | `file_too_large` | The upload is larger than `MAX_UPLOAD_BYTES`; `details.maxBytes` |
 | 413 | `body_too_large` | A JSON body is larger than 64 KiB; `details.maxBytes` |
 | 415 | `unsupported_media_type` | A JSON endpoint received a body whose `Content-Type` is not `application/json` |
 | 422 | `too_many_records` | The file has more bookmarks than `MAX_IMPORT_RECORDS`; `details.maxRecords` |
 | 422 | `no_text` | An uploaded article file holds no text |
-| 422 | `validation_failed` | An article edit is invalid; `details` is a list of field problems |
+| 409 | `collection_exists` | The user already has a collection with that name (compared by slug) |
+| 422 | `validation_failed` | An article edit or a collection name is invalid; `details` is a list of field problems |
 | 500 | `internal` | Anything unexpected; retry later |
 | 502 | `fetch_failed` | The article could not be downloaded from its URL; `details.problem` says why (see Article text) |
 | 503 | `timeout` | The request took longer than the server's request timeout |
@@ -124,12 +125,13 @@ An article:
   "folder": ["Bookmarks bar", "Go"],
   "bookmarkedAt": "2023-11-14T22:15:00Z",
   "tags": [{ "name": "go", "slug": "go" }],
+  "collection": { "id": "0b6f4c1e-5b3a-4a52-9a49-3f1d2b7c8e10", "name": "Reading", "slug": "reading" },
   "createdAt": "2026-11-07T23:27:07.5Z",
   "updatedAt": "2026-11-07T23:27:07.5Z"
 }
 ```
 
-Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lowercased, the fragment and known tracking parameters (`utm_*`, `fbclid`, `gclid` and similar) are removed, and everything else is kept. Tags are sorted by slug; a tag's slug is its lowercase name with spaces turned into hyphens, and it is unique per user.
+Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lowercased, the fragment and known tracking parameters (`utm_*`, `fbclid`, `gclid` and similar) are removed, and everything else is kept. Tags are sorted by slug; a tag's slug is its lowercase name with spaces turned into hyphens, and it is unique per user. `collection` is the one collection the article is in, or `null`.
 
 ### `GET /api/articles`
 
@@ -137,6 +139,7 @@ Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lo
 |---|---|
 | `q` | Matches words of the title and URL, and any part of the title, URL or a tag name. Up to 200 characters |
 | `tag` | Keeps articles that have this tag (name or slug). Repeat it to require several tags, up to 10 |
+| `collection` | Keeps the articles of this collection (name or slug); an unknown collection gives an empty list |
 | `sort` | `created_desc` (default), `created_asc`, `title_asc`, `title_desc` |
 | `limit` | 1 to 100; 25 when absent |
 | `cursor` | The `nextCursor` of the previous page |
@@ -145,7 +148,7 @@ Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lo
 { "items": [ /* articles */ ], "nextCursor": "eyJzIjoiY3JlYXRlZF9kZXNjIiwiay..." }
 ```
 
-`nextCursor` is `null` on the last page. A cursor only works with the `sort` it came from. `q` and `tag` must be valid UTF-8 without NUL bytes (`invalid`).
+`nextCursor` is `null` on the last page. A cursor only works with the `sort` it came from. `q`, `tag` and `collection` must be valid UTF-8 without NUL bytes (`invalid`).
 
 ### `GET /api/articles/{id}`
 
@@ -154,15 +157,17 @@ Returns one article, or `404 not_found`.
 ### `PATCH /api/articles/{id}`
 
 ```json
-{ "title": "My title", "tags": ["go", "Concurrency"] }
+{ "title": "My title", "tags": ["go", "Concurrency"], "collectionId": "0b6f4c1e-5b3a-4a52-9a49-3f1d2b7c8e10" }
 ```
 
-Send it as `application/json`. Both fields are optional, but at least one is required. Any other field, such as `originalUrl`, is rejected with `400 invalid_json`, so URLs cannot change here.
+Send it as `application/json`. Every field is optional, but at least one is required. Any other field, such as `originalUrl`, is rejected with `400 invalid_json`, so URLs cannot change here.
 
 - `title` is trimmed and inner spaces collapsed. It must not be empty and can be up to 500 characters. A changed title is marked as edited (`titleEditedAt`), and imports never overwrite it.
 - `tags` replaces the whole tag set: send `[]` to remove every tag. When the set changes, the tags are marked as edited (`tagsEditedAt`), and imports add no tags to the article from then on; sending the same set marks nothing. Up to 50 tags of up to 64 characters each. Tags that share a slug are merged, and an existing tag keeps its stored spelling.
 
-Returns the updated article. Field problem codes: `body/empty`, `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
+- `collectionId` moves the article to that collection; an article is in at most one, so this replaces its current one. Send `null` to take it out of its collection. Tags are not affected.
+
+Returns the updated article. Field problem codes: `body/empty`, `collectionId/not_found` (no collection with that id for this user), `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
 
 ### `GET /api/tags`
 
@@ -171,6 +176,32 @@ Returns every tag that has at least one article, with how many articles carry it
 ```json
 { "tags": [{ "name": "Go", "slug": "go", "articles": 12 }] }
 ```
+
+## Collections
+
+A collection groups articles. An article is in at most one collection; its tags are independent of it. Collections are flat.
+
+```json
+{ "id": "0b6f4c1e-5b3a-4a52-9a49-3f1d2b7c8e10", "name": "Reading", "slug": "reading", "articles": 12 }
+```
+
+Names follow the tag rules: spaces are collapsed, up to 64 characters, and the slug (lowercase, spaces as hyphens) is unique per user. Field problem codes: `name/required`, `name/too_long`, `name/invalid`.
+
+### `GET /api/collections`
+
+Returns `{ "collections": [...] }`, sorted by name, with the number of articles in each.
+
+### `POST /api/collections`
+
+`{ "name": "Reading" }` as `application/json`. Returns `201` with the collection, or `409 collection_exists`.
+
+### `PATCH /api/collections/{id}`
+
+`{ "name": "To read" }`. Returns the renamed collection, `404 not_found` or `409 collection_exists`.
+
+### `DELETE /api/collections/{id}`
+
+Returns `204`. The collection's articles stay in the library, without a collection. `404 not_found` when it does not exist.
 
 ## Article text
 
@@ -234,4 +265,4 @@ Downloads every article of the user, oldest first, as `readvault-export-<date>-<
 }
 ```
 
-`schemaVersion` changes when a field is removed or changes meaning. A new optional field does not change it. The export holds only the current user's articles. Saved article text and images are not part of it; the database backup keeps them.
+`schemaVersion` changes when a field is removed or changes meaning. A new optional field does not change it. The export holds only the current user's articles. Each article carries its `collection`; collections without articles are not part of it. Saved article text and images are not part of it; the database backup keeps them.

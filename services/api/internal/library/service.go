@@ -32,9 +32,10 @@ var ErrNotFound = errors.New("library: article not found")
 
 // ListParams is a list request as the client sent it.
 type ListParams struct {
-	Search string
-	Tags   []string
-	Sort   string
+	Search     string
+	Tags       []string
+	Collection string
+	Sort       string
 	// Limit is nil when the client sent none.
 	Limit  *int
 	Cursor string
@@ -108,6 +109,9 @@ func (s *Service) Tags(ctx context.Context, userID string) ([]TagCount, error) {
 type Patch struct {
 	Title *string   `json:"title"`
 	Tags  *[]string `json:"tags"`
+	// CollectionID moves the article to a collection; null removes it from
+	// its collection.
+	CollectionID Nullable[string] `json:"collectionId"`
 }
 
 // Update edits the title and tags of one of the user's articles. The title
@@ -122,6 +126,9 @@ func (s *Service) Update(ctx context.Context, userID, articleID string, p Patch)
 		return Article{}, ErrNotFound
 	}
 	a, err := s.repo.Update(ctx, userID, articleID, c)
+	if errors.Is(err, ErrCollectionNotFound) {
+		return Article{}, &ValidationError{Problems: []FieldProblem{collectionNotFound}}
+	}
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return Article{}, fmt.Errorf("updating article: %w", err)
 	}
@@ -129,8 +136,8 @@ func (s *Service) Update(ctx context.Context, userID, articleID string, p Patch)
 }
 
 func parsePatch(p Patch) (Change, error) {
-	if p.Title == nil && p.Tags == nil {
-		return Change{}, &ValidationError{Problems: []FieldProblem{{"body", "empty", "send a title, tags or both"}}}
+	if p.Title == nil && p.Tags == nil && !p.CollectionID.Set {
+		return Change{}, &ValidationError{Problems: []FieldProblem{{"body", "empty", "send a title, tags, collectionId or several"}}}
 	}
 	var problems []FieldProblem
 	var c Change
@@ -155,6 +162,16 @@ func parsePatch(p Patch) (Change, error) {
 			problems = append(problems, *problem)
 		}
 		c.Tags = &tags
+	}
+
+	if p.CollectionID.Set {
+		c.SetCollection = true
+		if id := p.CollectionID.Value; id != nil {
+			if !uuidPattern.MatchString(*id) {
+				problems = append(problems, collectionNotFound)
+			}
+			c.CollectionID = id
+		}
 	}
 
 	if problems != nil {
@@ -243,6 +260,12 @@ func parseQuery(p ListParams) (Query, error) {
 
 	if validText(q.Search) && utf8.RuneCountInString(q.Search) > maxSearchRunes {
 		problems = append(problems, FieldProblem{"q", "too_long", fmt.Sprintf("the search is longer than %d characters", maxSearchRunes)})
+	}
+
+	if !validText(p.Collection) {
+		problems = append(problems, FieldProblem{"collection", "invalid", "the collection must be valid UTF-8 text"})
+	} else {
+		q.CollectionSlug = tag.Slugify(p.Collection)
 	}
 
 	for _, name := range p.Tags {
