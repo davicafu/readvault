@@ -883,6 +883,274 @@ a.tag:hover {
   font-size: var(--step--1);
 }
 
+/* Front page: collections to explore */
+
+.browse-section {
+  margin-top: 2.5rem;
+}
+
+.browse-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.browse-head h2 {
+  margin: 0;
+  font-family: var(--font-read);
+  font-size: var(--step-2);
+  letter-spacing: -0.01em;
+}
+
+.browse-head-links {
+  display: flex;
+  gap: 1.25rem;
+  font-size: var(--step--1);
+}
+
+/* Each collection is a card with a coloured spine, like a book on a shelf.
+   --hue comes from the collection's slug, so the colour is stable. */
+.shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shelf-card {
+  --spine: hsl(var(--hue, 210) 45% 40%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.1rem 1.2rem 1rem 1.5rem;
+  border: 1px solid var(--rule);
+  border-left: 6px solid var(--spine);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.shelf-card:hover,
+.shelf-card:focus-within {
+  border-color: var(--spine);
+  transform: translateY(-2px);
+}
+
+.shelf-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.shelf-card h3 {
+  margin: 0;
+  font-family: var(--font-read);
+  font-size: var(--step-1);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.shelf-card h3 a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.shelf-card h3 a:hover {
+  color: var(--spine);
+}
+
+.shelf-card-count {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+}
+
+.shelf-card-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--step--1);
+}
+
+.shelf-card-list a {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.shelf-card-list a:hover {
+  text-decoration: underline;
+}
+
+.shelf-card-source {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.8em;
+}
+
+.shelf-card-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.shelf-card-more {
+  margin-top: auto;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+  color: var(--spine);
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+
+.shelf-card-empty {
+  max-width: var(--measure);
+  border-left-color: var(--accent);
+}
+
+.shelf-card-empty h3,
+.shelf-card-empty p {
+  margin: 0;
+}
+
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1.25rem 2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.recent-source {
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.recent-title {
+  font-family: var(--font-read);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.recent-collection {
+  --spine: hsl(var(--hue, 210) 45% 40%);
+  align-self: flex-start;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+  text-decoration: none;
+}
+
+.recent-collection::before,
+.collection-hop a::before {
+  content: "";
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  background: var(--spine);
+}
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-count {
+  color: var(--ink-soft);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* An open collection: its name, then the other collections to move to. */
+.collection-hero {
+  --spine: hsl(var(--hue, 210) 45% 40%);
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 3px solid var(--spine);
+}
+
+.collection-hero .page-title {
+  margin: 0.25rem 0 0;
+}
+
+.collection-hero-count {
+  margin: 0.25rem 0 0;
+  color: var(--ink-soft);
+}
+
+.collection-hop {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0 0 0.25rem;
+  list-style: none;
+  overflow-x: auto;
+}
+
+.collection-hop a {
+  --spine: hsl(var(--hue, 210) 45% 40%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--step--1);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.collection-hop a:hover {
+  border-color: var(--spine);
+}
+
+@media (prefers-color-scheme: dark) {
+  .shelf-card,
+  .recent-collection,
+  .collection-hero,
+  .collection-hop a {
+    --spine: hsl(var(--hue, 210) 55% 66%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shelf-card {
+    transition: none;
+  }
+
+  .shelf-card:hover,
+  .shelf-card:focus-within {
+    transform: none;
+  }
+}
+
 /* Collections */
 
 .collection-list {

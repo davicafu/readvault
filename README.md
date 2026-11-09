@@ -83,7 +83,7 @@ Until accounts exist, everything belongs to a fixed development owner created by
 
 ## Organizing the library
 
-The library page is for finding articles: search by title, address or tag, and narrow the list with the **Collections** and **Tags** panels beside the results. A collection groups articles; each article is in one collection at most and keeps its tags. Create, rename and delete collections on the **Collections** page, and pick an article's collection on its page. Deleting a collection keeps its articles. Adding articles (one link, or a bookmarks file) is on the **Add articles** page.
+The front page starts with the search box, then shows your collections as cards with their latest articles, the most recently added articles and your tags, so you can browse and discover what you saved. Open a collection to see its articles and move to the others from its header; **All articles** lists everything. Searching shows the results with **Collections** and **Tags** panels beside them. A collection groups articles; each article is in one collection at most and keeps its tags. Create, rename and delete collections on the **Collections** page, and pick an article's collection on its page. Deleting a collection keeps its articles. Adding articles (one link, or a bookmarks file) is on the **Add articles** page.
 
 ## Article text
 
