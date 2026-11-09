@@ -39,8 +39,8 @@ async function loadContent(id: string): Promise<ArticleContent | null | undefine
   }
 }
 
-// The picker still works without the list: it then offers only the
-// article's current collection.
+// Without the list the editor shows an error in place of the picker and
+// leaves the collection as it is when saving.
 async function loadCollections(): Promise<Collection[] | null> {
   try {
     return (await apiGet<{ collections: Collection[] }>("/api/collections")).collections;

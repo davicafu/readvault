@@ -109,6 +109,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Sear
             ))}
           </select>
         </div>
+        {filters.collection ? <input type="hidden" name="collection" value={filters.collection} /> : null}
         {filters.tags.map((t) => (
           <input key={t} type="hidden" name="tag" value={t} />
         ))}
