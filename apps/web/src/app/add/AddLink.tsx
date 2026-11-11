@@ -20,12 +20,14 @@ export function AddLink() {
   const [url, setUrl] = useState("");
   const [failure, setFailure] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [stage, setStage] = useState("Saving…");
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const address = url.trim();
     if (!address) return;
     setSaving(true);
+    setStage("Saving…");
     setFailure(null);
     try {
       const file = `<DL><DT><A HREF="${escapeHTML(address)}">${escapeHTML(address)}</A></DL>\n`;
@@ -42,6 +44,13 @@ export function AddLink() {
       );
       const match = page.items.find((a) => a.originalUrl === address) ?? page.items[0];
       setUrl("");
+      // A new link gets its text right away, so its suggestions come from the
+      // content. A failed download still keeps the link; the article page
+      // offers the download again. Existing articles keep their saved text.
+      if (match && report.totals.inserted > 0) {
+        setStage("Downloading the text…");
+        await fetch(`/api/articles/${encodeURIComponent(match.id)}/content/fetch`, { method: "POST" }).catch(() => null);
+      }
       if (match) {
         router.push(`/articles/${match.id}`);
       } else {
@@ -72,7 +81,7 @@ export function AddLink() {
         />
       </div>
       <button className="button" type="submit" disabled={saving}>
-        {saving ? "Saving…" : "Save link"}
+        {saving ? stage : "Save link"}
       </button>
       {failure ? (
         <p className="field-error" role="alert">

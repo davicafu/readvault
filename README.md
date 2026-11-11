@@ -84,7 +84,9 @@ Until accounts exist, everything belongs to a fixed development owner created by
 
 ## Organizing the library
 
-The front page starts with the search box, then shows your collections as cards with their latest articles, the most recently added articles and your tags, so you can browse and discover what you saved. Open a collection to see its articles and move to the others from its header; **All articles** lists everything. Searching shows the results with **Collections** and **Tags** panels beside them. A collection groups articles; each article is in one collection at most and keeps its tags. Create, rename and delete collections on the **Collections** page, and pick an article's collection on its page. Deleting a collection keeps its articles. Adding articles (one link, or a bookmarks file) is on the **Add articles** page.
+The front page starts with the search box, then shows your collections as cards with their latest articles, the most recently added articles and your tags, so you can browse and discover what you saved. Open a collection to see its articles and move to the others from its header; **All articles** lists everything. Searching shows the results with **Collections** and **Tags** panels beside them. A collection groups articles; each article is in one collection at most and keeps its tags. Create, rename and delete collections on the **Collections** page, and pick an article's collection on its page. Deleting a collection keeps its articles. Adding articles (one link, or a bookmarks file) is on the **Add articles** page. A single link has its text downloaded right after it is saved; if the download fails, the link is still saved.
+
+An article's page suggests a collection and up to five tags from its content: its title, the words of its address and its saved text. Only your own collections and tags are suggested. The collection comes from the most similar articles in your library, and the tags are ones named in the article or carried by similar articles. Click a suggestion to put it in the form; nothing changes until you save.
 
 ## Article text
 

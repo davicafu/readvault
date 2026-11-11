@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { brand } from "@/config/brand";
-import { ApiError, isWebUrl, type Article, type ArticleContent, type Collection } from "@/lib/api";
+import { ApiError, isWebUrl, type Article, type ArticleContent, type Collection, type Suggestions } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { apiGet } from "@/lib/server-api";
 
@@ -49,6 +49,15 @@ async function loadCollections(): Promise<Collection[] | null> {
   }
 }
 
+// Suggestions are a convenience: without them the editor works as before.
+async function loadSuggestions(id: string): Promise<Suggestions | null> {
+  try {
+    return await apiGet<Suggestions>(`/api/articles/${encodeURIComponent(id)}/suggestions`);
+  } catch {
+    return null;
+  }
+}
+
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { article } = await loadArticle((await params).id);
   return { title: article ? article.title || "Untitled bookmark" : "Article unavailable" };
@@ -56,10 +65,11 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function ArticlePage({ params }: { params: Params }) {
   const { id } = await params;
-  const [{ article: a, error }, content, collections] = await Promise.all([
+  const [{ article: a, error }, content, collections, suggestions] = await Promise.all([
     loadArticle(id),
     loadContent(id),
     loadCollections(),
+    loadSuggestions(id),
   ]);
   if (!a) return <ArticleError error={error} />;
 
@@ -81,6 +91,7 @@ export default async function ArticlePage({ params }: { params: Params }) {
           tags={a.tags.map((t) => t.name)}
           collectionId={a.collection?.id ?? null}
           collections={collections}
+          suggestions={suggestions}
         />
         {content === undefined ? (
           <p className="field-error" role="alert">

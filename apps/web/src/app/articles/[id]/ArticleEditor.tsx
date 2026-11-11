@@ -5,7 +5,7 @@ import { useState, useTransition, type FormEvent, type KeyboardEvent } from "rea
 
 import Link from "next/link";
 
-import { ApiError, readJSON, type Article, type Collection, type FieldProblem } from "@/lib/api";
+import { ApiError, readJSON, type Article, type Collection, type FieldProblem, type Suggestions } from "@/lib/api";
 
 type Props = {
   id: string;
@@ -14,6 +14,8 @@ type Props = {
   collectionId: string | null;
   // null when the list could not be loaded.
   collections: Collection[] | null;
+  // null when there are none to offer or they could not be loaded.
+  suggestions: Suggestions | null;
 };
 
 export function ArticleEditor({
@@ -22,6 +24,7 @@ export function ArticleEditor({
   tags: initialTags,
   collectionId: initialCollection,
   collections,
+  suggestions,
 }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -87,6 +90,16 @@ export function ArticleEditor({
     });
   };
 
+  // A suggestion is offered until it is in the form; nothing is saved
+  // until the person saves.
+  const suggestedTags = (suggestions?.tags ?? []).filter(
+    (s) => !tags.some((t) => t.toLowerCase() === s.name.toLowerCase()),
+  );
+  const suggestedCollection =
+    collections && suggestions?.collection && suggestions.collection.id !== collectionId
+      ? collections.find((c) => c.id === suggestions.collection?.id)
+      : undefined;
+
   const titleError = problemFor("title");
   const tagsError = problemFor("tags");
   const collectionError = problemFor("collectionId");
@@ -140,6 +153,22 @@ export function ArticleEditor({
         <p id="tag-help" className="fine-print">
           Press Enter or type a comma to add a tag.
         </p>
+        {suggestedTags.length > 0 ? (
+          <div className="suggestions">
+            <span className="fine-print">Suggested:</span>
+            {suggestedTags.map((s) => (
+              <button
+                key={s.slug}
+                type="button"
+                className="suggestion"
+                onClick={() => setTags([...tags, s.name])}
+                aria-label={`Add suggested tag ${s.name}`}
+              >
+                + {s.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {tagsError ? <p className="field-error">{tagsError}</p> : null}
       </div>
 
@@ -165,6 +194,19 @@ export function ArticleEditor({
         ) : (
           <p className="field-error">The collections could not be loaded. Reload the page to change the collection.</p>
         )}
+        {suggestedCollection ? (
+          <div className="suggestions">
+            <span className="fine-print">Suggested:</span>
+            <button
+              type="button"
+              className="suggestion"
+              onClick={() => setCollectionId(suggestedCollection.id)}
+              aria-label={`Use suggested collection ${suggestedCollection.name}`}
+            >
+              {suggestedCollection.name}
+            </button>
+          </div>
+        ) : null}
         <p id="collection-help" className="fine-print">
           An article is in one collection at most. <Link href="/collections">Manage collections</Link>
         </p>

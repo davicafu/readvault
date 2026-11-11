@@ -12,6 +12,9 @@ export type CollectionRef = { id: string; name: string; slug: string };
 /** A collection with the number of its articles (GET /api/collections). */
 export type Collection = CollectionRef & { articles: number };
 
+// Suggestions for one article, from its content and the user's library.
+export type Suggestions = { collection: CollectionRef | null; tags: Tag[] };
+
 export type Article = {
   id: string;
   originalUrl: string;

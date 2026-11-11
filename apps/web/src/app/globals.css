@@ -451,6 +451,32 @@ a.tag:hover {
   cursor: pointer;
 }
 
+/* Article editor: suggested tags and collection */
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.suggestion {
+  padding: 0.1rem 0.55rem;
+  border: 1px dashed var(--rule);
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+
+.suggestion:hover,
+.suggestion:focus-visible {
+  border-color: var(--accent);
+  color: inherit;
+}
+
 .pager {
   display: flex;
   gap: 0.75rem;
