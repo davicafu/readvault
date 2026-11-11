@@ -202,6 +202,21 @@ Send it as `application/json`. Every field is optional, but at least one is requ
 
 Returns the updated article. Field problem codes: `body/empty`, `collectionId/not_found` (no collection with that id for this user), `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
 
+### `GET /api/articles/{id}/suggestions`
+
+Suggests a collection and tags for one article from its content: its title, the words of its URL and its saved text, when it has one (the first 200,000 characters). Nothing is changed; apply a suggestion with `PATCH /api/articles/{id}`.
+
+```json
+{ "collection": { "id": "0b6f4c1e-5b3a-4a52-9a49-3f1d2b7c8e10", "name": "Streaming", "slug": "streaming" }, "tags": [{ "name": "kafka", "slug": "kafka" }] }
+```
+
+Only the user's own collections and tags are suggested; nothing new is invented.
+
+- `collection` is the collection most common among the 7 library articles most similar to this one, compared by title and tags (rare words weigh more), among the 10,000 most recently added. It is `null` unless at least 2 of them share it and it has at least 1.5 times the votes of the next one.
+- `tags` holds up to 5 tags the article does not have yet: tags named in the title or the URL, named at least twice in the text, or carried by at least 2 of the similar articles. A tag of 1 or 2 characters, such as `go`, counts only when the title names it. Words inside links and image addresses in the text are ignored.
+
+Returns `404 not_found` for an unknown article.
+
 ### `GET /api/tags`
 
 Returns every tag that has at least one article, with how many articles carry it: most articles first, then by name. Filter the library by a tag with `GET /api/articles?tag=<slug>`.

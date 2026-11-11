@@ -244,6 +244,38 @@ func (s *Service) Get(ctx context.Context, userID, articleID string) (Article, e
 	return a, err
 }
 
+// Suggest suggests a collection and tags for one of the user's articles from
+// its content, among the user's own collections and tags. See Suggest.
+func (s *Service) Suggest(ctx context.Context, userID, articleID string) (Suggestions, error) {
+	if !uuidPattern.MatchString(articleID) {
+		return Suggestions{}, ErrNotFound
+	}
+	target, peers, err := s.repo.SuggestionData(ctx, userID, articleID)
+	if errors.Is(err, ErrNotFound) {
+		return Suggestions{}, err
+	}
+	if err != nil {
+		return Suggestions{}, fmt.Errorf("loading suggestion data: %w", err)
+	}
+	counts, err := s.repo.Tags(ctx, userID)
+	if err != nil {
+		return Suggestions{}, fmt.Errorf("listing tags: %w", err)
+	}
+	collections, err := s.repo.Collections(ctx, userID)
+	if err != nil {
+		return Suggestions{}, fmt.Errorf("listing collections: %w", err)
+	}
+
+	in := SuggestInput{Target: target, Peers: peers}
+	for _, t := range counts {
+		in.Tags = append(in.Tags, t.Tag)
+	}
+	for _, c := range collections {
+		in.Collections = append(in.Collections, CollectionRef{ID: c.ID, Name: c.Name, Slug: c.Slug})
+	}
+	return Suggest(in), nil
+}
+
 func parseQuery(p ListParams) (Query, error) {
 	var problems []FieldProblem
 	q := Query{Search: p.Search, Sort: Sort(p.Sort)}

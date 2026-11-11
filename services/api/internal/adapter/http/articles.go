@@ -23,6 +23,7 @@ type LibraryService interface {
 	CreateCollection(ctx context.Context, userID, name string) (library.Collection, error)
 	RenameCollection(ctx context.Context, userID, collectionID, name string) (library.Collection, error)
 	DeleteCollection(ctx context.Context, userID, collectionID string) error
+	Suggest(ctx context.Context, userID, articleID string) (library.Suggestions, error)
 }
 
 type articleHandler struct {
@@ -68,6 +69,16 @@ func (h *articleHandler) tags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"tags": tags})
+}
+
+// suggestions serves GET /api/articles/{id}/suggestions.
+func (h *articleHandler) suggestions(w http.ResponseWriter, r *http.Request) {
+	s, err := h.svc.Suggest(r.Context(), h.ownerID, r.PathValue("id"))
+	if err != nil {
+		h.fail(w, r, err, http.StatusBadRequest, "invalid_query", "the query parameters are not valid")
+		return
+	}
+	writeJSON(w, http.StatusOK, s)
 }
 
 // get serves GET /api/articles/{id}.

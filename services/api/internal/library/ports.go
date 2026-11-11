@@ -41,6 +41,11 @@ type Repository interface {
 	// DeleteCollection deletes one collection of the user; its articles
 	// stay, without a collection. Returns ErrCollectionNotFound.
 	DeleteCollection(ctx context.Context, userID, collectionID string) error
+
+	// SuggestionData returns one article of the user as a suggestion target,
+	// with its saved text, and the user's other articles to compare it with,
+	// most recently added first and bounded; or ErrNotFound.
+	SuggestionData(ctx context.Context, userID, articleID string) (SuggestTarget, []SuggestPeer, error)
 }
 
 // Collection groups articles. An article is in at most one collection.
