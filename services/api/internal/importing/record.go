@@ -17,6 +17,9 @@ type Record struct {
 	URL      string
 	Title    string
 	Folder   []string
-	AddedAt  *time.Time
-	Tags     []string
+	// Collection is the suggested collection: the first folder below the
+	// browser's root folders, or "" when there is none.
+	Collection string
+	AddedAt    *time.Time
+	Tags       []string
 }

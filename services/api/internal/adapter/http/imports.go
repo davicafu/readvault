@@ -1,18 +1,25 @@
 package http
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 
 	"readvault/api/internal/importing"
+	"readvault/api/internal/library"
 )
 
 // multipartOverhead is the room left in the request body for multipart
 // boundaries and headers on top of the file itself.
 const multipartOverhead = 64 << 10
+
+// maxChoicesBytes bounds the "choices" field of an import.
+const maxChoicesBytes = 1 << 20
 
 // errFileTooLarge means the uploaded file exceeded MaxUploadBytes.
 var errFileTooLarge = errors.New("uploaded file is too large")
@@ -20,7 +27,7 @@ var errFileTooLarge = errors.New("uploaded file is too large")
 // ImportService is the driving port the import endpoints call.
 type ImportService interface {
 	Preview(ctx context.Context, userID string, file io.Reader) (importing.Preview, error)
-	Import(ctx context.Context, userID string, file io.Reader) (importing.Report, error)
+	Import(ctx context.Context, userID string, choices importing.Choices, file io.Reader) (importing.Report, error)
 }
 
 type importHandler struct {
@@ -45,16 +52,64 @@ func (h *importHandler) preview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *importHandler) run(w http.ResponseWriter, r *http.Request) {
-	file, _, ok := openUpload(w, r, h.maxBytes, importUpload)
+	fields := map[string][]byte{}
+	file, _, ok := openUploadWithFields(w, r, h.maxBytes, importUpload, map[string]int64{"choices": maxChoicesBytes}, fields)
 	if !ok {
 		return
 	}
-	report, err := h.svc.Import(r.Context(), h.ownerID, file)
+	choices, err := decodeChoices(fields["choices"])
 	if err != nil {
-		h.fail(w, r, file, err)
+		writeError(w, http.StatusBadRequest, "invalid_choices", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, report)
+	report, err := h.svc.Import(r.Context(), h.ownerID, choices, file)
+	var choiceErr *importing.ChoiceError
+	switch {
+	case errors.As(err, &choiceErr):
+		writeErrorDetails(w, http.StatusUnprocessableEntity, "invalid_choices", choiceErr.Message, map[string]string{"field": choiceErr.Field})
+	case err != nil:
+		h.fail(w, r, file, err)
+	default:
+		writeJSON(w, http.StatusOK, report)
+	}
+}
+
+// choicesBody is the JSON of the "choices" field. A bookmark's collection
+// can be absent (keep the suggestion), null (none) or a name.
+type choicesBody struct {
+	Collections map[string]*string `json:"collections"`
+	Bookmarks   map[int]struct {
+		Collection library.Nullable[string] `json:"collection"`
+		Tags       *[]string                `json:"tags"`
+	} `json:"bookmarks"`
+}
+
+func decodeChoices(raw []byte) (importing.Choices, error) {
+	if raw == nil {
+		return importing.Choices{}, nil
+	}
+	if len(raw) > maxChoicesBytes {
+		return importing.Choices{}, fmt.Errorf("the choices are larger than %d bytes", maxChoicesBytes)
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	var body choicesBody
+	if err := dec.Decode(&body); err != nil {
+		return importing.Choices{}, errors.New(`the "choices" field is not valid JSON of the documented shape`)
+	}
+	c := importing.Choices{Collections: body.Collections}
+	if body.Bookmarks != nil {
+		c.Bookmarks = make(map[int]importing.BookmarkChoice, len(body.Bookmarks))
+	}
+	for pos, b := range body.Bookmarks {
+		choice := importing.BookmarkChoice{SetCollection: b.Collection.Set, Collection: b.Collection.Value}
+		if b.Tags != nil {
+			choice.SetTags = true
+			choice.Tags = *b.Tags
+		}
+		c.Bookmarks[pos] = choice
+	}
+	return c, nil
 }
 
 // uploadKind names what an endpoint receives, for its error messages.
@@ -71,7 +126,19 @@ var importUpload = uploadKind{noun: "bookmarks file", tooLarge: "the file is lar
 // the file name the client sent. The file is never buffered to disk: the
 // service reads it once.
 func openUpload(w http.ResponseWriter, r *http.Request, maxBytes int64, kind uploadKind) (*upload, string, bool) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxBytes+multipartOverhead)
+	return openUploadWithFields(w, r, maxBytes, kind, nil, nil)
+}
+
+// openUploadWithFields is openUpload that also reads the small fields named
+// in limits into values, up to one byte past each limit so callers can tell
+// an over-long field. Those fields must come before the file, since the file
+// is streamed; other parts are skipped.
+func openUploadWithFields(w http.ResponseWriter, r *http.Request, maxBytes int64, kind uploadKind, limits map[string]int64, values map[string][]byte) (*upload, string, bool) {
+	limit := maxBytes + multipartOverhead
+	for _, n := range limits {
+		limit += n + 1
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	mr, err := r.MultipartReader()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_upload", "send the "+kind.noun+` as multipart/form-data in the "file" field`)
@@ -92,6 +159,13 @@ func openUpload(w http.ResponseWriter, r *http.Request, maxBytes int64, kind upl
 			return nil, "", false
 		case part.FormName() == "file":
 			return &upload{r: io.LimitReader(part, maxBytes+1), max: maxBytes}, part.FileName(), true
+		case limits[part.FormName()] > 0:
+			b, err := io.ReadAll(io.LimitReader(part, limits[part.FormName()]+1))
+			if err != nil {
+				writeUploadError(w, err, maxBytes, kind)
+				return nil, "", false
+			}
+			values[part.FormName()] = b
 		}
 	}
 }

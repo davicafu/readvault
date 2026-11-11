@@ -18,6 +18,7 @@ Every error has the same shape:
 |---|---|---|
 | 400 | `invalid_upload` | The import request is not `multipart/form-data`, or the form cannot be read or holds no part at all |
 | 400 | `missing_file` | The form has no `file` field |
+| 400 | `invalid_choices` | The `choices` field of an import is not JSON of the documented shape, or is larger than 1 MiB |
 | 400 | `invalid_query` | A list parameter is invalid, or the query string is malformed (for example pairs separated by `;`); `details` is a list of field problems |
 | 400 | `invalid_json` | The body is not one JSON object with only the documented fields, spelled exactly (`Title` is not `title`) |
 | 404 | `not_found` | Unknown route, or an article or collection that does not exist for this user (including malformed ids) |
@@ -26,6 +27,7 @@ Every error has the same shape:
 | 413 | `body_too_large` | A JSON body is larger than 64 KiB; `details.maxBytes` |
 | 415 | `unsupported_media_type` | A JSON endpoint received a body whose `Content-Type` is not `application/json` |
 | 422 | `too_many_records` | The file has more bookmarks than `MAX_IMPORT_RECORDS`; `details.maxRecords` |
+| 422 | `invalid_choices` | An import choice breaks the rules (a name too long or blank, a position or suggestion not in the file); `details.field` names it, such as `bookmarks.12.tags` |
 | 422 | `no_text` | An uploaded article file holds no text |
 | 409 | `collection_exists` | The user already has a collection with that name (compared by slug) |
 | 422 | `validation_failed` | An article edit or a collection name is invalid; `details` is a list of field problems |
@@ -50,7 +52,12 @@ Limits: `MAX_UPLOAD_BYTES` (default 10 MiB) and `MAX_IMPORT_RECORDS` (default 20
 
 ### `POST /api/imports/preview`
 
-Parses and validates the file without writing anything.
+Parses and validates the file without writing anything, and suggests a collection and tags for each bookmark.
+
+- **Collection:** the bookmark's first folder below the browser's own root folders (headings marked `PERSONAL_TOOLBAR_FOLDER` or `UNFILED_BOOKMARKS_FOLDER`, such as "Bookmarks bar"). A bookmark directly in a root folder, or in none, gets no suggestion. The name follows the collection rules; a folder name over 64 characters gives the `collection_too_long` warning and no suggestion.
+- **Tags:** from the bookmark's `TAGS` attribute.
+
+`collections` lists every suggested collection, by slug, with how many bookmarks to import would go in it and whether the user already has a collection with that slug (`existing`).
 
 ```bash
 curl -F file=@fixtures/bookmarks.html http://localhost:8080/api/imports/preview
@@ -59,6 +66,9 @@ curl -F file=@fixtures/bookmarks.html http://localhost:8080/api/imports/preview
 ```json
 {
   "totals": { "detected": 11, "valid": 8, "invalid": 2, "duplicateInFile": 1, "existing": 0 },
+  "collections": [
+    { "name": "Reading", "slug": "reading", "bookmarks": 6, "existing": false }
+  ],
   "candidates": [
     {
       "position": 1,
@@ -67,6 +77,7 @@ curl -F file=@fixtures/bookmarks.html http://localhost:8080/api/imports/preview
       "canonicalUrl": "https://medium.com/@example/understanding-go-interfaces-1a2b3c4d5e6f?source=rss----5517fd7b58a6---4",
       "title": "Understanding Go interfaces",
       "folder": ["Bookmarks bar", "Reading", "Go"],
+      "collection": "Reading",
       "tags": ["go", "interfaces"],
       "errors": [],
       "warnings": []
@@ -84,11 +95,33 @@ curl -F file=@fixtures/bookmarks.html http://localhost:8080/api/imports/preview
 | `duplicate_in_file` | Its canonical URL appears earlier in the file; the first one wins |
 | `invalid` | It cannot be imported; see `errors` |
 
-Error codes: `missing_url`, `url_too_long` (over 2,048 bytes), `unsupported_scheme` (anything but http and https), `invalid_url`. Warning codes: `duplicate_in_file`, `missing_title`, `title_truncated` (over 500 characters), `tag_too_long` (over 64 characters; the tag is skipped), `text_repaired` (bytes that are not valid UTF-8, as in exports saved in a legacy encoding, became U+FFFD, and NUL bytes were dropped).
+Error codes: `missing_url`, `url_too_long` (over 2,048 bytes), `unsupported_scheme` (anything but http and https), `invalid_url`. Warning codes: `duplicate_in_file`, `missing_title`, `collection_too_long`, `title_truncated` (over 500 characters), `tag_too_long` (over 64 characters; the tag is skipped), `text_repaired` (bytes that are not valid UTF-8, as in exports saved in a legacy encoding, became U+FFFD, and NUL bytes were dropped).
 
 ### `POST /api/imports`
 
-Imports the file and returns a report. It is idempotent: importing the same file again adds nothing.
+Imports the file with the suggested collections and tags, changed by the optional `choices` field, and returns a report. It is idempotent: importing the same file again adds nothing.
+
+`choices` is JSON and must come before `file` in the form, because the file is streamed; parts after the file are not read. Every key is optional:
+
+```json
+{
+  "collections": { "Reading": "To read", "Misc": null },
+  "bookmarks": {
+    "12": { "collection": "Backend", "tags": ["go", "http"] },
+    "13": { "collection": null }
+  }
+}
+```
+
+- `collections` renames a suggested collection for all its bookmarks (keyed by the suggested name, compared by slug), or drops it with `null`.
+- `bookmarks` changes single bookmarks by their `position`: `collection` is a name or `null` for none (absent keeps the suggestion); `tags` replaces the file's tags (absent keeps them).
+- A choice about a suggestion or a position that is not imported, a blank or over-long collection name, or a tag over 64 characters rejects the whole import with `invalid_choices` before anything is written.
+
+```bash
+curl -F choices='{"collections":{"Misc":null}}' -F file=@fixtures/bookmarks.html http://localhost:8080/api/imports
+```
+
+Collections that do not exist are created; a name with the slug of an existing collection reuses it and keeps its name.
 
 ```json
 {
@@ -100,12 +133,12 @@ Imports the file and returns a report. It is idempotent: importing the same file
 }
 ```
 
-`items` lists every bookmark that was not inserted. `outcome` is `inserted`, `updated` (an existing article gained a missing title, folder, bookmark date or tag), `skipped` (nothing to change) or `failed`. A `storage_error` problem means its batch of up to 500 bookmarks could not be saved; the other batches are kept, and importing the file again completes it. `importId` also appears in the server log line `import finished`.
+`items` lists every bookmark that was not inserted. `outcome` is `inserted`, `updated` (an existing article gained a missing title, folder, bookmark date, collection or tag), `skipped` (nothing to change) or `failed`. A `storage_error` problem means its batch of up to 500 bookmarks could not be saved; the other batches are kept, and importing the file again completes it. `importId` also appears in the server log line `import finished`.
 
 Rules applied to existing articles:
 
 - A title is filled only when it is empty and the user never edited it.
-- The folder and bookmark date are filled only when missing.
+- The folder, bookmark date and collection are filled only when missing: an article already in a collection stays there.
 - Tags are only added, never removed, and never to an article whose tags the user edited (`tagsEditedAt`), so a tag the user removed does not come back.
 - The original URL of the first import is kept.
 

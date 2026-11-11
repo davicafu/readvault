@@ -68,20 +68,28 @@ func analyze(records []Record) []analyzed {
 			a.Warnings = append(a.Warnings, Problem{Code: "title_truncated", Message: fmt.Sprintf("the title was cut to %d characters", maxTitleRunes)})
 		}
 
+		collection, err := tag.Normalize(rec.Collection)
+		switch {
+		case errors.Is(err, tag.ErrEmpty):
+		case err != nil:
+			a.Warnings = append(a.Warnings, Problem{Code: "collection_too_long", Message: fmt.Sprintf("the folder name is longer than %d characters, so it is not suggested as a collection", tag.MaxRunes)})
+		default:
+			a.Collection = &collection.Name
+			a.article.Collection = &collection
+		}
+
 		tags, tagProblems := normalizeTags(rec.Tags)
 		a.Warnings = append(a.Warnings, tagProblems...)
 		for _, t := range tags {
 			a.Tags = append(a.Tags, t.Name)
 		}
 
-		a.article = NewArticle{
-			OriginalURL:  rec.URL,
-			CanonicalURL: a.CanonicalURL,
-			Title:        a.Title,
-			Folder:       rec.Folder,
-			BookmarkedAt: rec.AddedAt,
-			Tags:         tags,
-		}
+		a.article.OriginalURL = rec.URL
+		a.article.CanonicalURL = a.CanonicalURL
+		a.article.Title = a.Title
+		a.article.Folder = rec.Folder
+		a.article.BookmarkedAt = rec.AddedAt
+		a.article.Tags = tags
 		out = append(out, a)
 	}
 	return out
@@ -99,6 +107,7 @@ func repairText(rec Record) (Record, bool) {
 	}
 	rec.URL = fix(rec.URL)
 	rec.Title = fix(rec.Title)
+	rec.Collection = fix(rec.Collection)
 	rec.Folder = slices.Clone(rec.Folder)
 	for i := range rec.Folder {
 		rec.Folder[i] = fix(rec.Folder[i])
@@ -154,8 +163,8 @@ func normalizeTags(names []string) ([]tag.Tag, []Problem) {
 
 // FillMissing completes an existing article with imported metadata without
 // overwriting anything the user or an earlier import already set: a title is
-// filled only when it is empty and was never edited; folder and bookmark
-// date only when absent. It reports whether anything changed.
+// filled only when it is empty and was never edited; folder, bookmark date
+// and collection only when absent. It reports whether anything changed.
 func FillMissing(existing StoredArticle, incoming NewArticle) (StoredArticle, bool) {
 	filled := existing
 	changed := false
@@ -170,6 +179,10 @@ func FillMissing(existing StoredArticle, incoming NewArticle) (StoredArticle, bo
 	}
 	if existing.BookmarkedAt == nil && incoming.BookmarkedAt != nil {
 		filled.BookmarkedAt = incoming.BookmarkedAt
+		changed = true
+	}
+	if existing.CollectionID == nil && incoming.CollectionID != nil {
+		filled.CollectionID = incoming.CollectionID
 		changed = true
 	}
 	return filled, changed

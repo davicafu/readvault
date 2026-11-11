@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -38,6 +39,7 @@ type Candidate struct {
 	CanonicalURL string    `json:"canonicalUrl,omitempty"`
 	Title        string    `json:"title"`
 	Folder       []string  `json:"folder"`
+	Collection   *string   `json:"collection"`
 	Tags         []string  `json:"tags"`
 	Errors       []Problem `json:"errors"`
 	Warnings     []Problem `json:"warnings"`
@@ -53,10 +55,21 @@ type PreviewTotals struct {
 	Existing        int `json:"existing"`
 }
 
+// SuggestedCollection is a collection the bookmarks of a file suggest, with
+// how many bookmarks to import would go in it and whether the user already
+// has it.
+type SuggestedCollection struct {
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	Bookmarks int    `json:"bookmarks"`
+	Existing  bool   `json:"existing"`
+}
+
 // Preview is what an import would do, without writing anything.
 type Preview struct {
-	Totals     PreviewTotals `json:"totals"`
-	Candidates []Candidate   `json:"candidates"`
+	Totals      PreviewTotals         `json:"totals"`
+	Collections []SuggestedCollection `json:"collections"`
+	Candidates  []Candidate           `json:"candidates"`
 }
 
 // ReportTotals counts what an import did.
@@ -113,7 +126,8 @@ func (s *Service) Preview(ctx context.Context, userID string, file io.Reader) (P
 		return Preview{}, fmt.Errorf("checking existing articles: %w", err)
 	}
 
-	p := Preview{Candidates: make([]Candidate, 0, len(items))}
+	p := Preview{Collections: []SuggestedCollection{}, Candidates: make([]Candidate, 0, len(items))}
+	suggested := map[string]int{}
 	p.Totals.Detected = len(items)
 	for _, it := range items {
 		c := it.Candidate
@@ -131,19 +145,52 @@ func (s *Service) Preview(ctx context.Context, userID string, file io.Reader) (P
 			p.Totals.Existing++
 		}
 		p.Candidates = append(p.Candidates, c)
+
+		col := it.article.Collection
+		if col == nil || c.Status == StatusInvalid || c.Status == StatusDuplicateInFile {
+			continue
+		}
+		if i, ok := suggested[col.Slug]; ok {
+			p.Collections[i].Bookmarks++
+			continue
+		}
+		suggested[col.Slug] = len(p.Collections)
+		p.Collections = append(p.Collections, SuggestedCollection{Name: col.Name, Slug: col.Slug, Bookmarks: 1})
 	}
+
+	slugs := make([]string, len(p.Collections))
+	for i, c := range p.Collections {
+		slugs[i] = c.Slug
+	}
+	have, err := s.repo.ExistingCollections(ctx, userID, slugs)
+	if err != nil {
+		return Preview{}, fmt.Errorf("checking existing collections: %w", err)
+	}
+	for i := range p.Collections {
+		p.Collections[i].Existing = have[p.Collections[i].Slug]
+	}
+	slices.SortFunc(p.Collections, func(a, b SuggestedCollection) int { return strings.Compare(a.Slug, b.Slug) })
 	return p, nil
 }
 
-// Import persists the valid, unique records of a bookmark HTML file. It is
-// idempotent: re-importing the same file creates nothing new. A failing batch
+// Import persists the valid, unique records of a bookmark HTML file with
+// their suggested collection and tags, as changed by choices. It is
+// idempotent: re-importing the same file creates nothing new. Invalid
+// choices return a *ChoiceError before anything is written. A failing batch
 // is reported as failed without discarding the batches that succeeded.
-func (s *Service) Import(ctx context.Context, userID string, file io.Reader) (Report, error) {
+func (s *Service) Import(ctx context.Context, userID string, choices Choices, file io.Reader) (Report, error) {
 	records, err := ParseHTML(file, s.maxRecords)
 	if err != nil {
 		return Report{}, err
 	}
 	items := analyze(records)
+	resolved, err := choices.resolve(items)
+	if err != nil {
+		return Report{}, err
+	}
+	for i := range items {
+		resolved.apply(&items[i])
+	}
 
 	report := Report{ImportID: newID(), Items: []ReportItem{}}
 	logger := s.logger.With(slog.String("import_id", report.ImportID))

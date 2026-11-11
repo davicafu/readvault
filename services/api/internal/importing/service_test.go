@@ -91,7 +91,7 @@ func TestImport_IsIdempotent(t *testing.T) {
 	svc, pool := newService(t)
 	ctx := t.Context()
 
-	first, err := svc.Import(ctx, owner, strings.NewReader(fixture(t)))
+	first, err := svc.Import(ctx, owner, importing.Choices{}, strings.NewReader(fixture(t)))
 	if err != nil {
 		t.Fatalf("first Import() error: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestImport_IsIdempotent(t *testing.T) {
 		t.Error("import id is empty")
 	}
 
-	second, err := svc.Import(ctx, owner, strings.NewReader(fixture(t)))
+	second, err := svc.Import(ctx, owner, importing.Choices{}, strings.NewReader(fixture(t)))
 	if err != nil {
 		t.Fatalf("second Import() error: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestImport_KeepsUserEditsAndCompletesMissingData(t *testing.T) {
 	svc, pool := newService(t)
 	ctx := t.Context()
 
-	if _, err := svc.Import(ctx, owner, strings.NewReader(fixture(t))); err != nil {
+	if _, err := svc.Import(ctx, owner, importing.Choices{}, strings.NewReader(fixture(t))); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `UPDATE articles SET title = 'My title', title_edited_at = now()
@@ -153,7 +153,7 @@ func TestImport_KeepsUserEditsAndCompletesMissingData(t *testing.T) {
 		<DT><A HREF="https://example.com/untitled">Now titled</A>
 		<DT><A HREF="https://pkg.go.dev/net/http">http package</A>
 	</DL>`
-	report, err := svc.Import(ctx, owner, strings.NewReader(update))
+	report, err := svc.Import(ctx, owner, importing.Choices{}, strings.NewReader(update))
 	if err != nil {
 		t.Fatalf("Import() error: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestImport_RejectsFilesOverTheRecordLimit(t *testing.T) {
 	pool := testdb.New(t)
 	svc := importing.NewService(postgres.NewImportRepository(pool), 2)
 
-	_, err := svc.Import(t.Context(), owner, strings.NewReader(fixture(t)))
+	_, err := svc.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(fixture(t)))
 	if err == nil || !strings.Contains(err.Error(), importing.ErrTooManyRecords.Error()) {
 		t.Errorf("Import() error = %v, want ErrTooManyRecords", err)
 	}
@@ -234,7 +234,7 @@ func TestImport_ConcurrentImportsDoNotDuplicate(t *testing.T) {
 	errs := make(chan error, 4)
 	for range 4 {
 		go func() {
-			_, err := svc.Import(t.Context(), owner, strings.NewReader(fixture(t)))
+			_, err := svc.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(fixture(t)))
 			errs <- err
 		}()
 	}
@@ -278,7 +278,7 @@ func TestImport_RepairsInvalidTextInsteadOfFailingTheBatch(t *testing.T) {
 		t.Errorf("text_repaired warnings on %v, want [2 3 4]", repaired)
 	}
 
-	report, err := svc.Import(t.Context(), owner, strings.NewReader(file))
+	report, err := svc.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file))
 	if err != nil {
 		t.Fatal(err)
 	}

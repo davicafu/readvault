@@ -159,7 +159,7 @@ func TestUpdate_EditedTitleAndTagsSurviveAReimport(t *testing.T) {
 	svc, pool := newService(t)
 	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
 	file := `<DL><DT><A HREF="https://go.dev/blog/" TAGS="go">Imported title</A></DL>`
-	if _, err := imports.Import(t.Context(), owner, strings.NewReader(file)); err != nil {
+	if _, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file)); err != nil {
 		t.Fatal(err)
 	}
 	page, err := svc.List(t.Context(), owner, library.ListParams{})
@@ -172,7 +172,7 @@ func TestUpdate_EditedTitleAndTagsSurviveAReimport(t *testing.T) {
 	}
 
 	time.Sleep(time.Millisecond)
-	report, err := imports.Import(t.Context(), owner, strings.NewReader(file))
+	report, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestUpdate_ImportStillAddsTagsWhenOnlyTheTitleWasEdited(t *testing.T) {
 	}
 
 	file := `<DL><DT><A HREF="https://go.dev/blog/" TAGS="go">Imported title</A></DL>`
-	if _, err := imports.Import(t.Context(), owner, strings.NewReader(file)); err != nil {
+	if _, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file)); err != nil {
 		t.Fatal(err)
 	}
 	got, err := svc.Get(t.Context(), owner, ids[0])
@@ -284,7 +284,7 @@ func TestUpdate_ConcurrentImportAndEditDoNotDeadlock(t *testing.T) {
 		file := fmt.Sprintf(`<DL><DT><A HREF="https://a.example/imported-%d" TAGS="%s">imported</A></DL>`, round, strings.Join(descending, ","))
 
 		errs := make(chan error, 2)
-		go func() { _, err := imports.Import(t.Context(), owner, strings.NewReader(file)); errs <- err }()
+		go func() { _, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file)); errs <- err }()
 		go func() { _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Tags: &tags}); errs <- err }()
 		for range 2 {
 			if err := <-errs; err != nil {
@@ -311,7 +311,7 @@ func TestUpdate_ConcurrentImportAndTagEditOfTheSameArticle(t *testing.T) {
 		file := fmt.Sprintf(`<DL><DT><A HREF="%s" TAGS="%s,imported-%d">same</A></DL>`, url, strings.Join(descending, ","), round)
 
 		errs := make(chan error, 2)
-		go func() { _, err := imports.Import(t.Context(), owner, strings.NewReader(file)); errs <- err }()
+		go func() { _, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file)); errs <- err }()
 		go func() { _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Tags: &tags}); errs <- err }()
 		for range 2 {
 			if err := <-errs; err != nil {
@@ -366,7 +366,7 @@ func TestImport_WaitsForATagEditInProgressAndKeepsIt(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		_, err := imports.Import(t.Context(), owner, strings.NewReader(`<DL><DT><A HREF="https://go.dev/blog/" TAGS="go">x</A></DL>`))
+		_, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(`<DL><DT><A HREF="https://go.dev/blog/" TAGS="go">x</A></DL>`))
 		done <- err
 	}()
 	waitForLockWait(t, pool)

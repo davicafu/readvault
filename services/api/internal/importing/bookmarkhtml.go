@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +51,9 @@ func ParseHTML(r io.Reader, maxRecords int) ([]Record, error) {
 type folderLevel struct {
 	name    string
 	isNamed bool
+	// isRoot marks a browser's own folder (bookmarks bar, other bookmarks),
+	// which never becomes a collection.
+	isRoot bool
 }
 
 type htmlParser struct {
@@ -58,6 +62,8 @@ type htmlParser struct {
 
 	folders       []folderLevel
 	pendingFolder *string
+	pendingIsRoot bool
+	headingIsRoot bool
 
 	isInHeading bool
 	heading     strings.Builder
@@ -76,16 +82,20 @@ func (p *htmlParser) startTag(tok html.Token) error {
 	case "h3":
 		p.isInHeading = true
 		p.heading.Reset()
+		p.headingIsRoot = slices.ContainsFunc(tok.Attr, func(a html.Attribute) bool {
+			return (a.Key == "personal_toolbar_folder" || a.Key == "unfiled_bookmarks_folder") && strings.EqualFold(a.Val, "true")
+		})
 	case "dl":
 		if err := p.closeAnchor(); err != nil {
 			return err
 		}
 		level := folderLevel{}
 		if p.pendingFolder != nil {
-			level = folderLevel{name: *p.pendingFolder, isNamed: true}
+			level = folderLevel{name: *p.pendingFolder, isNamed: true, isRoot: p.pendingIsRoot}
 		}
 		p.folders = append(p.folders, level)
 		p.pendingFolder = nil
+		p.pendingIsRoot = false
 	case "dt":
 		return p.closeAnchor()
 	case "a":
@@ -105,6 +115,7 @@ func (p *htmlParser) endTag(tok html.Token) error {
 	case "h3":
 		name := collapseSpace(p.heading.String())
 		p.pendingFolder = &name
+		p.pendingIsRoot = p.headingIsRoot
 		p.isInHeading = false
 	case "dl":
 		if err := p.closeAnchor(); err != nil {
@@ -132,7 +143,7 @@ func (p *htmlParser) text(s string) {
 }
 
 func (p *htmlParser) openAnchor(attrs []html.Attribute) {
-	rec := Record{Folder: p.folderPath()}
+	rec := Record{Folder: p.folderPath(), Collection: p.collection()}
 	for _, a := range attrs {
 		switch a.Key {
 		case "href":
@@ -175,6 +186,17 @@ func (p *htmlParser) folderPath() []string {
 		}
 	}
 	return path
+}
+
+// collection is the first named folder that is not a browser root folder,
+// or "" when the bookmark sits directly in a root folder or in none.
+func (p *htmlParser) collection() string {
+	for _, f := range p.folders {
+		if f.isNamed && !f.isRoot {
+			return f.name
+		}
+	}
+	return ""
 }
 
 // parseUnixDate accepts seconds, milliseconds or microseconds since the epoch,

@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -25,9 +26,10 @@ const (
 
 // stubImports records what the handler passed to the importing service.
 type stubImports struct {
-	err      error
-	gotUser  string
-	gotBytes string
+	err        error
+	gotUser    string
+	gotBytes   string
+	gotChoices importing.Choices
 }
 
 func (s *stubImports) read(userID string, file io.Reader) error {
@@ -47,7 +49,8 @@ func (s *stubImports) Preview(_ context.Context, userID string, file io.Reader) 
 	return importing.Preview{Totals: importing.PreviewTotals{Detected: 1, Valid: 1}, Candidates: []importing.Candidate{}}, nil
 }
 
-func (s *stubImports) Import(_ context.Context, userID string, file io.Reader) (importing.Report, error) {
+func (s *stubImports) Import(_ context.Context, userID string, choices importing.Choices, file io.Reader) (importing.Report, error) {
+	s.gotChoices = choices
 	if err := s.read(userID, file); err != nil {
 		return importing.Report{}, err
 	}
@@ -216,5 +219,125 @@ func TestImportEndpoints_RejectBadUploads(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// orderedBody builds a form whose parts keep the given order; "file" is sent
+// as a file part.
+func orderedBody(t *testing.T, parts ...[2]string) (*bytes.Buffer, string) {
+	t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	for _, p := range parts {
+		var w io.Writer
+		var err error
+		if p[0] == "file" {
+			w, err = mw.CreateFormFile("file", "bookmarks.html")
+		} else {
+			w, err = mw.CreateFormField(p[0])
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(w, p[1]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return &buf, mw.FormDataContentType()
+}
+
+func TestImport_PassesThePersonsChoicesToTheService(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		choices  string
+		expected importing.Choices
+	}{
+		"no choices": {"", importing.Choices{}},
+		"every kind of choice": {
+			`{"collections": {"Streaming": "Data streaming", "Go": null},
+			  "bookmarks": {"3": {"collection": null, "tags": []}, "7": {"collection": "Backend"}, "9": {"tags": ["go", "web"]}}}`,
+			importing.Choices{
+				Collections: map[string]*string{"Streaming": new("Data streaming"), "Go": nil},
+				Bookmarks: map[int]importing.BookmarkChoice{
+					3: {SetCollection: true, SetTags: true, Tags: []string{}},
+					7: {SetCollection: true, Collection: new("Backend")},
+					9: {SetTags: true, Tags: []string{"go", "web"}},
+				},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			svc := &stubImports{}
+			parts := [][2]string{{"file", "<DL>"}}
+			if tt.choices != "" {
+				parts = append([][2]string{{"choices", tt.choices}}, parts...)
+			}
+			body, ct := orderedBody(t, parts...)
+
+			rec := post(t, newImportHandler(svc), "/api/imports", body, ct)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200; body %s", rec.Code, rec.Body.String())
+			}
+			if !reflect.DeepEqual(svc.gotChoices, tt.expected) {
+				t.Errorf("choices = %#v, want %#v", svc.gotChoices, tt.expected)
+			}
+			if svc.gotBytes != "<DL>" {
+				t.Errorf("file = %q, want the uploaded bytes", svc.gotBytes)
+			}
+		})
+	}
+}
+
+func TestImport_RejectsChoicesItCannotUse(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		choices         string
+		serviceErr      error
+		expectedStatus  int
+		expectedDetails map[string]any
+	}{
+		"not JSON":              {choices: `{"collections": `, expectedStatus: http.StatusBadRequest},
+		"wrong shape":           {choices: `{"bookmarks": {"x": {}}}`, expectedStatus: http.StatusBadRequest},
+		"collection not a name": {choices: `{"collections": {"Go": 3}}`, expectedStatus: http.StatusBadRequest},
+		"larger than allowed":   {choices: `{"collections": {"` + strings.Repeat("a", 1<<20) + `": null}}`, expectedStatus: http.StatusBadRequest},
+		"rejected by the service": {
+			choices:         `{}`,
+			serviceErr:      &importing.ChoiceError{Field: "bookmarks.2.tags", Message: "a tag is longer than 64 characters"},
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedDetails: map[string]any{"field": "bookmarks.2.tags"},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			svc := &stubImports{err: tt.serviceErr}
+			body, ct := orderedBody(t, [2]string{"choices", tt.choices}, [2]string{"file", "<DL>"})
+
+			rec := post(t, newImportHandler(svc), "/api/imports", body, ct)
+
+			if rec.Code != tt.expectedStatus {
+				t.Fatalf("status = %d, want %d; body %s", rec.Code, tt.expectedStatus, rec.Body.String())
+			}
+			errBody, _ := decode(t, rec)["error"].(map[string]any)
+			if errBody["code"] != "invalid_choices" {
+				t.Errorf("error code = %v, want invalid_choices; body %s", errBody["code"], rec.Body.String())
+			}
+			if tt.expectedDetails != nil {
+				if details, _ := errBody["details"].(map[string]any); fmt.Sprint(details) != fmt.Sprint(tt.expectedDetails) {
+					t.Errorf("details = %v, want %v", details, tt.expectedDetails)
+				}
+			}
+			if tt.serviceErr == nil && svc.gotUser != "" {
+				t.Error("the service ran with choices the handler could not read")
+			}
+		})
 	}
 }

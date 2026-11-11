@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -48,6 +49,26 @@ func (r *ImportRepository) ExistingCanonicalURLs(ctx context.Context, userID str
 	return found, nil
 }
 
+// ExistingCollections implements importing.Repository.
+func (r *ImportRepository) ExistingCollections(ctx context.Context, userID string, slugs []string) (map[string]bool, error) {
+	found := make(map[string]bool)
+	if len(slugs) == 0 {
+		return found, nil
+	}
+	rows, err := r.pool.Query(ctx, `SELECT slug FROM collections WHERE user_id = $1 AND slug = ANY($2)`, userID, slugs)
+	if err != nil {
+		return nil, fmt.Errorf("querying existing collections: %w", err)
+	}
+	have, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, fmt.Errorf("reading existing collections: %w", err)
+	}
+	for _, s := range have {
+		found[s] = true
+	}
+	return found, nil
+}
+
 // Save implements importing.Repository. The whole batch runs in one
 // transaction; the unique (user_id, canonical_url) constraint is what
 // prevents duplicates, including under concurrent imports.
@@ -57,7 +78,12 @@ func (r *ImportRepository) Save(ctx context.Context, userID string, articles []i
 		return outcomes, nil
 	}
 
+	// Copy so that setting collection ids does not change the caller's slice.
+	articles = slices.Clone(articles)
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		if err := ensureCollections(ctx, tx, userID, articles); err != nil {
+			return err
+		}
 		ids, err := insertArticles(ctx, tx, userID, articles, outcomes)
 		if err != nil {
 			return err
@@ -78,17 +104,60 @@ func (r *ImportRepository) Save(ctx context.Context, userID string, articles []i
 	return outcomes, nil
 }
 
+// ensureCollections creates the collections the articles go in that the user
+// does not have yet, and sets each article's CollectionID. A collection that
+// shares a slug with an existing one is that collection; its name is kept.
+func ensureCollections(ctx context.Context, tx pgx.Tx, userID string, articles []importing.NewArticle) error {
+	var names, slugs []string
+	seen := map[string]bool{}
+	for _, a := range articles {
+		if c := a.Collection; c != nil && !seen[c.Slug] {
+			seen[c.Slug] = true
+			names = append(names, c.Name)
+			slugs = append(slugs, c.Slug)
+		}
+	}
+	if len(slugs) == 0 {
+		return nil
+	}
+	// Sorted inserts keep concurrent imports from deadlocking on each other.
+	if _, err := tx.Exec(ctx, `INSERT INTO collections (user_id, name, slug)
+		SELECT $1, name, slug FROM unnest($2::text[], $3::text[]) AS c (name, slug) ORDER BY slug
+		ON CONFLICT (user_id, slug) DO NOTHING`, userID, names, slugs); err != nil {
+		return fmt.Errorf("creating collections: %w", err)
+	}
+	rows, err := tx.Query(ctx, `SELECT slug, id FROM collections WHERE user_id = $1 AND slug = ANY($2)`, userID, slugs)
+	if err != nil {
+		return fmt.Errorf("loading collections: %w", err)
+	}
+	ids := map[string]string{}
+	var slug, id string
+	if _, err := pgx.ForEachRow(rows, []any{&slug, &id}, func() error {
+		ids[slug] = id
+		return nil
+	}); err != nil {
+		return fmt.Errorf("reading collections: %w", err)
+	}
+	for i := range articles {
+		if c := articles[i].Collection; c != nil {
+			id := ids[c.Slug]
+			articles[i].CollectionID = &id
+		}
+	}
+	return nil
+}
+
 // insertArticles inserts every article that does not exist yet and returns
 // the id of each article by position. Existing ones are marked skipped and
 // get their id from fillExisting.
 func insertArticles(ctx context.Context, tx pgx.Tx, userID string, articles []importing.NewArticle, outcomes []importing.Outcome) ([]string, error) {
 	batch := &pgx.Batch{}
 	for _, a := range articles {
-		batch.Queue(`INSERT INTO articles (user_id, original_url, canonical_url, title, original_folder, bookmarked_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
+		batch.Queue(`INSERT INTO articles (user_id, original_url, canonical_url, title, original_folder, bookmarked_at, collection_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			ON CONFLICT (user_id, canonical_url) DO NOTHING
 			RETURNING id`,
-			userID, a.OriginalURL, a.CanonicalURL, a.Title, a.Folder, a.BookmarkedAt)
+			userID, a.OriginalURL, a.CanonicalURL, a.Title, a.Folder, a.BookmarkedAt, a.CollectionID)
 	}
 
 	ids := make([]string, len(articles))
@@ -132,7 +201,7 @@ func fillExisting(ctx context.Context, tx pgx.Tx, userID string, articles []impo
 		CanonicalURL string
 		importing.StoredArticle
 	}
-	rows, err := tx.Query(ctx, `SELECT id, canonical_url, title, title_edited_at, original_folder, bookmarked_at
+	rows, err := tx.Query(ctx, `SELECT id, canonical_url, title, title_edited_at, original_folder, bookmarked_at, collection_id
 		FROM articles WHERE user_id = $1 AND canonical_url = ANY($2)
 		ORDER BY id FOR UPDATE`, userID, urls)
 	if err != nil {
@@ -140,7 +209,7 @@ func fillExisting(ctx context.Context, tx pgx.Tx, userID string, articles []impo
 	}
 	existing, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (stored, error) {
 		var s stored
-		err := row.Scan(&s.ID, &s.CanonicalURL, &s.Title, &s.TitleEditedAt, &s.Folder, &s.BookmarkedAt)
+		err := row.Scan(&s.ID, &s.CanonicalURL, &s.Title, &s.TitleEditedAt, &s.Folder, &s.BookmarkedAt, &s.CollectionID)
 		return s, err
 	})
 	if err != nil {
@@ -156,8 +225,8 @@ func fillExisting(ctx context.Context, tx pgx.Tx, userID string, articles []impo
 			continue
 		}
 		changed[i] = true
-		batch.Queue(`UPDATE articles SET title = $2, original_folder = $3, bookmarked_at = $4, updated_at = now()
-			WHERE id = $1`, s.ID, filled.Title, filled.Folder, filled.BookmarkedAt)
+		batch.Queue(`UPDATE articles SET title = $2, original_folder = $3, bookmarked_at = $4, collection_id = $5, updated_at = now()
+			WHERE id = $1`, s.ID, filled.Title, filled.Folder, filled.BookmarkedAt, filled.CollectionID)
 	}
 	if err := tx.SendBatch(ctx, batch).Close(); err != nil {
 		return nil, fmt.Errorf("completing existing articles: %w", err)
