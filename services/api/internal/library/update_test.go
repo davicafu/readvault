@@ -284,7 +284,10 @@ func TestUpdate_ConcurrentImportAndEditDoNotDeadlock(t *testing.T) {
 		file := fmt.Sprintf(`<DL><DT><A HREF="https://a.example/imported-%d" TAGS="%s">imported</A></DL>`, round, strings.Join(descending, ","))
 
 		errs := make(chan error, 2)
-		go func() { _, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file)); errs <- err }()
+		go func() {
+			_, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file))
+			errs <- err
+		}()
 		go func() { _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Tags: &tags}); errs <- err }()
 		for range 2 {
 			if err := <-errs; err != nil {
@@ -311,7 +314,10 @@ func TestUpdate_ConcurrentImportAndTagEditOfTheSameArticle(t *testing.T) {
 		file := fmt.Sprintf(`<DL><DT><A HREF="%s" TAGS="%s,imported-%d">same</A></DL>`, url, strings.Join(descending, ","), round)
 
 		errs := make(chan error, 2)
-		go func() { _, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file)); errs <- err }()
+		go func() {
+			_, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file))
+			errs <- err
+		}()
 		go func() { _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Tags: &tags}); errs <- err }()
 		for range 2 {
 			if err := <-errs; err != nil {
