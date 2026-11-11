@@ -61,6 +61,31 @@ func TestPreview_SuggestsACollectionPerBookmark(t *testing.T) {
 	}
 }
 
+// Folders whose names share a slug suggest one collection, under the first
+// spelling, so every bookmark of the group names it the same way.
+func TestPreview_GroupsFoldersThatShareASlug(t *testing.T) {
+	t.Parallel()
+	svc, _ := newService(t)
+	file := `<DL><p>
+		<DT><H3>Go</H3><DL><p><DT><A HREF="https://example.com/a">A</A></DL><p>
+		<DT><H3>go</H3><DL><p><DT><A HREF="https://example.com/b">B</A></DL><p>
+	</DL>`
+
+	got, err := svc.Preview(t.Context(), owner, strings.NewReader(file))
+	if err != nil {
+		t.Fatalf("Preview() error: %v", err)
+	}
+	for _, c := range got.Candidates {
+		if deref(c.Collection) != "Go" {
+			t.Errorf("candidate %d collection = %q, want the group's name Go", c.Position, deref(c.Collection))
+		}
+	}
+	expected := []importing.SuggestedCollection{{Name: "Go", Slug: "go", Bookmarks: 2}}
+	if !slices.Equal(got.Collections, expected) {
+		t.Errorf("collections = %+v, want %+v", got.Collections, expected)
+	}
+}
+
 func TestPreview_WarnsAboutACollectionNameTooLong(t *testing.T) {
 	t.Parallel()
 	svc, _ := newService(t)

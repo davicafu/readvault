@@ -1,20 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   ApiError,
   readJSON,
   type Candidate,
   type CandidateStatus,
+  type Collection,
+  type ImportChoices,
   type ImportOutcome,
   type ImportPreview,
   type ImportReport,
 } from "@/lib/api";
 
-// Big exports can hold thousands of bookmarks; the table shows a slice.
+// Big exports can hold thousands of bookmarks; the table shows a slice at a time.
 const VISIBLE_ROWS = 200;
+
+// Collection names and tags follow the same rule on the server.
+const MAX_NAME = 64;
+
+/** What the person decided for a suggested collection, by its slug. */
+type GroupChoice = { use: boolean; name: string };
+
+/** What the person changed on one bookmark: raw input, parsed on import. */
+type BookmarkEdit = { collection?: string; tags?: string };
+
+const importable = (c: Candidate) => c.status === "valid" || c.status === "existing";
+
+function splitTags(text: string): string[] {
+  return text
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
 
 type Step =
   | { kind: "choose" }
@@ -37,8 +57,10 @@ const outcomeLabels: Record<ImportOutcome, string> = {
   failed: "Not imported",
 };
 
-async function upload<T>(path: string, file: File): Promise<T> {
+async function upload<T>(path: string, file: File, choices?: ImportChoices): Promise<T> {
   const body = new FormData();
+  // The server streams the file, so the choices must come first.
+  if (choices) body.append("choices", JSON.stringify(choices));
   body.append("file", file);
   return readJSON<T>(await fetch(path, { method: "POST", body }));
 }
@@ -59,6 +81,8 @@ function describe(err: unknown): string {
     case "invalid_upload":
     case "missing_file":
       return "The file could not be read. Choose the HTML file your browser exported.";
+    case "invalid_choices":
+      return `Your changes could not be applied: ${err.message}. Fix them and import again.`;
     default:
       return "The server could not finish. Try again in a moment.";
   }
@@ -87,13 +111,14 @@ export function ImportFlow() {
     }
   };
 
-  // The file is uploaded again on confirm; the server keeps nothing between steps.
-  const confirm = async (current: ImportPreview) => {
+  // The file is uploaded again on confirm, with the person's changes; the
+  // server keeps nothing between steps.
+  const confirm = async (current: ImportPreview, choices: ImportChoices) => {
     if (!file) return;
     setError(null);
     setStep({ kind: "importing", preview: current });
     try {
-      setStep({ kind: "done", report: await upload<ImportReport>("/api/imports", file) });
+      setStep({ kind: "done", report: await upload<ImportReport>("/api/imports", file, choices) });
     } catch (err) {
       setError(describe(err));
       setStep({ kind: "preview", preview: current });
@@ -136,7 +161,7 @@ export function ImportFlow() {
           preview={step.preview}
           fileName={file?.name ?? ""}
           importing={step.kind === "importing"}
-          onConfirm={() => confirm(step.preview)}
+          onConfirm={(choices) => confirm(step.preview, choices)}
           onCancel={reset}
         />
       ) : null}
@@ -156,16 +181,51 @@ function PreviewStep({
   preview: ImportPreview;
   fileName: string;
   importing: boolean;
-  onConfirm: () => void;
+  onConfirm: (choices: ImportChoices) => void;
   onCancel: () => void;
 }) {
   const [show, setShow] = useState<CandidateStatus | "all">("all");
+  const [groups, setGroups] = useState<Record<string, GroupChoice>>(() =>
+    Object.fromEntries(preview.collections.map((c) => [c.slug, { use: true, name: c.name }])),
+  );
+  const [edits, setEdits] = useState<Record<number, BookmarkEdit>>({});
+  const existing = useExistingCollections();
+
   const rows = useMemo(
     () => (show === "all" ? preview.candidates : preview.candidates.filter((c) => c.status === show)),
     [preview.candidates, show],
   );
   const t = preview.totals;
-  const importable = t.valid + t.existing;
+  const importableCount = t.valid + t.existing;
+
+  // The collection a bookmark gets from its suggestion, after the group choice.
+  const suggestedFor = (c: Candidate): string => {
+    if (!c.collection) return "";
+    const g = groups[slugOf(preview, c.collection)];
+    return g && g.use ? g.name : "";
+  };
+
+  const problems = validate(groups, edits);
+  const names = [...new Set([...existing.map((c) => c.name), ...Object.values(groups).filter((g) => g.use).map((g) => g.name.trim())])]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
+  const choices = (): ImportChoices => {
+    const collections: Record<string, string | null> = {};
+    for (const s of preview.collections) {
+      const g = groups[s.slug];
+      if (!g.use) collections[s.name] = null;
+      else if (g.name.trim() !== s.name) collections[s.name] = g.name.trim();
+    }
+    const bookmarks: NonNullable<ImportChoices["bookmarks"]> = {};
+    for (const [pos, e] of Object.entries(edits)) {
+      const b: { collection?: string | null; tags?: string[] } = {};
+      if (e.collection !== undefined) b.collection = e.collection.trim() || null;
+      if (e.tags !== undefined) b.tags = splitTags(e.tags);
+      bookmarks[Number(pos)] = b;
+    }
+    return { collections, bookmarks };
+  };
 
   const counts: [CandidateStatus | "all", string, number][] = [
     ["all", "All", t.detected],
@@ -205,13 +265,36 @@ function PreviewStep({
       </dl>
 
       <div className="actions">
-        <button className="button" type="button" disabled={importing || importable === 0} onClick={onConfirm}>
-          {importing ? "Importing…" : `Import ${importable.toLocaleString()} bookmarks`}
+        <button
+          className="button"
+          type="button"
+          disabled={importing || importableCount === 0 || problems.length > 0}
+          onClick={() => onConfirm(choices())}
+        >
+          {importing ? "Importing…" : `Import ${importableCount.toLocaleString()} bookmarks`}
         </button>
         <button className="button button-quiet" type="button" disabled={importing} onClick={onCancel}>
           Cancel
         </button>
       </div>
+
+      {problems.length > 0 ? (
+        <ul className="notice notice-error problems" role="alert">
+          {problems.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      {preview.collections.length > 0 ? (
+        <SuggestedCollections preview={preview} groups={groups} onChange={setGroups} />
+      ) : null}
+
+      <datalist id="collection-names">
+        {names.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
 
       <ul className="filter-tabs" aria-label="Show bookmarks">
         {counts.map(([key, label, n]) => (
@@ -223,13 +306,110 @@ function PreviewStep({
         ))}
       </ul>
 
-      <CandidateTable rows={rows} />
+      <CandidateTable
+        key={show}
+        rows={rows}
+        edits={edits}
+        suggestedFor={suggestedFor}
+        onEdit={(position, edit) => setEdits((all) => ({ ...all, [position]: { ...all[position], ...edit } }))}
+      />
     </section>
   );
 }
 
-function CandidateTable({ rows }: { rows: Candidate[] }) {
-  const visible = rows.slice(0, VISIBLE_ROWS);
+/** The person's collections, so a bookmark can be sent to one the file does not suggest. */
+function useExistingCollections(): Collection[] {
+  const [collections, setCollections] = useState<Collection[]>([]);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/collections")
+      .then((res) => readJSON<{ collections: Collection[] }>(res))
+      .then((body) => live && setCollections(body.collections))
+      // Without the list, names can still be typed.
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  return collections;
+}
+
+function slugOf(preview: ImportPreview, name: string): string {
+  return preview.collections.find((c) => c.name === name)?.slug ?? "";
+}
+
+function validate(groups: Record<string, GroupChoice>, edits: Record<number, BookmarkEdit>): string[] {
+  const problems: string[] = [];
+  for (const g of Object.values(groups)) {
+    if (g.use && !g.name.trim()) problems.push("A collection you keep needs a name. Untick it to import its bookmarks without one.");
+    if (g.use && g.name.trim().length > MAX_NAME) problems.push(`The collection name "${g.name.trim().slice(0, 20)}…" is longer than ${MAX_NAME} characters.`);
+  }
+  for (const [pos, e] of Object.entries(edits)) {
+    if (e.collection && e.collection.trim().length > MAX_NAME) problems.push(`Line ${pos}: the collection name is longer than ${MAX_NAME} characters.`);
+    if (e.tags && splitTags(e.tags).some((t) => t.length > MAX_NAME)) problems.push(`Line ${pos}: a tag is longer than ${MAX_NAME} characters.`);
+  }
+  return [...new Set(problems)];
+}
+
+function SuggestedCollections({
+  preview,
+  groups,
+  onChange,
+}: {
+  preview: ImportPreview;
+  groups: Record<string, GroupChoice>;
+  onChange: (update: (all: Record<string, GroupChoice>) => Record<string, GroupChoice>) => void;
+}) {
+  const set = (slug: string, change: Partial<GroupChoice>) => onChange((all) => ({ ...all, [slug]: { ...all[slug], ...change } }));
+  return (
+    <section aria-labelledby="suggested-title" className="suggested">
+      <h3 id="suggested-title">Collections</h3>
+      <p className="fine-print">
+        Each bookmark goes into the collection named after its folder. Rename a collection, or untick it to import its
+        bookmarks without one. A name you already use adds them to that collection. Change single bookmarks in the
+        list below.
+      </p>
+      <ul className="suggested-list">
+        {preview.collections.map((c) => {
+          const g = groups[c.slug];
+          return (
+            <li key={c.slug} className={g.use ? undefined : "suggested-off"}>
+              <label className="suggested-use">
+                <input type="checkbox" checked={g.use} onChange={(e) => set(c.slug, { use: e.target.checked })} />
+                <span className="visually-hidden">Use the collection {c.name}</span>
+              </label>
+              <input
+                className="input"
+                aria-label={`Name for the collection suggested by the folder ${c.name}`}
+                value={g.name}
+                disabled={!g.use}
+                onChange={(e) => set(c.slug, { name: e.target.value })}
+              />
+              <span className="suggested-count">
+                {c.bookmarks.toLocaleString()} {c.bookmarks === 1 ? "bookmark" : "bookmarks"}
+                {c.existing ? " · already yours" : " · new"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function CandidateTable({
+  rows,
+  edits,
+  suggestedFor,
+  onEdit,
+}: {
+  rows: Candidate[];
+  edits: Record<number, BookmarkEdit>;
+  suggestedFor: (c: Candidate) => string;
+  onEdit: (position: number, edit: BookmarkEdit) => void;
+}) {
+  const [limit, setLimit] = useState(VISIBLE_ROWS);
+  const visible = rows.slice(0, limit);
   return (
     <>
       <div className="table-wrap">
@@ -239,6 +419,8 @@ function CandidateTable({ rows }: { rows: Candidate[] }) {
               <th scope="col">Line</th>
               <th scope="col">Bookmark</th>
               <th scope="col">Folder</th>
+              <th scope="col">Collection</th>
+              <th scope="col">Tags</th>
               <th scope="col">Result</th>
               <th scope="col">Notes</th>
             </tr>
@@ -252,6 +434,34 @@ function CandidateTable({ rows }: { rows: Candidate[] }) {
                   <span className="record-url">{c.originalUrl || "No address"}</span>
                 </td>
                 <td>{c.folder.join(" / ")}</td>
+                {importable(c) ? (
+                  <>
+                    <td>
+                      <input
+                        className="input input-cell"
+                        list="collection-names"
+                        aria-label={`Collection for line ${c.position}`}
+                        placeholder="No collection"
+                        value={edits[c.position]?.collection ?? suggestedFor(c)}
+                        onChange={(e) => onEdit(c.position, { collection: e.target.value })}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="input input-cell"
+                        aria-label={`Tags for line ${c.position}, separated by commas`}
+                        placeholder="No tags"
+                        value={edits[c.position]?.tags ?? c.tags.join(", ")}
+                        onChange={(e) => onEdit(c.position, { tags: e.target.value })}
+                      />
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td />
+                    <td />
+                  </>
+                )}
                 <td>
                   <span className={`status status-${c.status}`}>{statusLabels[c.status]}</span>
                 </td>
@@ -269,10 +479,15 @@ function CandidateTable({ rows }: { rows: Candidate[] }) {
           </tbody>
         </table>
       </div>
-      {rows.length > VISIBLE_ROWS ? (
-        <p className="fine-print">
-          Showing the first {VISIBLE_ROWS} of {rows.length.toLocaleString()}. All of them are imported.
-        </p>
+      {rows.length > limit ? (
+        <div className="actions">
+          <p className="fine-print">
+            Showing the first {limit.toLocaleString()} of {rows.length.toLocaleString()}. All of them are imported.
+          </p>
+          <button className="button button-quiet" type="button" onClick={() => setLimit((n) => n + VISIBLE_ROWS)}>
+            Show more
+          </button>
+        </div>
       ) : null}
     </>
   );

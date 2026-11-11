@@ -70,14 +70,30 @@ export type Candidate = {
   canonicalUrl?: string;
   title: string;
   folder: string[];
+  /** The suggested collection, or null for none. */
+  collection: string | null;
   tags: string[];
   errors: Problem[];
   warnings: Problem[];
 };
 
+/** A collection the bookmarks of a file suggest. */
+export type SuggestedCollection = { name: string; slug: string; bookmarks: number; existing: boolean };
+
 export type ImportPreview = {
   totals: { detected: number; valid: number; invalid: number; duplicateInFile: number; existing: number };
+  collections: SuggestedCollection[];
   candidates: Candidate[];
+};
+
+/**
+ * The person's decisions on a preview, sent with the import. A suggested
+ * collection maps to a new name or null (dropped); a bookmark's collection
+ * is a name or null (none), and its tags replace the file's.
+ */
+export type ImportChoices = {
+  collections?: Record<string, string | null>;
+  bookmarks?: Record<number, { collection?: string | null; tags?: string[] }>;
 };
 
 export type ImportOutcome = "inserted" | "updated" | "skipped" | "failed";

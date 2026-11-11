@@ -144,18 +144,20 @@ func (s *Service) Preview(ctx context.Context, userID string, file io.Reader) (P
 		case StatusExisting:
 			p.Totals.Existing++
 		}
-		p.Candidates = append(p.Candidates, c)
-
-		col := it.article.Collection
-		if col == nil || c.Status == StatusInvalid || c.Status == StatusDuplicateInFile {
-			continue
-		}
-		if i, ok := suggested[col.Slug]; ok {
+		// Bookmarks whose folders share a slug suggest one collection, named
+		// by the first spelling in the file.
+		if col := it.article.Collection; col != nil && c.Status != StatusInvalid && c.Status != StatusDuplicateInFile {
+			i, ok := suggested[col.Slug]
+			if !ok {
+				i = len(p.Collections)
+				suggested[col.Slug] = i
+				p.Collections = append(p.Collections, SuggestedCollection{Name: col.Name, Slug: col.Slug})
+			}
 			p.Collections[i].Bookmarks++
-			continue
+			name := p.Collections[i].Name
+			c.Collection = &name
 		}
-		suggested[col.Slug] = len(p.Collections)
-		p.Collections = append(p.Collections, SuggestedCollection{Name: col.Name, Slug: col.Slug, Bookmarks: 1})
+		p.Candidates = append(p.Candidates, c)
 	}
 
 	slugs := make([]string, len(p.Collections))

@@ -76,9 +76,10 @@ Until accounts exist, everything belongs to a fixed development owner created by
 ## How imports behave
 
 - The file is checked first. The preview shows what is new, what is already saved, what repeats inside the file and what cannot be imported, and nothing is written yet.
-- Uploaded files are never stored. Confirming the import uploads the file again.
+- The preview suggests a collection for each bookmark, its first folder below the browser's own folders (such as "Bookmarks bar"), and the tags saved in the file. Rename or drop a suggested collection, or change the collection and tags of a single bookmark, before importing. Missing collections are created; a name you already use reuses that collection.
+- Uploaded files are never stored. Confirming the import uploads the file again, with your changes.
 - Two bookmarks are the same article when their canonical URL matches: same address, ignoring the host's case, the `#fragment` and known tracking parameters such as `utm_*` and `fbclid`.
-- Importing the same file again creates nothing new. Titles you edited are kept. Missing titles, folders and dates are filled in. Tags are only ever added, and never to an article whose tags you edited.
+- Importing the same file again creates nothing new. Titles you edited are kept. Missing titles, folders, dates and collections are filled in; an article already in a collection stays there. Tags are only ever added, and never to an article whose tags you edited.
 - Only `http` and `https` addresses are imported. `javascript:`, `file:` and others are reported and skipped.
 
 ## Organizing the library
