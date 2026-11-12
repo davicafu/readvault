@@ -79,6 +79,8 @@ func NewHandler(deps Deps) http.Handler {
 		mux.HandleFunc("GET /api/articles/{id}/content", h.get)
 		mux.HandleFunc("POST /api/articles/{id}/content", h.upload)
 		mux.HandleFunc("POST /api/articles/{id}/content/fetch", h.fetch)
+		mux.HandleFunc("GET /api/content-downloads", h.downloads)
+		mux.HandleFunc("POST /api/content-downloads", h.queueMissing)
 		mux.HandleFunc("GET /api/articles/{id}/images/{imageId}", h.image)
 	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

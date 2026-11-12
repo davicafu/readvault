@@ -57,6 +57,13 @@ func (r *LibraryRepository) List(ctx context.Context, userID string, q library.Q
 	if q.CollectionSlug != "" {
 		where = append(where, fmt.Sprintf("a.collection_id = (SELECT id FROM collections WHERE user_id = $1 AND slug = %s)", arg(q.CollectionSlug)))
 	}
+	switch q.Text {
+	case "":
+	case library.TextMissing:
+		where = append(where, "NOT EXISTS (SELECT 1 FROM article_contents c WHERE c.article_id = a.id)")
+	default:
+		where = append(where, fmt.Sprintf("EXISTS (SELECT 1 FROM article_contents c WHERE c.article_id = a.id AND c.status = %s)", arg(string(q.Text))))
+	}
 	if len(q.TagSlugs) > 0 {
 		slugs := arg(q.TagSlugs)
 		where = append(where, fmt.Sprintf(`(SELECT count(*) FROM article_tags at JOIN tags t ON t.id = at.tag_id

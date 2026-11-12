@@ -42,7 +42,7 @@ func (h *articleHandler) list(w http.ResponseWriter, r *http.Request) {
 			[]library.FieldProblem{{Field: "query", Code: "invalid", Message: `the query string is malformed; separate parameters with "&"`}})
 		return
 	}
-	p := library.ListParams{Search: v.Get("q"), Tags: v["tag"], Collection: v.Get("collection"), Sort: v.Get("sort"), Cursor: v.Get("cursor")}
+	p := library.ListParams{Search: v.Get("q"), Tags: v["tag"], Collection: v.Get("collection"), Text: v.Get("text"), Sort: v.Get("sort"), Cursor: v.Get("cursor")}
 	if raw := v.Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil {

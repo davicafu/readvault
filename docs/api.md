@@ -175,6 +175,7 @@ Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lo
 | `q` | Matches words of the title and URL, and any part of the title, URL or a tag name. Up to 200 characters |
 | `tag` | Keeps articles that have this tag (name or slug). Repeat it to require several tags, up to 10 |
 | `collection` | Keeps the articles of this collection (name or slug); an unknown collection gives an empty list, and a blank value is ignored |
+| `text` | Keeps the articles whose saved text is `complete`, `incomplete` (a paid preview), `failed` (the download failed and nothing was saved) or `missing` (never downloaded); any other value is `text/invalid` |
 | `sort` | `created_desc` (default), `created_asc`, `title_asc`, `title_desc` |
 | `limit` | 1 to 100; 25 when absent |
 | `cursor` | The `nextCursor` of the previous page |
@@ -296,6 +297,18 @@ Downloads the article from its original URL and saves its text the same way. A p
 A failed download keeps any saved text. Requests identify themselves as `ReadVault/0.1`.
 
 Images: up to 30 per article, 5 MiB each and 30 MiB in total, downloaded with the same address rules. Only PNG, JPEG, GIF and WebP are kept, recognized from their bytes; SVG and anything else are counted in `missingImages`.
+
+### `GET /api/content-downloads`
+
+Counts the articles by the state of their text: `queued` wait for the background download, `missing` were never downloaded and are not queued, `failed` have a recorded download failure and no text (and are not queued), `incomplete` have only a paid preview.
+
+```json
+{ "queued": 312, "missing": 0, "failed": 7, "incomplete": 2 }
+```
+
+### `POST /api/content-downloads`
+
+Queues the background download of every article never downloaded (the ones counted as `missing`) and answers `202` with how many were queued, `{ "queued": 518 }`. Failed and incomplete articles are not queued again; download them from their page. Calling it again queues nothing twice.
 
 ### `GET /api/articles/{id}/images/{imageId}`
 

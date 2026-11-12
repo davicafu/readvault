@@ -95,6 +95,24 @@ type Repository interface {
 	SaveFailure(ctx context.Context, userID, articleID, problem string) error
 	Get(ctx context.Context, userID, articleID string) (Content, error)
 	Image(ctx context.Context, userID, articleID, imageID string) (Image, error)
+	// DownloadSummary counts the user's articles by the state of their text.
+	DownloadSummary(ctx context.Context, userID string) (DownloadSummary, error)
+	// QueueMissing queues the text download of every article of the user
+	// that has no text and no recorded download and is not queued yet, and
+	// returns how many it queued.
+	QueueMissing(ctx context.Context, userID string) (int, error)
+}
+
+// DownloadSummary counts a user's articles by the state of their text.
+type DownloadSummary struct {
+	// Queued are waiting for the background download.
+	Queued int `json:"queued"`
+	// Missing have no text, no recorded download and are not queued.
+	Missing int `json:"missing"`
+	// Failed have a recorded download failure and no text.
+	Failed int `json:"failed"`
+	// Incomplete have only a paid preview.
+	Incomplete int `json:"incomplete"`
 }
 
 // Fetched is a downloaded resource.

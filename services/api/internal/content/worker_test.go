@@ -259,3 +259,12 @@ func TestWorker_ADownloadCutShortIsTriedAgain(t *testing.T) {
 		t.Errorf("after the retry: %+v, %v; want the text saved", got, err)
 	}
 }
+
+func queuedFor(t *testing.T, pool *pgxpool.Pool, articleIDs ...string) int {
+	t.Helper()
+	var n int
+	if err := pool.QueryRow(t.Context(), `SELECT count(*) FROM content_downloads WHERE article_id = ANY($1::uuid[])`, articleIDs).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}

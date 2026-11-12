@@ -152,3 +152,35 @@ func (r *ContentRepository) Image(ctx context.Context, userID, articleID, imageI
 	}
 	return img, nil
 }
+
+// DownloadSummary implements content.Repository.
+func (r *ContentRepository) DownloadSummary(ctx context.Context, userID string) (content.DownloadSummary, error) {
+	var s content.DownloadSummary
+	err := r.pool.QueryRow(ctx, `SELECT
+			count(*) FILTER (WHERE d.article_id IS NOT NULL),
+			count(*) FILTER (WHERE d.article_id IS NULL AND c.article_id IS NULL),
+			count(*) FILTER (WHERE c.status = 'failed' AND d.article_id IS NULL),
+			count(*) FILTER (WHERE c.status = 'incomplete')
+		FROM articles a
+		LEFT JOIN article_contents c ON c.article_id = a.id
+		LEFT JOIN content_downloads d ON d.article_id = a.id
+		WHERE a.user_id = $1`, userID).Scan(&s.Queued, &s.Missing, &s.Failed, &s.Incomplete)
+	if err != nil {
+		return content.DownloadSummary{}, fmt.Errorf("summarising text downloads: %w", err)
+	}
+	return s, nil
+}
+
+// QueueMissing implements content.Repository.
+func (r *ContentRepository) QueueMissing(ctx context.Context, userID string) (int, error) {
+	tag, err := r.pool.Exec(ctx, `INSERT INTO content_downloads (article_id, user_id)
+		SELECT a.id, a.user_id FROM articles a
+		WHERE a.user_id = $1
+		  AND NOT EXISTS (SELECT 1 FROM article_contents c WHERE c.article_id = a.id)
+		ORDER BY a.created_at, a.id
+		ON CONFLICT (article_id) DO NOTHING`, userID)
+	if err != nil {
+		return 0, fmt.Errorf("queueing missing texts: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}

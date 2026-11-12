@@ -117,9 +117,12 @@ type Query struct {
 	TagSlugs []string
 	// CollectionSlug keeps the articles of that collection when set.
 	CollectionSlug string
-	Sort           Sort
-	Limit          int
-	After          *Position
+	// Text keeps the articles whose saved text is in this state; empty
+	// keeps all.
+	Text  TextState
+	Sort  Sort
+	Limit int
+	After *Position
 }
 
 // Position is the sort key and id of the last article of a page.

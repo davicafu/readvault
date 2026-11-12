@@ -17,6 +17,8 @@ type ContentService interface {
 	Upload(ctx context.Context, userID, articleID, fileName string, file io.Reader) (content.Content, error)
 	Fetch(ctx context.Context, userID, articleID string) (content.Content, error)
 	Image(ctx context.Context, userID, articleID, imageID string) (content.Image, error)
+	DownloadSummary(ctx context.Context, userID string) (content.DownloadSummary, error)
+	QueueMissing(ctx context.Context, userID string) (int, error)
 }
 
 var articleUpload = uploadKind{noun: "article page or Markdown file", tooLarge: "the file is larger than an article allows"}
@@ -26,6 +28,29 @@ type contentHandler struct {
 	ownerID  string
 	maxBytes int64
 	logger   *slog.Logger
+}
+
+// downloads serves GET /api/content-downloads: how many articles wait for
+// their text, have none, failed or are incomplete.
+func (h *contentHandler) downloads(w http.ResponseWriter, r *http.Request) {
+	s, err := h.svc.DownloadSummary(r.Context(), h.ownerID)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, s)
+}
+
+// queueMissing serves POST /api/content-downloads: queue the background
+// download of every article never downloaded.
+func (h *contentHandler) queueMissing(w http.ResponseWriter, r *http.Request) {
+	n, err := h.svc.QueueMissing(r.Context(), h.ownerID)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	h.logger.InfoContext(r.Context(), "missing texts queued", slog.Int("queued", n))
+	writeJSON(w, http.StatusAccepted, map[string]int{"queued": n})
 }
 
 // get serves GET /api/articles/{id}/content.

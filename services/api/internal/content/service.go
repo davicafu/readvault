@@ -162,6 +162,18 @@ func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content,
 	return s.save(ctx, userID, articleID, ex, status, SourceFetched)
 }
 
+// DownloadSummary counts the user's articles by the state of their text.
+func (s *Service) DownloadSummary(ctx context.Context, userID string) (DownloadSummary, error) {
+	return s.repo.DownloadSummary(ctx, userID)
+}
+
+// QueueMissing queues the background download of every article of the user
+// never downloaded. Failed and incomplete ones are left to the person, from
+// the article's page, so a site that refused is not asked again unasked.
+func (s *Service) QueueMissing(ctx context.Context, userID string) (int, error) {
+	return s.repo.QueueMissing(ctx, userID)
+}
+
 // downloadMissing fetches the article's text unless something was saved
 // or a download recorded already, by the person or an earlier download.
 func (s *Service) downloadMissing(ctx context.Context, userID, articleID string) error {

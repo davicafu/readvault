@@ -30,12 +30,26 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]
 // ErrNotFound means the article does not exist for this user.
 var ErrNotFound = errors.New("library: article not found")
 
+// TextState is the state of an article's saved text, for filtering.
+type TextState string
+
+const (
+	TextComplete   TextState = "complete"
+	TextIncomplete TextState = "incomplete"
+	TextFailed     TextState = "failed"
+	// TextMissing means no text was saved and no download recorded.
+	TextMissing TextState = "missing"
+)
+
 // ListParams is a list request as the client sent it.
 type ListParams struct {
 	Search     string
 	Tags       []string
 	Collection string
-	Sort       string
+	// Text is complete, incomplete, failed or missing (no text saved and
+	// no download recorded); empty keeps all.
+	Text string
+	Sort string
 	// Limit is nil when the client sent none.
 	Limit  *int
 	Cursor string
@@ -308,6 +322,13 @@ func parseQuery(p ListParams) (Query, error) {
 	}
 	if len(q.TagSlugs) > maxFilterTags {
 		problems = append(problems, FieldProblem{"tag", "too_many", fmt.Sprintf("filter by at most %d tags", maxFilterTags)})
+	}
+
+	switch TextState(p.Text) {
+	case "", TextComplete, TextIncomplete, TextFailed, TextMissing:
+		q.Text = TextState(p.Text)
+	default:
+		problems = append(problems, FieldProblem{"text", "invalid", "text must be complete, incomplete, failed or missing"})
 	}
 
 	switch q.Sort {
