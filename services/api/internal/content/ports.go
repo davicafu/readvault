@@ -141,3 +141,19 @@ func (e *FetchError) Error() string {
 }
 
 func (e *FetchError) Unwrap() error { return e.Err }
+
+// DownloadJob is one article waiting for its text to be downloaded.
+type DownloadJob struct {
+	UserID    string
+	ArticleID string
+}
+
+// DownloadQueue hands out queued text downloads to the Worker.
+type DownloadQueue interface {
+	// Claim takes the next queued download for lease. A claim that runs
+	// out before Done is handed out again, a few times at most. ok is false
+	// when nothing is waiting.
+	Claim(ctx context.Context, lease time.Duration) (job DownloadJob, ok bool, err error)
+	// Done removes the download from the queue.
+	Done(ctx context.Context, job DownloadJob) error
+}

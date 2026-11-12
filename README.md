@@ -55,6 +55,7 @@ Everything is configured with environment variables. `make` reads them from `.en
 | `MAX_IMPORT_RECORDS` | API | `20000` | Most bookmarks accepted in one file |
 | `MAX_ARTICLE_BYTES` | API | `5242880` | Largest article page or Markdown file uploaded or downloaded (5 MiB) |
 | `ARTICLE_MIRROR_URL` | API | none | Reading mirror tried when an article page fails or is a paid preview, as a prefix put before the article's address, for example `https://freedium-mirror.cfd/`. Only those addresses are sent to it. Unset: no mirror |
+| `DOWNLOAD_WORKERS` | API | `2` | How many article texts are downloaded at once in the background after an import (0 to 16); `0` turns background downloads off |
 | `API_ORIGIN` | Web app | `http://127.0.0.1:8080` | Where the web app's server reaches the API. Read at runtime. Set it when the API is not on port 8080 |
 | `TEST_DATABASE_URL` | Integration tests | `DATABASE_URL` | A server where the tests may create and drop throwaway databases |
 

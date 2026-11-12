@@ -68,6 +68,24 @@ func run() error {
 		MaxHeaderBytes:    1 << 20,
 	}
 
+	// Background text downloads stop with the API: a download cut short is
+	// tried again on the next start.
+	workerCtx, stopWorker := context.WithCancel(ctx)
+	workerDone := make(chan struct{})
+	if cfg.DownloadWorkers > 0 {
+		worker := content.NewWorker(contents, postgres.NewDownloadQueue(pool), content.WorkerConfig{Workers: cfg.DownloadWorkers})
+		go func() {
+			defer close(workerDone)
+			worker.Run(workerCtx)
+		}()
+	} else {
+		close(workerDone)
+	}
+	defer func() {
+		stopWorker()
+		<-workerDone
+	}()
+
 	serveErr := make(chan error, 1)
 	go func() {
 		logger.Info("api listening", slog.String("addr", cfg.HTTPAddr))

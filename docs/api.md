@@ -101,6 +101,8 @@ Error codes: `missing_url`, `url_too_long` (over 2,048 bytes), `unsupported_sche
 
 Imports the file with the suggested collections and tags, changed by the optional `choices` field, and returns a report. It is idempotent: importing the same file again adds nothing.
 
+Every imported article, new or already in the library, that has no saved text and no recorded download is queued, and the API downloads its text in the background the same way as `POST /api/articles/{id}/content/fetch`, mirror included. `DOWNLOAD_WORKERS` downloads run at once, with a pause between two downloads of each. A failed download is recorded on the article and not retried; a download cut short by an API restart is tried again, 3 times at most. Adding a single link goes through this import too.
+
 `choices` is JSON and must come before `file` in the form, because the file is streamed; parts after the file are not read. Every key is optional:
 
 ```json

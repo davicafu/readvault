@@ -25,6 +25,9 @@ type Config struct {
 	// ArticleMirrorURL is the prefix of a reading mirror tried when an
 	// article page fails or is a paid preview; empty means none.
 	ArticleMirrorURL string
+	// DownloadWorkers is how many article texts are downloaded at once in
+	// the background; 0 turns background downloads off.
+	DownloadWorkers int
 }
 
 // Load reads the configuration from the environment. DATABASE_URL is required;
@@ -38,6 +41,7 @@ func Load() (Config, error) {
 		MaxArticleBytes:  5 << 20,
 		RequestTimeout:   30 * time.Second,
 		ShutdownTimeout:  15 * time.Second,
+		DownloadWorkers:  2,
 	}
 
 	var errs []error
@@ -76,6 +80,14 @@ func Load() (Config, error) {
 			errs = append(errs, fmt.Errorf("ARTICLE_MIRROR_URL must be an http or https address, got %q", v))
 		}
 		cfg.ArticleMirrorURL = v
+	}
+
+	if v := os.Getenv("DOWNLOAD_WORKERS"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 || n > 16 {
+			errs = append(errs, fmt.Errorf("DOWNLOAD_WORKERS must be an integer from 0 to 16, got %q", v))
+		}
+		cfg.DownloadWorkers = n
 	}
 
 	if err := errors.Join(errs...); err != nil {

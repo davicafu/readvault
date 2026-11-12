@@ -29,3 +29,22 @@ func TestLoad_ArticleMirror(t *testing.T) {
 		}
 	}
 }
+
+func TestLoad_DownloadWorkers(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://example")
+
+	t.Setenv("DOWNLOAD_WORKERS", "")
+	if cfg, err := config.Load(); err != nil || cfg.DownloadWorkers != 2 {
+		t.Errorf("unset: %d, %v; want 2", cfg.DownloadWorkers, err)
+	}
+	t.Setenv("DOWNLOAD_WORKERS", "0")
+	if cfg, err := config.Load(); err != nil || cfg.DownloadWorkers != 0 {
+		t.Errorf("0: %d, %v; want 0 (off)", cfg.DownloadWorkers, err)
+	}
+	for _, bad := range []string{"-1", "x", "17"} {
+		t.Setenv("DOWNLOAD_WORKERS", bad)
+		if _, err := config.Load(); err == nil || !strings.Contains(err.Error(), "DOWNLOAD_WORKERS") {
+			t.Errorf("%q: error = %v, want DOWNLOAD_WORKERS rejected", bad, err)
+		}
+	}
+}

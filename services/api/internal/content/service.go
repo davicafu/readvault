@@ -158,6 +158,20 @@ func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content,
 	return s.save(ctx, userID, articleID, ex, status, SourceFetched)
 }
 
+// downloadMissing fetches the article's text unless something was saved
+// or a download recorded already, by the person or an earlier download.
+func (s *Service) downloadMissing(ctx context.Context, userID, articleID string) error {
+	_, err := s.repo.Get(ctx, userID, articleID)
+	switch {
+	case err == nil:
+		return nil
+	case !errors.Is(err, ErrNoContent):
+		return err
+	}
+	_, err = s.Fetch(ctx, userID, articleID)
+	return err
+}
+
 // download fetches one page and extracts its text.
 func (s *Service) download(ctx context.Context, rawURL string) (Extracted, *FetchError) {
 	pageCtx, cancel := context.WithTimeout(ctx, pageTimeout)

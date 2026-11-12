@@ -96,12 +96,30 @@ func (r *ImportRepository) Save(ctx context.Context, userID string, articles []i
 		if err != nil {
 			return err
 		}
-		return touchUpdated(ctx, tx, articles, ids, outcomes, filled, tagged)
+		if err := touchUpdated(ctx, tx, articles, ids, outcomes, filled, tagged); err != nil {
+			return err
+		}
+		return queueDownloads(ctx, tx, userID, ids)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("saving import batch: %w", err)
 	}
 	return outcomes, nil
+}
+
+// queueDownloads queues the text download of the imported articles that
+// have no saved text and no recorded download, new or already in the
+// library. An article already queued stays as it is.
+func queueDownloads(ctx context.Context, tx pgx.Tx, userID string, ids []string) error {
+	if _, err := tx.Exec(ctx, `INSERT INTO content_downloads (article_id, user_id)
+		SELECT a.id, a.user_id FROM articles a
+		WHERE a.user_id = $1 AND a.id = ANY($2::uuid[])
+		  AND NOT EXISTS (SELECT 1 FROM article_contents c WHERE c.article_id = a.id)
+		ORDER BY a.created_at, a.id
+		ON CONFLICT (article_id) DO NOTHING`, userID, ids); err != nil {
+		return fmt.Errorf("queueing text downloads: %w", err)
+	}
+	return nil
 }
 
 // ensureCollections creates the collections the articles go in that the user
