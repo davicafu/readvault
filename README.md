@@ -92,7 +92,7 @@ An article's page shows its saved text with a table of contents built from its h
 
 ## Article text
 
-Each article can keep its text as Markdown, with the images of its body, for reading later. On the article page, **Download text** fetches it from the article's address; **Upload page** takes an HTML page you saved from your browser, or a Markdown file. When a download fails (Medium refuses servers) or saves only a paid preview, the library and the article page show a warning so you can upload the page instead. Downloads only reach public addresses on ports 80 and 443. See `docs/api.md` for the details.
+Each article can keep its text as Markdown, with the images of its body, for reading later. On the article page, **Download text** fetches it from the article's address; **Upload page** takes an HTML page you saved from your browser, or a Markdown file. When a download fails (Medium refuses servers) or saves only a paid preview, the library and the article page show a warning so you can upload the page instead. Once an article has its whole text, its page folds the editor (title, tags and collection) and the controls that replace the text; open them to change anything. When articles in the library have no text yet, the front page offers **Download all**, which queues them for the background download and shows how many are left; articles whose download failed are listed under **See them** (the library's `text=failed` filter). Downloads only reach public addresses on ports 80 and 443. See `docs/api.md` for the details.
 
 ## Backup and restore
 

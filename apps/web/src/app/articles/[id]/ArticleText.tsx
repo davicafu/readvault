@@ -120,7 +120,11 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
               : ""}
             {content.problem ? `. The last download failed (${problemText(content.problem)}); this text was kept` : ""}.
           </p>
-          {actions}
+          {/* The text is here: replacing it is rare, so it stays folded. */}
+          <details className="text-options">
+            <summary>Replace the text</summary>
+            {actions}
+          </details>
         </div>
       )}
 

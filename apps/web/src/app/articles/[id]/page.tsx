@@ -102,6 +102,7 @@ export default async function ArticlePage({ params }: { params: Params }) {
           collectionId={a.collection?.id ?? null}
           collections={collections}
           suggestions={suggestions}
+          folded={content?.status === "complete"}
         />
         {content === undefined ? (
           <p className="field-error" role="alert">

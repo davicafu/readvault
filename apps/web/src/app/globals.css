@@ -31,6 +31,11 @@
   --wide: 68rem;
   --radius: 6px;
 
+  /* The backdrop: two soft glows of the accent family over the paper. */
+  --glow-a: rgb(31 95 139 / 0.13);
+  --glow-b: rgb(64 160 150 / 0.1);
+  --grain-opacity: 0.05;
+
   color-scheme: light;
 }
 
@@ -46,6 +51,9 @@
     --ok: #7cc4a0;
     --warn: #e2b562;
     --bad: #f0928b;
+    --glow-a: rgb(70 120 210 / 0.16);
+    --glow-b: rgb(40 170 160 / 0.1);
+    --grain-opacity: 0.07;
     color-scheme: dark;
   }
 }
@@ -62,7 +70,11 @@ html {
 
 body {
   margin: 0;
-  background: var(--paper);
+  background:
+    radial-gradient(60rem 40rem at 8% -10%, var(--glow-a), transparent 70%),
+    radial-gradient(50rem 36rem at 100% 15%, var(--glow-b), transparent 70%),
+    var(--paper);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: var(--step-0);
@@ -102,6 +114,17 @@ h3 {
 }
 
 /* Frame */
+
+/* A fine grain over the whole page so large surfaces are not flat. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
 
 .masthead {
   border-bottom: 1px solid var(--rule);
@@ -891,13 +914,109 @@ body:has(.article-with-toc) .masthead-inner {
 .editor {
   display: grid;
   gap: 1.25rem;
+  padding-top: 1.25rem;
+}
+
+/* The editor folds away once the article has its text. */
+.editor-panel {
   margin-top: 2rem;
-  padding-top: 1.5rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--rule);
 }
 
-.editor h2 {
+.editor-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.editor-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.editor-panel > summary::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--ink-soft);
+  border-bottom: 2px solid var(--ink-soft);
+  transform: rotate(-45deg);
+  transition: transform 200ms ease;
+}
+
+.editor-panel[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.editor-panel > summary h2 {
+  margin: 0;
   font-size: var(--step-1);
+}
+
+.editor-hint {
+  padding: 0.05rem 0.55rem;
+  border: 1px dashed var(--rule);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+/* Replacing a saved text is rare: its buttons stay folded. */
+.text-options > summary {
+  width: fit-content;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+
+.text-options[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
+/* Home: how the library's texts are doing. */
+.text-downloads {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 2rem;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.text-downloads-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  margin: 0;
+}
+
+.text-downloads-bad {
+  color: var(--bad);
+}
+
+.text-downloads-pulse {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+}
+
+.button-small {
+  padding: 0.3rem 0.8rem;
+  font-size: var(--step--1);
 }
 
 .tag-input {
@@ -1174,8 +1293,9 @@ body:has(.article-with-toc) .masthead-inner {
   border: 1px solid var(--rule);
   border-radius: 14px;
   background: var(--surface);
-  animation: shelf-in 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  animation-delay: calc(var(--i, 0) * 70ms);
+  /* backwards, not both: once in, the card's transform is free for hover. */
+  animation: shelf-in 900ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(120ms + var(--i, 0) * 85ms);
   transition:
     transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
     box-shadow 220ms ease,
@@ -1185,7 +1305,11 @@ body:has(.article-with-toc) .masthead-inner {
 @keyframes shelf-in {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.98);
+    filter: blur(6px);
+    transform: translateY(18px) scale(0.985);
+  }
+  60% {
+    filter: blur(0);
   }
 }
 

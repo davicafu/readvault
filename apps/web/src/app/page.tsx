@@ -13,6 +13,7 @@ import { formatDate } from "@/lib/format";
 import { apiGet } from "@/lib/server-api";
 
 import { BrowseHome, hueStyle, type CollectionShelf } from "./BrowseHome";
+import { TextDownloads } from "./TextDownloads";
 
 const PAGE_SIZE = 25;
 // The front page previews the latest articles of this many collections.
@@ -29,7 +30,24 @@ const sortLabels: Record<Sort, string> = {
 
 // all is set when the list was asked for without filters (view=all or an
 // explicit order); without it and without filters the front page shows.
-type Filters = { q: string; tags: string[]; collection: string; sort: Sort; cursor: string; all: boolean };
+type TextFilter = "" | "complete" | "incomplete" | "failed" | "missing";
+
+const textLabels: Record<Exclude<TextFilter, "">, string> = {
+  complete: "with their text",
+  incomplete: "with only part of their text",
+  failed: "whose text could not be downloaded",
+  missing: "never downloaded",
+};
+
+type Filters = {
+  q: string;
+  tags: string[];
+  collection: string;
+  text: TextFilter;
+  sort: Sort;
+  cursor: string;
+  all: boolean;
+};
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -40,6 +58,7 @@ function readFilters(params: Record<string, string | string[] | undefined>): Fil
     q: one(params.q).trim(),
     tags: [params.tag ?? []].flat().filter(Boolean),
     collection: one(params.collection).trim(),
+    text: one(params.text) in textLabels ? (one(params.text) as TextFilter) : "",
     sort: sort in sortLabels ? (sort as Sort) : "created_desc",
     cursor: one(params.cursor),
     all: one(params.view) === "all" || one(params.sort) !== "",
@@ -53,6 +72,7 @@ function libraryHref(f: Filters, overrides: Partial<Filters> = {}): string {
   if (next.q) qs.set("q", next.q);
   if (next.collection) qs.set("collection", next.collection);
   for (const t of next.tags) qs.append("tag", t);
+  if (next.text) qs.set("text", next.text);
   if (next.sort !== "created_desc") qs.set("sort", next.sort);
   if (next.cursor) qs.set("cursor", next.cursor);
   if (next.all && qs.size === 0) qs.set("view", "all");
@@ -62,8 +82,8 @@ function libraryHref(f: Filters, overrides: Partial<Filters> = {}): string {
 
 export default async function LibraryPage({ searchParams }: { searchParams: SearchParams }) {
   const filters = readFilters(await searchParams);
-  const filtered = filters.q !== "" || filters.tags.length > 0 || filters.collection !== "";
-  const cleared = { ...filters, q: "", tags: [], collection: "", all: false };
+  const filtered = filters.q !== "" || filters.tags.length > 0 || filters.collection !== "" || filters.text !== "";
+  const cleared: Filters = { ...filters, q: "", tags: [], collection: "", text: "", all: false };
 
   if (!filtered && !filters.all && !filters.cursor) {
     return <FrontPage />;
@@ -73,6 +93,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Sear
   if (filters.q) qs.set("q", filters.q);
   if (filters.collection) qs.set("collection", filters.collection);
   for (const t of filters.tags) qs.append("tag", t);
+  if (filters.text) qs.set("text", filters.text);
   if (filters.cursor) qs.set("cursor", filters.cursor);
 
   // The side panels are optional: the list still shows when they fail to load.
@@ -106,10 +127,17 @@ export default async function LibraryPage({ searchParams }: { searchParams: Sear
       )}
       <SearchForm filters={filters} withOrder />
 
-      {filters.q || filters.tags.length > 0 ? (
+      {filters.q || filters.tags.length > 0 || filters.text ? (
         <div className="active-filters">
           <span>Showing</span>
           {filters.q ? <span>results for “{filters.q}”</span> : null}
+          {filters.text ? (
+            <Link className="tag" href={libraryHref(filters, { text: "" })}>
+              articles {textLabels[filters.text]}
+              <span aria-hidden="true">×</span>
+              <span className="visually-hidden">Remove this filter</span>
+            </Link>
+          ) : null}
           {filters.tags.map((t) => (
             <Link key={t} className="tag" href={libraryHref(filters, { tags: filters.tags.filter((x) => x !== t) })}>
               {t}
@@ -212,6 +240,7 @@ async function FrontPage() {
     <>
       <h1 className="visually-hidden">Library</h1>
       <SearchForm />
+      <TextDownloads />
       <BrowseHome shelves={shelves} recent={recent} tags={tagList.status === "fulfilled" ? tagList.value.tags : []} />
     </>
   );
@@ -250,6 +279,7 @@ function SearchForm({ filters, withOrder = false }: { filters?: Filters; withOrd
         </div>
       ) : null}
       {filters?.collection ? <input type="hidden" name="collection" value={filters.collection} /> : null}
+      {filters?.text ? <input type="hidden" name="text" value={filters.text} /> : null}
       {filters?.tags.map((t) => (
         <input key={t} type="hidden" name="tag" value={t} />
       ))}
