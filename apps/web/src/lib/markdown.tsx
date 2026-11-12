@@ -10,10 +10,69 @@ import { Fragment, type ReactNode } from "react";
 
 export type ImageResolver = (src: string) => string | null;
 
-type Ctx = { resolveImage: ImageResolver };
+// headingIds maps the line of each top-level heading to its anchor id.
+type Ctx = { resolveImage: ImageResolver; headingIds: Map<number, string> };
 
 export function Markdown({ source, resolveImage }: { source: string; resolveImage: ImageResolver }) {
-  return <>{blocks(source.replace(/\r\n?/g, "\n").split("\n"), { resolveImage }, "b")}</>;
+  const lines = splitLines(source);
+  const headingIds = new Map(scanHeadings(lines).map((h) => [h.line, h.id]));
+  return <>{blocks(lines, { resolveImage, headingIds }, "b")}</>;
+}
+
+export type OutlineEntry = { id: string; level: number; text: string };
+
+// outline lists the top-level headings of the text down to depth levels,
+// with the same anchor ids Markdown gives them, for a table of contents.
+export function outline(source: string, depth = 3): OutlineEntry[] {
+  return scanHeadings(splitLines(source))
+    .filter((h) => h.level <= depth)
+    .map(({ id, level, text }) => ({ id, level, text }));
+}
+
+const splitLines = (source: string) => source.replace(/\r\n?/g, "\n").split("\n");
+
+// scanHeadings finds the headings blocks renders at the top level: every
+// heading line outside fenced code (a heading line always ends a paragraph,
+// and lines in a block quote start with ">"). Ids are unique per text.
+function scanHeadings(lines: string[]): { line: number; id: string; level: number; text: string }[] {
+  const found: { line: number; id: string; level: number; text: string }[] = [];
+  const seen = new Map<string, number>();
+  for (let i = 0; i < lines.length; i++) {
+    const fence = fenceOpen.exec(lines[i]);
+    if (fence) {
+      i++;
+      while (i < lines.length && !lines[i].trimStart().startsWith(fence[1])) i++;
+      continue;
+    }
+    const h = heading.exec(lines[i]);
+    if (!h) continue;
+    const text = plainText(h[2]);
+    const base =
+      "h-" +
+      (text
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 60) || "section");
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    found.push({ line: i, id: n === 1 ? base : `${base}-${n}`, level: h[1].length, text });
+  }
+  return found;
+}
+
+// plainText drops the inline syntax of a heading: images, link targets,
+// emphasis and code marks, and escapes.
+function plainText(md: string): string {
+  return md
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\\(.)/g, "$1")
+    .replace(/[*_`~]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 const fenceOpen = /^ {0,3}(`{3,}|~{3,})/;
@@ -57,7 +116,12 @@ function blocks(lines: string[], ctx: Ctx, key: string): ReactNode[] {
       // The page title is the h1, so article headings start at h2.
       const level = Math.min(h[1].length + 1, 6);
       const Tag = `h${level}` as "h2" | "h3" | "h4" | "h5" | "h6";
-      out.push(<Tag key={k}>{inline(h[2], ctx, k)}</Tag>);
+      const id = key === "b" ? ctx.headingIds.get(i) : undefined;
+      out.push(
+        <Tag key={k} id={id}>
+          {inline(h[2], ctx, k)}
+        </Tag>,
+      );
       i++;
       continue;
     }

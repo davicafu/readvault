@@ -3,6 +3,8 @@ import type { CSSProperties } from "react";
 
 import { hostname, type Article, type Collection, type TagCount } from "@/lib/api";
 
+import { CollectionIcon } from "./CollectionIcon";
+
 export type CollectionShelf = { collection: Collection; latest: Article[] | null };
 
 /** A stable hue per collection, so each one keeps its colour across visits. */
@@ -48,8 +50,8 @@ export function BrowseHome({
           </div>
         ) : (
           <ul className="shelf-grid">
-            {shelves.map((s) => (
-              <ShelfCard key={s.collection.id} shelf={s} />
+            {shelves.map((s, i) => (
+              <ShelfCard key={s.collection.id} shelf={s} index={i} />
             ))}
           </ul>
         )}
@@ -107,11 +109,15 @@ export function BrowseHome({
   );
 }
 
-function ShelfCard({ shelf: { collection: c, latest } }: { shelf: CollectionShelf }) {
+function ShelfCard({ shelf: { collection: c, latest }, index }: { shelf: CollectionShelf; index: number }) {
   const href = `/?collection=${encodeURIComponent(c.slug)}`;
   return (
-    <li className="shelf-card" style={hueStyle(c.slug)}>
-      <div className="shelf-card-head">
+    <li className="shelf-card" style={{ ...hueStyle(c.slug), "--i": index } as CSSProperties}>
+      <div className="shelf-cover">
+        <CollectionIcon name={c.name} className="shelf-cover-mark" />
+        <span className="shelf-cover-icon">
+          <CollectionIcon name={c.name} />
+        </span>
         <h3>
           <Link href={href}>{c.name}</Link>
         </h3>

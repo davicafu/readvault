@@ -6,10 +6,13 @@ import { cache } from "react";
 import { brand } from "@/config/brand";
 import { ApiError, isWebUrl, type Article, type ArticleContent, type Collection, type Suggestions } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { outline } from "@/lib/markdown";
 import { apiGet } from "@/lib/server-api";
 
 import { ArticleEditor } from "./ArticleEditor";
 import { ArticleText } from "./ArticleText";
+import { ArticleToc } from "./ArticleToc";
+import { ReadingProgress } from "./ReadingProgress";
 
 type Params = Promise<{ id: string }>;
 
@@ -73,9 +76,16 @@ export default async function ArticlePage({ params }: { params: Params }) {
   ]);
   if (!a) return <ArticleError error={error} />;
 
+  const markdown = content?.markdown ?? "";
+  // A table of contents helps only when the text has a few sections.
+  const sections = outline(markdown);
+  const withToc = sections.length >= 2;
+
   return (
-    <article className="article">
-      <div>
+    <article className={withToc ? "article article-with-toc" : "article"}>
+      {markdown ? <ReadingProgress targetId="article-text" /> : null}
+      {withToc ? <ArticleToc items={sections} /> : null}
+      <div className="article-main">
         <p className="fine-print">
           <Link href="/">Library</Link>
         </p>

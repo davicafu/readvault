@@ -131,7 +131,7 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
       ) : null}
 
       {content && content.markdown ? (
-        <div className="prose">
+        <div className="prose" id="article-text">
           <Markdown source={content.markdown} resolveImage={resolveImage} />
         </div>
       ) : null}

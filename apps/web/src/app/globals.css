@@ -748,6 +748,113 @@ a.tag:hover {
   align-items: start;
 }
 
+/* With a table of contents: contents | text | facts on wide screens, the
+   facts under the text in between, one column on phones. The page widens
+   to make room only for these articles. */
+.page:has(.article-with-toc),
+body:has(.article-with-toc) .masthead-inner {
+  max-width: 86rem;
+}
+
+.article-with-toc {
+  grid-template-columns: 13.5rem minmax(0, var(--measure)) minmax(13rem, 1fr);
+  grid-template-areas: "toc main facts";
+}
+
+.article-with-toc > .toc {
+  grid-area: toc;
+}
+
+.article-with-toc > .article-main {
+  grid-area: main;
+}
+
+.article-with-toc > .facts {
+  grid-area: facts;
+}
+
+@media (max-width: 84rem) {
+  .article-with-toc {
+    grid-template-columns: 13.5rem minmax(0, var(--measure));
+    grid-template-areas:
+      "toc main"
+      "toc facts";
+  }
+}
+
+.toc {
+  position: sticky;
+  top: 1.5rem;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  font-size: var(--step--1);
+  scrollbar-width: thin;
+}
+
+.toc-title {
+  margin: 0 0 0.75rem;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.toc-toggle {
+  display: none;
+}
+
+.toc-list {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--rule);
+  list-style: none;
+}
+
+.toc-list a {
+  display: block;
+  margin-left: -1px;
+  padding: 0.3rem 0.5rem 0.3rem calc(0.85rem + var(--depth, 0) * 0.85rem);
+  border-left: 2px solid transparent;
+  color: var(--ink-soft);
+  line-height: 1.35;
+  text-decoration: none;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.toc-list a:hover {
+  color: var(--ink);
+}
+
+.toc-list a[aria-current="location"] {
+  border-left-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Headings reached from the contents stop below the window's edge. */
+.prose :is(h2, h3, h4, h5, h6) {
+  scroll-margin-top: 1.5rem;
+}
+
+/* A hairline at the very top that fills as the text is read. */
+.reading-progress {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 50;
+  height: 3px;
+  pointer-events: none;
+}
+
+.reading-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--focus)));
+  opacity: 0.75;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
 .article-title {
   font-family: var(--font-read);
   font-size: var(--step-3);
@@ -850,8 +957,58 @@ a.tag:hover {
     order: 2;
   }
 
-  .article {
-    grid-template-columns: 1fr;
+  .article,
+  .article-with-toc {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "toc"
+      "main"
+      "facts";
+  }
+
+  .toc {
+    position: static;
+    max-height: none;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .toc-title {
+    margin: 0;
+  }
+
+  .toc-heading {
+    display: none;
+  }
+
+  .toc-toggle {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .toc-toggle::after {
+    content: "+";
+  }
+
+  .toc-toggle[aria-expanded="true"]::after {
+    content: "\2212";
+  }
+
+  .toc[data-open="false"] .toc-list {
+    display: none;
+  }
+
+  .toc-list {
+    margin-top: 0.75rem;
   }
 
   .page-title,
@@ -992,72 +1149,160 @@ a.tag:hover {
   font-size: var(--step--1);
 }
 
-/* Each collection is a card with a coloured spine, like a book on a shelf.
-   --hue comes from the collection's slug, so the colour is stable. */
+/* Each collection is a card under a cover in its own colour: a gradient
+   from --hue (stable per slug) to a neighbouring hue, the collection's icon
+   in a glass chip, and the same icon drawn large and faint as a watermark.
+   The cards come in one after another when the page loads; that is the one
+   moment of motion, and hover only answers the pointer. */
 .shelf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
-  gap: 1rem;
+  gap: 1.25rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .shelf-card {
-  --spine: hsl(var(--hue, 210) 45% 40%);
+  --tone: hsl(var(--hue, 210) 62% 38%);
+  --cover-a: hsl(var(--hue, 210) 68% 34%);
+  --cover-b: hsl(calc(var(--hue, 210) + 48) 72% 46%);
+  --cover-glow: hsl(calc(var(--hue, 210) + 20) 90% 70% / 0.55);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1.1rem 1.2rem 1rem 1.5rem;
+  overflow: hidden;
   border: 1px solid var(--rule);
-  border-left: 6px solid var(--spine);
-  border-radius: var(--radius);
+  border-radius: 14px;
   background: var(--surface);
-  transition: border-color 120ms ease, transform 120ms ease;
+  animation: shelf-in 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+@keyframes shelf-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
 }
 
 .shelf-card:hover,
 .shelf-card:focus-within {
-  border-color: var(--spine);
-  transform: translateY(-2px);
+  border-color: var(--tone);
+  transform: translateY(-4px);
+  box-shadow: 0 18px 36px -18px var(--tone);
 }
 
-.shelf-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.75rem;
+.shelf-cover {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "icon ."
+    "name name"
+    "count count";
+  gap: 0.35rem 0.75rem;
+  padding: 1.1rem 1.2rem 1rem;
+  overflow: hidden;
+  isolation: isolate;
+  color: #fff;
+  background:
+    radial-gradient(120% 90% at 100% 0%, var(--cover-glow), transparent 55%),
+    linear-gradient(135deg, var(--cover-a), var(--cover-b));
+  background-size: 100% 100%, 180% 180%;
+  background-position: 0 0, 0% 0%;
+  transition: background-position 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.shelf-card:hover .shelf-cover,
+.shelf-card:focus-within .shelf-cover {
+  background-position: 0 0, 100% 100%;
+}
+
+/* The watermark: the icon at cover size, tilted and faint. */
+.shelf-cover-mark {
+  position: absolute;
+  z-index: -1;
+  right: -1.1rem;
+  bottom: -1.6rem;
+  width: 8.5rem;
+  height: 8.5rem;
+  opacity: 0.16;
+  stroke-width: 1.1;
+  transform: rotate(-12deg);
+  transition: transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 400ms ease;
+}
+
+.shelf-card:hover .shelf-cover-mark,
+.shelf-card:focus-within .shelf-cover-mark {
+  opacity: 0.24;
+  transform: rotate(-4deg) scale(1.08);
+}
+
+.shelf-cover-icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 0.16);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
+  backdrop-filter: blur(6px);
+}
+
+.shelf-cover-icon svg {
+  width: 1.45rem;
+  height: 1.45rem;
 }
 
 .shelf-card h3 {
-  margin: 0;
+  grid-area: name;
+  margin: 0.6rem 0 0;
   font-family: var(--font-read);
   font-size: var(--step-1);
-  line-height: 1.25;
+  line-height: 1.2;
+  text-wrap: balance;
   overflow-wrap: anywhere;
 }
 
 .shelf-card h3 a {
-  color: var(--ink);
+  color: inherit;
   text-decoration: none;
 }
 
-.shelf-card h3 a:hover {
-  color: var(--spine);
+/* The whole cover opens the collection. */
+.shelf-card h3 a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.shelf-card h3 a:focus-visible {
+  outline: none;
+}
+
+.shelf-cover:has(a:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
 }
 
 .shelf-card-count {
-  flex: none;
-  color: var(--ink-soft);
+  grid-area: count;
+  color: rgb(255 255 255 / 0.82);
   font-size: var(--step--1);
   font-variant-numeric: tabular-nums;
 }
 
 .shelf-card-list {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.6rem;
   margin: 0;
-  padding: 0;
+  padding: 1rem 1.2rem 0;
   list-style: none;
   font-size: var(--step--1);
 }
@@ -1072,7 +1317,7 @@ a.tag:hover {
 }
 
 .shelf-card-list a:hover {
-  text-decoration: underline;
+  color: var(--tone);
 }
 
 .shelf-card-source {
@@ -1083,22 +1328,56 @@ a.tag:hover {
 
 .shelf-card-note {
   margin: 0;
+  padding: 1rem 1.2rem 0;
   color: var(--ink-soft);
   font-size: var(--step--1);
 }
 
 .shelf-card-more {
-  margin-top: auto;
-  padding-top: 0.5rem;
+  margin: auto 1.2rem 0;
+  padding: 0.75rem 0 0.9rem;
   border-top: 1px solid var(--rule);
-  color: var(--spine);
+  color: var(--tone);
   font-size: var(--step--1);
   font-weight: 600;
+  text-decoration: none;
+}
+
+.shelf-card-more:hover {
+  text-decoration: underline;
+}
+
+.shelf-card > :nth-child(2) {
+  margin-bottom: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .shelf-card {
+    --tone: hsl(var(--hue, 210) 70% 68%);
+    --cover-a: hsl(var(--hue, 210) 55% 26%);
+    --cover-b: hsl(calc(var(--hue, 210) + 48) 60% 36%);
+    --cover-glow: hsl(calc(var(--hue, 210) + 20) 90% 65% / 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shelf-card,
+  .shelf-cover,
+  .shelf-cover-mark {
+    animation: none;
+    transition: none;
+  }
+
+  .shelf-card:hover,
+  .shelf-card:focus-within {
+    transform: none;
+  }
 }
 
 .shelf-card-empty {
+  gap: 0.75rem;
   max-width: var(--measure);
-  border-left-color: var(--accent);
+  padding: 1.2rem;
 }
 
 .shelf-card-empty h3,
