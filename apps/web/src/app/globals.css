@@ -1762,288 +1762,271 @@ body:has(.article-with-toc) .masthead-inner {
   letter-spacing: -0.01em;
 }
 
-/* Each collection is a card under a cover in its own colour: a gradient
-   from --hue (one per subject, see collectionHue) to a neighbouring hue, the collection's icon
-   in a glass chip, and the same icon drawn large and faint as a watermark.
-   The cards come in one after another when the page loads; that is the one
-   moment of motion, and hover only answers the pointer. */
+/* Each collection is a folder in its own colour (a gradient from --hue,
+   one per subject, see collectionHue): its latest articles stick out of it
+   as sheets, and its icon sits on the front with a large faint copy as a
+   watermark.
+
+   Loading: the folders come into focus one after another, from a soft blur
+   to sharp, and a band of light crosses each front once as it settles; the
+   sheets rise out of the folder when they arrive. Hover lifts the folder,
+   fans the sheets, tilts the front and lights a soft glow behind it. */
 .shelf-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: 2.25rem 1.5rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.shelf-card {
-  --tone: hsl(var(--hue, 210) 62% 38%);
-  --cover-a: hsl(var(--hue, 210) 68% 34%);
-  --cover-b: hsl(calc(var(--hue, 210) + 48) 72% 46%);
-  --cover-glow: hsl(calc(var(--hue, 210) + 20) 90% 70% / 0.55);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--rule);
-  border-radius: 14px;
-  background: var(--surface);
-  /* backwards, not both: once in, the card's transform is free for hover. */
+.folder {
+  --folder-back: hsl(var(--hue, 210) 45% 30%);
   position: relative;
-  animation: shelf-in 720ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-  animation-delay: calc(min(var(--i, 0), 11) * 70ms);
-  transition:
-    transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
-    box-shadow 220ms ease,
-    border-color 220ms ease;
+  height: 17rem;
+  isolation: isolate;
+  animation: folder-in 1100ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 11) * 120ms);
+  transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@keyframes shelf-in {
+@keyframes folder-in {
   from {
     opacity: 0;
-    transform: translateY(16px) scale(0.955);
+    filter: blur(14px);
+    transform: translateY(10px) scale(1.03);
   }
-  55% {
+  60% {
     opacity: 1;
+  }
+  to {
+    filter: blur(0);
   }
 }
 
-/* As each card settles, a band of light crosses it once: the card seems to
-   take shape rather than simply appear. */
-.shelf-card::after {
+.folder:hover,
+.folder:focus-within {
+  transform: translateY(-4px);
+}
+
+/* The soft glow behind the folder, in its colour. */
+.folder-glow {
+  position: absolute;
+  inset: 3.5rem 8% -0.5rem;
+  z-index: -1;
+  border-radius: 40%;
+  background: hsl(var(--hue, 210) 85% 60%);
+  filter: blur(34px);
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 500ms ease,
+    transform 500ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.folder:hover .folder-glow,
+.folder:focus-within .folder-glow {
+  opacity: 0.45;
+  transform: scale(1);
+}
+
+/* The back of the folder and its tab. */
+.folder-back {
+  position: absolute;
+  inset: 3rem 0 0;
+  border-radius: 4px 14px 14px 14px;
+  background: var(--folder-back);
+}
+
+.folder-back::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 42%;
+  height: 1.2rem;
+  border-radius: 10px 10px 0 0;
+  background: var(--folder-back);
+}
+
+.folder-sheets {
+  position: absolute;
+  inset: 1.2rem 1rem auto;
+  z-index: 1;
+  height: 8rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folder-sheets li {
+  position: absolute;
+  inset: calc(var(--j, 0) * 0.9rem + 0.5rem) calc(var(--j, 0) * 0.4rem) auto;
+  animation: sheet-in 600ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--j, 0) * 90ms);
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(2.5rem);
+  }
+}
+
+.folder-sheet {
+  display: block;
+  height: 6.5rem;
+  padding: 0.6rem 0.8rem;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f4f6f8;
+  box-shadow: 0 6px 16px -10px rgb(0 0 0 / 0.6);
+  color: #1c2430;
+  font-family: var(--font-read);
+  font-size: 0.82rem;
+  line-height: 1.3;
+  text-decoration: none;
+  transform: rotate(calc((var(--j, 0) - 1) * -2deg));
+  transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.folder-sheet:hover {
+  color: #1c2430;
+}
+
+.folder:hover .folder-sheet,
+.folder:focus-within .folder-sheet {
+  transform: translateY(calc(-2.2rem + var(--j, 0) * 0.4rem)) translateX(calc((var(--j, 0) - 1) * 1.6rem))
+    rotate(calc((var(--j, 0) - 1) * -6deg));
+}
+
+.folder-sheets li:hover {
+  z-index: 3;
+}
+
+.folder-front {
+  position: absolute;
+  inset: 6rem 0 0;
+  z-index: 2;
+  display: grid;
+  align-content: end;
+  gap: 0.15rem;
+  overflow: hidden;
+  padding: 1.2rem 1.3rem;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(160deg, hsl(var(--hue, 210) 62% 42%), hsl(calc(var(--hue, 210) + 48) 68% 32%));
+  box-shadow:
+    0 -8px 20px -14px rgb(0 0 0 / 0.6),
+    inset 0 1px 0 rgb(255 255 255 / 0.25);
+  text-decoration: none;
+  transform-origin: bottom center;
+  transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.folder-front:hover {
+  color: #fff;
+}
+
+.folder:hover .folder-front,
+.folder:focus-within .folder-front {
+  transform: perspective(800px) rotateX(-14deg);
+}
+
+/* The band of light that crosses the front once as the folder settles. */
+.folder-front::after {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 2;
   pointer-events: none;
   background: linear-gradient(
     105deg,
     transparent 35%,
-    rgb(255 255 255 / 0.22) 48%,
-    rgb(255 255 255 / 0.05) 55%,
+    rgb(255 255 255 / 0.24) 48%,
+    rgb(255 255 255 / 0.06) 55%,
     transparent 65%
   );
   transform: translateX(-110%);
-  animation: shelf-sheen 1100ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
-  animation-delay: calc(min(var(--i, 0), 11) * 70ms + 220ms);
+  animation: folder-sheen 1300ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
+  animation-delay: calc(min(var(--i, 0), 11) * 120ms + 450ms);
 }
 
-@keyframes shelf-sheen {
+@keyframes folder-sheen {
   to {
     transform: translateX(110%);
   }
 }
 
-/* The latest articles arrive after the card: they rise in one by one. */
-.shelf-card-list:not(.shelf-card-list-loading) li {
-  animation: shelf-line-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  animation-delay: calc(var(--j, 0) * 60ms);
-}
-
-@keyframes shelf-line-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-
-.shelf-card-list-loading .skeleton-line {
-  height: 0.85rem;
-  margin-bottom: 0.4rem;
-}
-
-.skeleton-short {
-  width: 45%;
-}
-
-.shelf-card:hover,
-.shelf-card:focus-within {
-  border-color: var(--tone);
-  transform: translateY(-4px);
-  box-shadow: 0 18px 36px -18px var(--tone);
-}
-
-.shelf-cover {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas:
-    "icon ."
-    "name name"
-    "count count";
-  gap: 0.35rem 0.75rem;
-  padding: 1.1rem 1.2rem 1rem;
-  overflow: hidden;
-  isolation: isolate;
-  color: #fff;
-  background:
-    radial-gradient(120% 90% at 100% 0%, var(--cover-glow), transparent 55%),
-    linear-gradient(135deg, var(--cover-a), var(--cover-b));
-  background-size: 100% 100%, 180% 180%;
-  background-position: 0 0, 0% 0%;
-  transition: background-position 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-
-.shelf-card:hover .shelf-cover,
-.shelf-card:focus-within .shelf-cover {
-  background-position: 0 0, 100% 100%;
-}
-
-/* The watermark: the icon at cover size, tilted and faint. */
-.shelf-cover-mark {
+.folder-mark {
   position: absolute;
-  z-index: -1;
-  right: -1.1rem;
+  right: -1.2rem;
   bottom: -1.6rem;
   width: 8.5rem;
   height: 8.5rem;
   opacity: 0.16;
-  stroke-width: 1.1;
-  transform: rotate(-12deg);
-  transition: transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 400ms ease;
+  transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.shelf-card:hover .shelf-cover-mark,
-.shelf-card:focus-within .shelf-cover-mark {
-  opacity: 0.24;
-  transform: rotate(-4deg) scale(1.08);
+.folder:hover .folder-mark,
+.folder:focus-within .folder-mark {
+  transform: rotate(-8deg) scale(1.06);
 }
 
-.shelf-cover-icon {
-  grid-area: icon;
+.folder-icon {
   display: grid;
   place-items: center;
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 2.3rem;
+  height: 2.3rem;
+  margin-bottom: 0.4rem;
   border: 1px solid rgb(255 255 255 / 0.35);
-  border-radius: 11px;
+  border-radius: 10px;
   background: rgb(255 255 255 / 0.16);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
   backdrop-filter: blur(6px);
 }
 
-.shelf-cover-icon svg {
-  width: 1.45rem;
-  height: 1.45rem;
+.folder-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
-.shelf-card h3 {
-  grid-area: name;
-  margin: 0.6rem 0 0;
+.folder-title {
   font-family: var(--font-read);
   font-size: var(--step-1);
+  font-weight: 700;
   line-height: 1.2;
-  text-wrap: balance;
-  overflow-wrap: anywhere;
 }
 
-.shelf-card h3 a {
-  color: inherit;
-  text-decoration: none;
-}
-
-/* The whole cover opens the collection. */
-.shelf-card h3 a::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-}
-
-.shelf-card h3 a:focus-visible {
-  outline: none;
-}
-
-.shelf-cover:has(a:focus-visible) {
-  outline: 3px solid var(--focus);
-  outline-offset: -3px;
-}
-
-.shelf-card-count {
-  grid-area: count;
-  color: rgb(255 255 255 / 0.82);
+.folder-count {
+  opacity: 0.85;
   font-size: var(--step--1);
-  font-variant-numeric: tabular-nums;
-}
-
-.shelf-card-list {
-  display: grid;
-  gap: 0.6rem;
-  margin: 0;
-  padding: 1rem 1.2rem 0;
-  list-style: none;
-  font-size: var(--step--1);
-}
-
-.shelf-card-list a {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.shelf-card-list a:hover {
-  color: var(--tone);
-}
-
-.shelf-card-source {
-  display: block;
-  color: var(--ink-soft);
-  font-size: 0.8em;
-}
-
-.shelf-card-note {
-  margin: 0;
-  padding: 1rem 1.2rem 0;
-  color: var(--ink-soft);
-  font-size: var(--step--1);
-}
-
-.shelf-card-more {
-  margin: auto 1.2rem 0;
-  padding: 0.75rem 0 0.9rem;
-  border-top: 1px solid var(--rule);
-  color: var(--tone);
-  font-size: var(--step--1);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.shelf-card-more:hover {
-  text-decoration: underline;
-}
-
-.shelf-card > :nth-child(2) {
-  margin-bottom: 1rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  .shelf-card {
-    --tone: hsl(var(--hue, 210) 70% 68%);
-    --cover-a: hsl(var(--hue, 210) 55% 26%);
-    --cover-b: hsl(calc(var(--hue, 210) + 48) 60% 36%);
-    --cover-glow: hsl(calc(var(--hue, 210) + 20) 90% 65% / 0.35);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shelf-card,
-  .shelf-cover,
-  .shelf-cover-mark {
-    animation: none;
+  .folder,
+  .folder-glow,
+  .folder-sheet,
+  .folder-front,
+  .folder-mark {
     transition: none;
   }
 
-  .shelf-card:hover,
-  .shelf-card:focus-within {
+  .folder:hover,
+  .folder:focus-within,
+  .folder:hover .folder-front,
+  .folder:focus-within .folder-front {
     transform: none;
   }
 }
 
+/* No collections yet. */
 .shelf-card-empty {
+  display: grid;
   gap: 0.75rem;
   max-width: var(--measure);
   padding: 1.2rem;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--surface);
 }
 
 .shelf-card-empty h3,
@@ -2157,22 +2140,10 @@ body:has(.article-with-toc) .masthead-inner {
 }
 
 @media (prefers-color-scheme: dark) {
-  .shelf-card,
   .recent-collection,
   .collection-hero,
   .collection-hop a {
     --spine: hsl(var(--hue, 210) 55% 66%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .shelf-card {
-    transition: none;
-  }
-
-  .shelf-card:hover,
-  .shelf-card:focus-within {
-    transform: none;
   }
 }
 
@@ -2254,15 +2225,28 @@ body:has(.article-with-toc) .masthead-inner {
   margin-bottom: 2rem;
 }
 
+/* A fixed grid, so the three never wrap apart whatever the browser. */
 .collection-form-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.6rem;
 }
 
+.collection-form-row .collection-chip {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
 .collection-form-row .input {
-  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
+  height: 2.5rem;
+}
+
+.collection-form-row .button {
+  height: 2.5rem;
+  white-space: nowrap;
 }
 
 .collection-form .fine-print,
@@ -2270,13 +2254,14 @@ body:has(.article-with-toc) .masthead-inner {
   margin: 0;
 }
 
+/* On a phone the button goes under the name, full width. */
 @media (max-width: 520px) {
   .collection-form-row {
-    flex-wrap: wrap;
+    grid-template-columns: 2.5rem minmax(0, 1fr);
   }
 
   .collection-form-row .button {
-    flex: 1 1 100%;
+    grid-column: 1 / -1;
   }
 }
 
