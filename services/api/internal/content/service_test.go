@@ -350,10 +350,13 @@ func TestFetch_ClassifiesErrorsThatAreNotFetchErrors(t *testing.T) {
 
 const mirror = "https://mirror.example/"
 
+// everyPage lets the mirror serve every article.
+func everyPage(context.Context, string) bool { return true }
+
 func setupWithMirror(t *testing.T) (*content.Service, *fakeFetcher, string) {
 	t.Helper()
 	_, f, pool, id := setup(t)
-	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10, content.WithMirror(mirror))
+	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10, content.WithMirror(mirror, everyPage))
 	return svc, f, id
 }
 
@@ -455,7 +458,7 @@ func TestFetch_WithoutAMirrorTheFailureStands(t *testing.T) {
 func TestFetch_AMirrorAddressIsNotSentToTheMirrorAgain(t *testing.T) {
 	t.Parallel()
 	_, f, pool, _ := setup(t)
-	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10, content.WithMirror(mirror))
+	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10, content.WithMirror(mirror, everyPage))
 	saved := mirror + articleURL
 	id := newArticle(t, pool, owner, saved)
 	f.errs[saved] = &content.FetchError{Problem: content.ProblemTimeout}
@@ -532,5 +535,29 @@ func TestFetch_SendsOnlyAnsweredFailuresToTheMirror(t *testing.T) {
 				t.Errorf("the mirror was asked %d times, want never for %s", n, problem)
 			}
 		})
+	}
+}
+
+func TestFetch_SendsOnlyPagesTheMirrorServesToIt(t *testing.T) {
+	t.Parallel()
+	_, f, pool, id := setup(t)
+	var asked []string
+	onlyMedium := func(_ context.Context, rawURL string) bool {
+		asked = append(asked, rawURL)
+		return false
+	}
+	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10, content.WithMirror(mirror, onlyMedium))
+	f.errs[articleURL] = &content.FetchError{Problem: content.ProblemHTTPStatus, Status: 403}
+	f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(mirrorPage)}
+
+	var fe *content.FetchError
+	if _, err := svc.Fetch(t.Context(), owner, id); !errors.As(err, &fe) || fe.Status != 403 {
+		t.Errorf("Fetch() error = %v, want the original 403", err)
+	}
+	if n := requestsWithPrefix(f, mirror); n != 0 {
+		t.Errorf("the mirror was asked %d times, want never for a page it does not serve", n)
+	}
+	if len(asked) != 1 || asked[0] != articleURL {
+		t.Errorf("asked about %v, want the article's address", asked)
 	}
 }

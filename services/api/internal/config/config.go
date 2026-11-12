@@ -22,8 +22,8 @@ type Config struct {
 	MaxArticleBytes int64
 	RequestTimeout  time.Duration
 	ShutdownTimeout time.Duration
-	// ArticleMirrorURL is the prefix of a reading mirror tried when an
-	// article page fails or is a paid preview; empty means none.
+	// ArticleMirrorURL is the prefix of the reading mirror tried when a
+	// Medium article is refused or is a paid preview; empty means none.
 	ArticleMirrorURL string
 	// DownloadWorkers is how many article texts are downloaded at once in
 	// the background; 0 turns background downloads off.
@@ -42,6 +42,7 @@ func Load() (Config, error) {
 		RequestTimeout:   30 * time.Second,
 		ShutdownTimeout:  15 * time.Second,
 		DownloadWorkers:  2,
+		ArticleMirrorURL: "https://freedium-mirror.cfd/",
 	}
 
 	var errs []error
@@ -74,7 +75,9 @@ func Load() (Config, error) {
 		cfg.MaxArticleBytes = n
 	}
 
-	if v := os.Getenv("ARTICLE_MIRROR_URL"); v != "" {
+	if v := os.Getenv("ARTICLE_MIRROR_URL"); v == "off" {
+		cfg.ArticleMirrorURL = ""
+	} else if v != "" {
 		u, err := url.Parse(v)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			errs = append(errs, fmt.Errorf("ARTICLE_MIRROR_URL must be an http or https address, got %q", v))

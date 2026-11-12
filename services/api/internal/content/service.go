@@ -43,6 +43,7 @@ type Service struct {
 	fetcher      Fetcher
 	maxPageBytes int64
 	mirror       string
+	mirrorServes func(ctx context.Context, rawURL string) bool
 }
 
 // Option configures a Service.
@@ -51,9 +52,13 @@ type Option func(*Service)
 // WithMirror makes Fetch fall back to a reading mirror when the original page
 // fails or is a paid preview. The mirror address is prefix followed by the
 // original URL, as in https://freedium-mirror.cfd/https://medium.com/....
-// An empty prefix means no mirror.
-func WithMirror(prefix string) Option {
-	return func(s *Service) { s.mirror = prefix }
+// serves says which articles the mirror can read (Freedium reads Medium);
+// others are never sent to it. An empty prefix means no mirror.
+func WithMirror(prefix string, serves func(ctx context.Context, rawURL string) bool) Option {
+	return func(s *Service) {
+		s.mirror = prefix
+		s.mirrorServes = serves
+	}
 }
 
 // NewService returns a Service. maxPageBytes bounds an uploaded file and a
@@ -173,19 +178,21 @@ func (s *Service) downloadMissing(ctx context.Context, userID, articleID string)
 
 // useMirror says whether the mirror may help: a mirror is configured, the
 // download was not cancelled, and the site answered without the article (an
-// HTTP error such as 403, a page without text, or a paid preview). An
-// address that did not resolve or answer, or that the fetcher refused, may
-// be a private or intranet host and never leaves the machine. An address
-// already on the mirror is not sent to it again.
+// HTTP error such as 403, a page without text, or a paid preview), and the
+// mirror serves the article. An address that did not resolve or answer, or
+// that the fetcher refused, may be a private or intranet host and never
+// leaves the machine. An address already on the mirror is not sent to it
+// again.
 func (s *Service) useMirror(ctx context.Context, rawURL string, ex Extracted, fe *FetchError) bool {
 	switch {
 	case s.mirror == "" || ctx.Err() != nil || strings.HasPrefix(rawURL, s.mirror):
 		return false
-	case fe != nil:
-		return fe.Problem == ProblemHTTPStatus || fe.Problem == ProblemNoText
-	default:
-		return ex.Paywalled
+	case fe != nil && fe.Problem != ProblemHTTPStatus && fe.Problem != ProblemNoText:
+		return false
+	case fe == nil && !ex.Paywalled:
+		return false
 	}
+	return s.mirrorServes == nil || s.mirrorServes(ctx, rawURL)
 }
 
 // download fetches one page and extracts its text.

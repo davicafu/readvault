@@ -12,8 +12,14 @@ func TestLoad_ArticleMirror(t *testing.T) {
 
 	t.Setenv("ARTICLE_MIRROR_URL", "")
 	cfg, err := config.Load()
+	if err != nil || cfg.ArticleMirrorURL != "https://freedium-mirror.cfd/" {
+		t.Errorf("unset: %q, %v; want Freedium by default", cfg.ArticleMirrorURL, err)
+	}
+
+	t.Setenv("ARTICLE_MIRROR_URL", "off")
+	cfg, err = config.Load()
 	if err != nil || cfg.ArticleMirrorURL != "" {
-		t.Errorf("unset: %q, %v; want no mirror", cfg.ArticleMirrorURL, err)
+		t.Errorf("off: %q, %v; want no mirror", cfg.ArticleMirrorURL, err)
 	}
 
 	t.Setenv("ARTICLE_MIRROR_URL", "https://freedium-mirror.cfd/")
