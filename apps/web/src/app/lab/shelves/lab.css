@@ -1,3 +1,274 @@
+/* Original: the front page card before the folders (from c5a8300). */
+/* Each collection is a card under a cover in its own colour: a gradient
+   from --hue (one per subject, see collectionHue) to a neighbouring hue, the collection's icon
+   in a glass chip, and the same icon drawn large and faint as a watermark.
+   The cards come in one after another when the page loads; that is the one
+   moment of motion, and hover only answers the pointer. */
+.lab-orig-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.orig-card {
+  --tone: hsl(var(--hue, 210) 62% 38%);
+  --cover-a: hsl(var(--hue, 210) 68% 34%);
+  --cover-b: hsl(calc(var(--hue, 210) + 48) 72% 46%);
+  --cover-glow: hsl(calc(var(--hue, 210) + 20) 90% 70% / 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--surface);
+  /* backwards, not both: once in, the card's transform is free for hover. */
+  position: relative;
+  animation: orig-in 720ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 11) * 70ms);
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+@keyframes orig-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.955);
+  }
+  55% {
+    opacity: 1;
+  }
+}
+
+/* As each card settles, a band of light crosses it once: the card seems to
+   take shape rather than simply appear. */
+.orig-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgb(255 255 255 / 0.22) 48%,
+    rgb(255 255 255 / 0.05) 55%,
+    transparent 65%
+  );
+  transform: translateX(-110%);
+  animation: orig-sheen 1100ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
+  animation-delay: calc(min(var(--i, 0), 11) * 70ms + 220ms);
+}
+
+@keyframes orig-sheen {
+  to {
+    transform: translateX(110%);
+  }
+}
+
+/* The latest articles arrive after the card: they rise in one by one. */
+.orig-card-list li {
+  animation: orig-line-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--j, 0) * 60ms);
+}
+
+@keyframes orig-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.orig-card:hover,
+.orig-card:focus-within {
+  border-color: var(--tone);
+  transform: translateY(-4px);
+  box-shadow: 0 18px 36px -18px var(--tone);
+}
+
+.orig-cover {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "icon ."
+    "name name"
+    "count count";
+  gap: 0.35rem 0.75rem;
+  padding: 1.1rem 1.2rem 1rem;
+  overflow: hidden;
+  isolation: isolate;
+  color: #fff;
+  background:
+    radial-gradient(120% 90% at 100% 0%, var(--cover-glow), transparent 55%),
+    linear-gradient(135deg, var(--cover-a), var(--cover-b));
+  background-size: 100% 100%, 180% 180%;
+  background-position: 0 0, 0% 0%;
+  transition: background-position 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.orig-card:hover .orig-cover,
+.orig-card:focus-within .orig-cover {
+  background-position: 0 0, 100% 100%;
+}
+
+/* The watermark: the icon at cover size, tilted and faint. */
+.orig-cover-mark {
+  position: absolute;
+  z-index: -1;
+  right: -1.1rem;
+  bottom: -1.6rem;
+  width: 8.5rem;
+  height: 8.5rem;
+  opacity: 0.16;
+  stroke-width: 1.1;
+  transform: rotate(-12deg);
+  transition: transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 400ms ease;
+}
+
+.orig-card:hover .orig-cover-mark,
+.orig-card:focus-within .orig-cover-mark {
+  opacity: 0.24;
+  transform: rotate(-4deg) scale(1.08);
+}
+
+.orig-cover-icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 0.16);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
+  backdrop-filter: blur(6px);
+}
+
+.orig-cover-icon svg {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+.orig-card h3 {
+  grid-area: name;
+  margin: 0.6rem 0 0;
+  font-family: var(--font-read);
+  font-size: var(--step-1);
+  line-height: 1.2;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.orig-card h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The whole cover opens the collection. */
+.orig-card h3 a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.orig-card h3 a:focus-visible {
+  outline: none;
+}
+
+.orig-cover:has(a:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.orig-card-count {
+  grid-area: count;
+  color: rgb(255 255 255 / 0.82);
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+}
+
+.orig-card-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 1rem 1.2rem 0;
+  list-style: none;
+  font-size: var(--step--1);
+}
+
+.orig-card-list a {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.orig-card-list a:hover {
+  color: var(--tone);
+}
+
+.orig-card-source {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.8em;
+}
+
+.orig-card-note {
+  margin: 0;
+  padding: 1rem 1.2rem 0;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.orig-card-more {
+  margin: auto 1.2rem 0;
+  padding: 0.75rem 0 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--tone);
+  font-size: var(--step--1);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.orig-card-more:hover {
+  text-decoration: underline;
+}
+
+.orig-card > :nth-child(2) {
+  margin-bottom: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .orig-card {
+    --tone: hsl(var(--hue, 210) 70% 68%);
+    --cover-a: hsl(var(--hue, 210) 55% 26%);
+    --cover-b: hsl(calc(var(--hue, 210) + 48) 60% 36%);
+    --cover-glow: hsl(calc(var(--hue, 210) + 20) 90% 65% / 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orig-card,
+  .orig-cover,
+  .orig-cover-mark {
+    animation: none;
+    transition: none;
+  }
+
+  .orig-card:hover,
+  .orig-card:focus-within {
+    transform: none;
+  }
+}
+
+
 /* Prototype card designs (lab/shelves). */
 .lab-section {
   margin-bottom: 4rem;
@@ -150,7 +421,6 @@
   font-size: var(--step--1);
 }
 
-/* Shared by C and D. */
 .lab-folder-title {
   font-family: var(--font-read);
   font-size: var(--step-1);
@@ -172,10 +442,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .lab-book-cover,
-  .lab-drawer-card,
-  .lab-drawer-front,
-  .lab-deck-card,
-  .lab-deck-top {
+  .lab-vinyl-disc,
+  .lab-vinyl-sleeve,
+  .lab-holo,
+  .lab-holo-icon {
     transition: none;
   }
 }
@@ -185,197 +455,238 @@
   color: #fff;
 }
 
-/* C. Drawer: a cabinet front with a label and a handle; the drawer slides
-   down and the index cards inside stand up. */
-.lab-drawer {
+
+/* E. Vinyl: a square sleeve in the collection's colours; reaching for it
+   slides the record out, spinning, with the icon on its label. The latest
+   articles are the track list on the sleeve. */
+.lab-vinyl {
   position: relative;
   height: 18rem;
+  margin-right: 3.5rem;
   animation: lab-in 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
   animation-delay: calc(var(--i, 0) * 70ms);
 }
 
-.lab-drawer-box {
+.lab-vinyl-disc {
   position: absolute;
-  inset: 0 0.6rem 6rem;
-  overflow: hidden;
-  border-radius: 12px 12px 0 0;
-  background: hsl(var(--hue) 30% 16%);
-  box-shadow: inset 0 10px 18px -10px rgb(0 0 0 / 0.8);
-  opacity: 0;
-  transition: opacity 300ms ease;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: calc(100% - 1.2rem);
+  aspect-ratio: 1;
+  max-height: 16.8rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, hsl(var(--hue) 70% 55%) 0 17%, #111 17.5% 19%, transparent 19.5%),
+    repeating-radial-gradient(circle, #151515 0 2px, #1d1d1d 2px 4px),
+    #111;
+  box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.8);
+  transition: transform 800ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.lab-drawer-card {
+.lab-vinyl-disc::after {
+  content: "";
   position: absolute;
-  left: calc(0.8rem + var(--j) * 0.5rem);
-  right: calc(0.8rem + var(--j) * 0.5rem);
-  bottom: calc(-4rem + var(--j) * -1.2rem);
-  height: 5.5rem;
-  padding: 0.5rem 0.7rem;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 30deg, transparent 0 20%, rgb(255 255 255 / 0.12) 25%, transparent 30% 70%, rgb(255 255 255 / 0.08) 75%, transparent 80%);
+}
+
+.lab-vinyl-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.lab-vinyl-label svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.lab-vinyl:hover .lab-vinyl-disc,
+.lab-vinyl:focus-within .lab-vinyl-disc {
+  transform: translateX(42%) rotate(200deg);
+}
+
+.lab-vinyl-sleeve {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.5rem;
+  padding: 1.2rem;
   overflow: hidden;
-  border-radius: 6px 6px 0 0;
-  border-top: 3px solid hsl(var(--hue) 70% 55%);
-  background: #f4f6f8;
-  color: #1c2430;
-  font-family: var(--font-read);
-  font-size: 0.8rem;
-  line-height: 1.3;
+  border-radius: 6px;
+  color: #fff;
+  background:
+    radial-gradient(120% 90% at 100% 0%, hsl(calc(var(--hue) + 60) 80% 60% / 0.55), transparent 60%),
+    linear-gradient(160deg, hsl(var(--hue) 62% 40%), hsl(calc(var(--hue) + 30) 70% 22%));
+  box-shadow:
+    0 22px 40px -24px rgb(0 0 0 / 0.9),
+    inset 0 0 0 1px rgb(255 255 255 / 0.1);
   text-decoration: none;
-  transition: bottom 550ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  transition-delay: calc(var(--j) * 60ms);
+  transition: transform 800ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.lab-drawer-card:hover {
-  color: #1c2430;
+.lab-vinyl-sleeve:hover {
+  color: #fff;
 }
 
-.lab-drawer:hover .lab-drawer-box,
-.lab-drawer:focus-within .lab-drawer-box {
+.lab-vinyl:hover .lab-vinyl-sleeve,
+.lab-vinyl:focus-within .lab-vinyl-sleeve {
+  transform: translateX(-0.6rem) rotate(-2deg);
+}
+
+.lab-vinyl-tracks {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+  opacity: 0.88;
+}
+
+.lab-vinyl-tracks li {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr;
+}
+
+.lab-vinyl-tracks li span:last-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lab-vinyl-tracks li span:first-child {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* F. Holographic glass: a frosted card with an iridescent rim that turns,
+   tilting in 3D on hover with the icon floating above it. */
+.lab-holo-wrap {
+  height: 18rem;
+  perspective: 1000px;
+  animation: lab-in 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@property --holo-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.lab-holo {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.6rem;
+  height: 100%;
+  padding: 1.3rem;
+  border-radius: 20px;
+  color: var(--ink);
+  background:
+    radial-gradient(90% 60% at 20% 0%, hsl(var(--hue) 80% 60% / 0.28), transparent 70%),
+    color-mix(in srgb, var(--surface) 70%, transparent);
+  backdrop-filter: blur(16px);
+  text-decoration: none;
+  transform-style: preserve-3d;
+  transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* The rim: a turning conic gradient masked to a 1.5px border. */
+.lab-holo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--holo-angle),
+    hsl(var(--hue) 90% 65%),
+    hsl(calc(var(--hue) + 90) 90% 65%),
+    hsl(calc(var(--hue) + 180) 90% 65%),
+    hsl(calc(var(--hue) + 270) 90% 65%),
+    hsl(var(--hue) 90% 65%)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.6;
+  animation: holo-turn 6s linear infinite;
+  transition: opacity 400ms ease;
+}
+
+@keyframes holo-turn {
+  to {
+    --holo-angle: 360deg;
+  }
+}
+
+.lab-holo:hover {
+  color: var(--ink);
+}
+
+.lab-holo-wrap:hover .lab-holo,
+.lab-holo-wrap:focus-within .lab-holo {
+  transform: rotateX(8deg) rotateY(-12deg);
+}
+
+.lab-holo-wrap:hover .lab-holo::before,
+.lab-holo-wrap:focus-within .lab-holo::before {
   opacity: 1;
 }
 
-.lab-drawer:hover .lab-drawer-card,
-.lab-drawer:focus-within .lab-drawer-card {
-  bottom: calc(5.5rem - var(--j) * 2.4rem);
-}
-
-.lab-drawer-front {
-  position: absolute;
-  inset: auto 0 0;
-  height: 9rem;
+.lab-holo-icon {
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  justify-items: center;
-  padding: 1rem;
-  border-radius: 12px;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 14px;
   color: #fff;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.14), transparent 40%),
-    linear-gradient(160deg, hsl(var(--hue) 55% 40%), hsl(calc(var(--hue) + 40) 60% 28%));
-  box-shadow:
-    0 18px 30px -20px rgb(0 0 0 / 0.8),
-    inset 0 0 0 1px rgb(255 255 255 / 0.12);
-  text-decoration: none;
-  transition: transform 550ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  background: linear-gradient(135deg, hsl(var(--hue) 70% 50%), hsl(calc(var(--hue) + 60) 75% 45%));
+  box-shadow: 0 14px 28px -12px hsl(var(--hue) 80% 50%);
+  transform: translateZ(0);
+  transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.lab-drawer-front:hover {
-  color: #fff;
+.lab-holo-wrap:hover .lab-holo-icon,
+.lab-holo-wrap:focus-within .lab-holo-icon {
+  transform: translateZ(40px) rotate(-6deg);
 }
 
-.lab-drawer:hover .lab-drawer-front,
-.lab-drawer:focus-within .lab-drawer-front {
-  transform: translateY(0.6rem);
+.lab-holo-icon svg {
+  width: 1.6rem;
+  height: 1.6rem;
 }
 
-.lab-drawer-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.35rem 0.8rem;
-  border: 1px solid rgb(255 255 255 / 0.35);
-  border-radius: 4px;
-  background: rgb(255 255 255 / 0.92);
-  color: #1c2430;
-  font-family: var(--font-read);
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-
-.lab-drawer-label svg {
-  width: 1rem;
-  height: 1rem;
-  color: hsl(var(--hue) 60% 35%);
-}
-
-.lab-drawer-handle {
-  align-self: center;
-  width: 5rem;
-  height: 0.7rem;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.25));
-  box-shadow: 0 3px 6px rgb(0 0 0 / 0.35);
-}
-
-.lab-drawer-count {
-  opacity: 0.85;
-  font-size: var(--step--1);
-}
-
-/* D. Deck: article cards stacked under the collection card; hover fans them
-   out from the bottom corner like a hand of cards. */
-.lab-deck {
-  position: relative;
-  height: 16rem;
-  margin-top: 1rem;
-  animation: lab-in 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-  animation-delay: calc(var(--i, 0) * 70ms);
-}
-
-.lab-deck-card,
-.lab-deck-top {
-  position: absolute;
-  inset: 0 12%;
-  border-radius: 16px;
-  transform-origin: 50% 120%;
-  transition: transform 550ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.lab-deck-card {
-  display: grid;
-  align-content: start;
-  gap: 0.3rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid rgb(0 0 0 / 0.08);
-  background: #f4f6f8;
-  box-shadow: 0 8px 20px -14px rgb(0 0 0 / 0.7);
-  color: #1c2430;
-  font-family: var(--font-read);
-  font-size: 0.82rem;
-  line-height: 1.3;
-  text-decoration: none;
-  transform: rotate(calc((var(--j) + 1) * 3deg)) translateY(calc(var(--j) * -2px));
-}
-
-.lab-deck-card:hover {
-  color: #1c2430;
-}
-
-.lab-deck-card small {
-  color: #4f5b6a;
-  font-family: var(--font-ui);
-}
-
-.lab-deck-top {
-  z-index: 2;
+.lab-holo ul {
   display: grid;
   align-content: end;
-  gap: 0.15rem;
-  padding: 1.2rem;
-  color: #fff;
-  background: linear-gradient(160deg, hsl(var(--hue) 62% 42%), hsl(calc(var(--hue) + 48) 68% 30%));
-  box-shadow: 0 18px 30px -18px rgb(0 0 0 / 0.8);
-  text-decoration: none;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  transform: translateZ(20px);
 }
 
-.lab-deck-top:hover {
-  color: #fff;
+.lab-holo ul li {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.lab-deck-top .lab-book-icon {
-  margin-bottom: auto;
-}
-
-.lab-deck:hover .lab-deck-card,
-.lab-deck:focus-within .lab-deck-card {
-  transform: rotate(calc((var(--j) + 1) * 14deg)) translateX(calc((var(--j) + 1) * 0.6rem));
-}
-
-.lab-deck:hover .lab-deck-top,
-.lab-deck:focus-within .lab-deck-top {
-  transform: rotate(-8deg) translateX(-0.8rem);
-}
-
-.lab-deck-card:hover {
-  z-index: 3;
+/* The record slides over the next sleeve, not under it. */
+.lab-vinyl:hover,
+.lab-vinyl:focus-within {
+  z-index: 2;
 }

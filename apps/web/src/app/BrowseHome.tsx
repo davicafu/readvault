@@ -3,7 +3,9 @@ import { Suspense, type CSSProperties } from "react";
 
 import { hostname, type Article, type Collection, type TagCount } from "@/lib/api";
 
-import { CollectionIcon, hueStyle, TagIcon } from "./CollectionIcon";
+import { CollectionIcon, hueStyle } from "./CollectionIcon";
+import { PixelFilters } from "./PixelFilters";
+import { TagLogo } from "./TagLogo";
 
 // latest resolves to the collection's newest articles, or null when they
 // were not loaded.
@@ -39,11 +41,14 @@ export function BrowseHome({
             </Link>
           </div>
         ) : (
-          <ul className="shelf-grid">
-            {shelves.map((s, i) => (
-              <FolderCard key={s.collection.id} shelf={s} index={i} />
-            ))}
-          </ul>
+          <>
+            <PixelFilters />
+            <ul className="shelf-grid">
+              {shelves.map((s, i) => (
+                <FolderCard key={s.collection.id} shelf={s} index={i} />
+              ))}
+            </ul>
+          </>
         )}
       </section>
 
@@ -84,7 +89,7 @@ export function BrowseHome({
             {tags.map((t) => (
               <li key={t.slug}>
                 <Link className="tag" href={`/?tag=${encodeURIComponent(t.slug)}`}>
-                  <TagIcon name={t.name} className="tag-icon" />
+                  <TagLogo name={t.name} className="tag-icon" />
                   {t.name}
                   <span className="tag-count">
                     {t.articles}

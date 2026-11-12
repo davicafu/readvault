@@ -35,6 +35,38 @@ export default async function ShelvesLab() {
       </div>
 
       <section className="lab-section">
+        <h2>Original</h2>
+        <p className="fine-print">The front page card before the folders: a cover in the collection&apos;s colours over its latest articles.</p>
+        <ul className="lab-orig-grid">
+          {shown.map((c, i) => (
+            <li key={c.id} className="orig-card" style={{ ...hueStyle(c), "--i": i } as CSSProperties}>
+              <div className="orig-cover">
+                <CollectionIcon name={c.name} className="orig-cover-mark" />
+                <span className="orig-cover-icon">
+                  <CollectionIcon name={c.name} />
+                </span>
+                <h3>
+                  <Link href={`/?collection=${encodeURIComponent(c.slug)}`}>{c.name}</Link>
+                </h3>
+                <span className="orig-card-count">{c.articles} articles</span>
+              </div>
+              <ul className="orig-card-list">
+                {latest[i].map((a) => (
+                  <li key={a.id}>
+                    <Link href={`/articles/${a.id}`}>{a.title || "Untitled bookmark"}</Link>
+                    <span className="orig-card-source">{hostname(a.canonicalUrl || a.originalUrl)}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link className="orig-card-more" href={`/?collection=${encodeURIComponent(c.slug)}`}>
+                Browse {c.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="lab-section">
         <h2>A. A book that opens</h2>
         <p className="fine-print">The cover swings open on its spine and shows the first page: the latest articles.</p>
         <ul className="lab-grid">
@@ -67,30 +99,27 @@ export default async function ShelvesLab() {
       </section>
 
       <section className="lab-section">
-        <h2>C. A drawer that slides out</h2>
-        <p className="fine-print">The front of a filing drawer; it slides out to show the index cards inside.</p>
+        <h2>E. A record and its sleeve</h2>
+        <p className="fine-print">The collection is a record sleeve with its latest articles as the track list; the record slides out, spinning, with the icon on its label.</p>
         <ul className="lab-grid">
           {shown.map((c, i) => (
-            <li key={c.id} className="lab-drawer" style={{ ...hueStyle(c), "--i": i } as CSSProperties}>
-              <div className="lab-drawer-box">
-                {latest[i].map((a, j) => (
-                  <Link
-                    key={a.id}
-                    href={`/articles/${a.id}`}
-                    className="lab-drawer-card"
-                    style={{ "--j": j } as CSSProperties}
-                  >
-                    {a.title || "Untitled bookmark"}
-                  </Link>
-                ))}
-              </div>
-              <Link className="lab-drawer-front" href={`/?collection=${encodeURIComponent(c.slug)}`}>
-                <span className="lab-drawer-label">
+            <li key={c.id} className="lab-vinyl" style={{ ...hueStyle(c), "--i": i } as CSSProperties}>
+              <span className="lab-vinyl-disc" aria-hidden="true">
+                <span className="lab-vinyl-label">
                   <CollectionIcon name={c.name} />
-                  {c.name}
                 </span>
-                <span className="lab-drawer-handle" aria-hidden="true" />
-                <span className="lab-drawer-count">{c.articles} articles</span>
+              </span>
+              <Link className="lab-vinyl-sleeve" href={`/?collection=${encodeURIComponent(c.slug)}`}>
+                <span className="lab-folder-title">{c.name}</span>
+                <ol className="lab-vinyl-tracks">
+                  {latest[i].map((a, j) => (
+                    <li key={a.id}>
+                      <span>{String(j + 1).padStart(2, "0")}</span>
+                      <span>{a.title || "Untitled bookmark"}</span>
+                    </li>
+                  ))}
+                </ol>
+                <span className="lab-folder-count">{c.articles} articles</span>
               </Link>
             </li>
           ))}
@@ -98,28 +127,25 @@ export default async function ShelvesLab() {
       </section>
 
       <section className="lab-section">
-        <h2>D. A deck of cards</h2>
-        <p className="fine-print">The collection on top of its articles, stacked like cards; they fan out like a hand.</p>
+        <h2>F. Holographic glass</h2>
+        <p className="fine-print">A frosted card with an iridescent rim that keeps turning; it tilts in 3D and the icon floats up when you reach for it.</p>
         <ul className="lab-grid">
           {shown.map((c, i) => (
-            <li key={c.id} className="lab-deck" style={{ ...hueStyle(c), "--i": i } as CSSProperties}>
-              {latest[i].map((a, j) => (
-                <Link
-                  key={a.id}
-                  href={`/articles/${a.id}`}
-                  className="lab-deck-card"
-                  style={{ "--j": j, "--n": latest[i].length } as CSSProperties}
-                >
-                  <span>{a.title || "Untitled bookmark"}</span>
-                  <small>{hostname(a.canonicalUrl || a.originalUrl)}</small>
-                </Link>
-              ))}
-              <Link className="lab-deck-top" href={`/?collection=${encodeURIComponent(c.slug)}`}>
-                <span className="lab-book-icon">
+            <li key={c.id} className="lab-holo-wrap" style={{ ...hueStyle(c), "--i": i } as CSSProperties}>
+              <Link className="lab-holo" href={`/?collection=${encodeURIComponent(c.slug)}`}>
+                <span className="lab-holo-icon" aria-hidden="true">
                   <CollectionIcon name={c.name} />
                 </span>
-                <span className="lab-folder-title">{c.name}</span>
-                <span className="lab-folder-count">{c.articles} articles</span>
+                <span>
+                  <span className="lab-folder-title">{c.name}</span>
+                  <br />
+                  <span className="lab-folder-count">{c.articles} articles</span>
+                </span>
+                <ul>
+                  {latest[i].map((a) => (
+                    <li key={a.id}>{a.title || "Untitled bookmark"}</li>
+                  ))}
+                </ul>
               </Link>
             </li>
           ))}

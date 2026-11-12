@@ -14,7 +14,8 @@ import { formatDate } from "@/lib/format";
 import { apiGet } from "@/lib/server-api";
 
 import { BrowseHome, type CollectionShelf } from "./BrowseHome";
-import { CollectionIcon, hueStyle, TagIcon } from "./CollectionIcon";
+import { CollectionIcon, hueStyle } from "./CollectionIcon";
+import { TagLogo } from "./TagLogo";
 import { TextDownloads } from "./TextDownloads";
 
 const PAGE_SIZE = 25;
@@ -372,7 +373,7 @@ function TagPanel({ tags, filters }: { tags: TagCount[]; filters: Filters }) {
                 aria-current={selected ? "true" : undefined}
               >
                 <span className="side-panel-name">
-                  <TagIcon name={t.name} className="side-panel-icon" />
+                  <TagLogo name={t.name} className="side-panel-icon" />
                   {t.name}
                 </span>
                 <span className="side-panel-count">
@@ -429,7 +430,7 @@ function Entry({ article: a, filters }: { article: Article; filters: Filters }) 
                   tags: filters.tags.includes(t.slug) ? filters.tags : [...filters.tags, t.slug],
                 })}
               >
-                <TagIcon name={t.name} className="tag-icon" />
+                <TagLogo name={t.name} className="tag-icon" />
                 {t.name}
               </Link>
             </li>

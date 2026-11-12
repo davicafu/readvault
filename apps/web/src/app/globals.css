@@ -1767,9 +1767,9 @@ body:has(.article-with-toc) .masthead-inner {
    as sheets, and its icon sits on the front with a large faint copy as a
    watermark.
 
-   Loading: the folders come into focus one after another, from a soft blur
-   to sharp, and a band of light crosses each front once as it settles; the
-   sheets rise out of the folder when they arrive. Hover lifts the folder,
+   Loading: the folders form one after another out of large square pixels
+   that grow finer until sharp; the sheets rise out of the folder when they
+   arrive. Hover lifts the folder,
    fans the sheets, tilts the front and lights a soft glow behind it. */
 .shelf-grid {
   display: grid;
@@ -1785,23 +1785,46 @@ body:has(.article-with-toc) .masthead-inner {
   position: relative;
   height: 17rem;
   isolation: isolate;
-  animation: folder-in 1100ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-  animation-delay: calc(min(var(--i, 0), 11) * 120ms);
+  animation: folder-in 800ms linear backwards;
+  animation-delay: calc(min(var(--i, 0), 11) * 90ms);
   transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* The folder assembles from large square pixels that grow finer until it
+   is sharp (filters in PixelFilters.tsx). Filters do not blend, so each
+   step holds until the next. */
 @keyframes folder-in {
-  from {
+  0% {
     opacity: 0;
-    filter: blur(14px);
-    transform: translateY(10px) scale(1.03);
+    filter: url(#rv-px-24);
   }
-  60% {
+  14% {
     opacity: 1;
+    filter: url(#rv-px-24);
   }
-  to {
-    filter: blur(0);
+  30% {
+    filter: url(#rv-px-16);
   }
+  46% {
+    filter: url(#rv-px-10);
+  }
+  62% {
+    filter: url(#rv-px-6);
+  }
+  78% {
+    filter: url(#rv-px-3);
+  }
+  92%,
+  100% {
+    filter: none;
+  }
+}
+
+.pixel-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
 }
 
 .folder:hover,
@@ -1931,30 +1954,6 @@ body:has(.article-with-toc) .masthead-inner {
 .folder:hover .folder-front,
 .folder:focus-within .folder-front {
   transform: perspective(800px) rotateX(-14deg);
-}
-
-/* The band of light that crosses the front once as the folder settles. */
-.folder-front::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    105deg,
-    transparent 35%,
-    rgb(255 255 255 / 0.24) 48%,
-    rgb(255 255 255 / 0.06) 55%,
-    transparent 65%
-  );
-  transform: translateX(-110%);
-  animation: folder-sheen 1300ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
-  animation-delay: calc(min(var(--i, 0), 11) * 120ms + 450ms);
-}
-
-@keyframes folder-sheen {
-  to {
-    transform: translateX(110%);
-  }
 }
 
 .folder-mark {
