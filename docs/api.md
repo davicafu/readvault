@@ -279,7 +279,7 @@ Saves the text of a file the user chose, sent as `multipart/form-data` in the `f
 
 ### `POST /api/articles/{id}/content/fetch`
 
-Downloads the article from its original URL and saves its text the same way. A page whose schema.org data says `isAccessibleForFree: false`, or that shows Medium's "Member-only story" label, is saved as `incomplete`. On failure the answer is `502 fetch_failed` with `details.problem`:
+Downloads the article from its original URL and saves its text the same way. A page whose schema.org data says `isAccessibleForFree: false`, or that shows Medium's "Member-only story" label, is saved as `incomplete`. When the page fails or is a paid preview and `ARTICLE_MIRROR_URL` is set, the mirror's copy (the prefix followed by the article's URL) is downloaded the same way; if it has text and is not a paid preview, it is saved as `complete`, otherwise the original outcome stands. An article whose URL already starts with the prefix is not sent to the mirror again. On failure the answer is `502 fetch_failed` with `details.problem`:
 
 | Problem | Meaning |
 |---|---|

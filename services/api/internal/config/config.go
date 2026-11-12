@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -21,6 +22,9 @@ type Config struct {
 	MaxArticleBytes int64
 	RequestTimeout  time.Duration
 	ShutdownTimeout time.Duration
+	// ArticleMirrorURL is the prefix of a reading mirror tried when an
+	// article page fails or is a paid preview; empty means none.
+	ArticleMirrorURL string
 }
 
 // Load reads the configuration from the environment. DATABASE_URL is required;
@@ -64,6 +68,14 @@ func Load() (Config, error) {
 			errs = append(errs, fmt.Errorf("MAX_ARTICLE_BYTES must be a positive integer, got %q", v))
 		}
 		cfg.MaxArticleBytes = n
+	}
+
+	if v := os.Getenv("ARTICLE_MIRROR_URL"); v != "" {
+		u, err := url.Parse(v)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			errs = append(errs, fmt.Errorf("ARTICLE_MIRROR_URL must be an http or https address, got %q", v))
+		}
+		cfg.ArticleMirrorURL = v
 	}
 
 	if err := errors.Join(errs...); err != nil {

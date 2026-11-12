@@ -42,12 +42,28 @@ type Service struct {
 	repo         Repository
 	fetcher      Fetcher
 	maxPageBytes int64
+	mirror       string
+}
+
+// Option configures a Service.
+type Option func(*Service)
+
+// WithMirror makes Fetch fall back to a reading mirror when the original page
+// fails or is a paid preview. The mirror address is prefix followed by the
+// original URL, as in https://freedium-mirror.cfd/https://medium.com/....
+// An empty prefix means no mirror.
+func WithMirror(prefix string) Option {
+	return func(s *Service) { s.mirror = prefix }
 }
 
 // NewService returns a Service. maxPageBytes bounds an uploaded file and a
 // downloaded page.
-func NewService(repo Repository, fetcher Fetcher, maxPageBytes int64) *Service {
-	return &Service{repo: repo, fetcher: fetcher, maxPageBytes: maxPageBytes}
+func NewService(repo Repository, fetcher Fetcher, maxPageBytes int64, opts ...Option) *Service {
+	s := &Service{repo: repo, fetcher: fetcher, maxPageBytes: maxPageBytes}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 // Get returns the saved text of an article.
@@ -108,8 +124,10 @@ func (s *Service) Upload(ctx context.Context, userID, articleID, fileName string
 }
 
 // Fetch downloads the article from its original URL and saves its text. A
-// page that says it is a paid preview is saved as incomplete. A failed
-// download keeps any saved text, is recorded and is returned as *FetchError.
+// page that says it is a paid preview is saved as incomplete. When the page
+// fails or is a paid preview and a mirror is configured, the mirror's copy is
+// saved instead if it holds the whole text. A failed download keeps any saved
+// text, is recorded and is returned as *FetchError.
 func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content, error) {
 	if !uuidPattern.MatchString(articleID) {
 		return Content{}, ErrNotFound
@@ -119,23 +137,11 @@ func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content,
 		return Content{}, err
 	}
 
-	pageCtx, cancel := context.WithTimeout(ctx, pageTimeout)
-	page, err := s.fetcher.Fetch(pageCtx, rawURL, s.maxPageBytes, []string{"text/html", "application/xhtml+xml"})
-	cancel()
-	var ex Extracted
-	var fe *FetchError
-	if err != nil {
-		fe = asFetchError(err)
-	} else {
-		base, _ := url.Parse(page.URL)
-		ex, err = FromHTML(bytes.NewReader(cleanText(page.Body)), base)
-		switch {
-		case err != nil:
-			fe = &FetchError{Problem: ProblemNotHTML, Err: err}
-		case ex.Words == 0:
-			fe = &FetchError{Problem: ProblemNoText}
-		case len(ex.Markdown) > maxMarkdownBytes:
-			fe = &FetchError{Problem: ProblemTooLarge}
+	ex, fe := s.download(ctx, rawURL)
+	// An address that already points at the mirror is not sent to it again.
+	if s.mirror != "" && !strings.HasPrefix(rawURL, s.mirror) && (fe != nil || ex.Paywalled) {
+		if mex, mfe := s.download(ctx, s.mirror+rawURL); mfe == nil && !mex.Paywalled {
+			ex, fe = mex, nil
 		}
 	}
 	if fe != nil {
@@ -150,6 +156,27 @@ func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content,
 		status = StatusIncomplete
 	}
 	return s.save(ctx, userID, articleID, ex, status, SourceFetched)
+}
+
+// download fetches one page and extracts its text.
+func (s *Service) download(ctx context.Context, rawURL string) (Extracted, *FetchError) {
+	pageCtx, cancel := context.WithTimeout(ctx, pageTimeout)
+	page, err := s.fetcher.Fetch(pageCtx, rawURL, s.maxPageBytes, []string{"text/html", "application/xhtml+xml"})
+	cancel()
+	if err != nil {
+		return Extracted{}, asFetchError(err)
+	}
+	base, _ := url.Parse(page.URL)
+	ex, err := FromHTML(bytes.NewReader(cleanText(page.Body)), base)
+	switch {
+	case err != nil:
+		return Extracted{}, &FetchError{Problem: ProblemNotHTML, Err: err}
+	case ex.Words == 0:
+		return Extracted{}, &FetchError{Problem: ProblemNoText}
+	case len(ex.Markdown) > maxMarkdownBytes:
+		return Extracted{}, &FetchError{Problem: ProblemTooLarge}
+	}
+	return ex, nil
 }
 
 // asFetchError keeps a *FetchError and classifies any other download error,

@@ -334,3 +334,127 @@ func TestFetch_ClassifiesErrorsThatAreNotFetchErrors(t *testing.T) {
 		t.Errorf("Fetch() error = %v, want timeout", err)
 	}
 }
+
+const mirror = "https://mirror.example/"
+
+func setupWithMirror(t *testing.T) (*content.Service, *fakeFetcher, string) {
+	t.Helper()
+	_, f, pool, id := setup(t)
+	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10, content.WithMirror(mirror))
+	return svc, f, id
+}
+
+const mirrorPage = `<html><body><nav>Mirror menu</nav><article><h1>Queues</h1><p>The whole article, free to read on the mirror.</p></article></body></html>`
+
+func TestFetch_UsesTheMirrorWhenTheOriginalFails(t *testing.T) {
+	t.Parallel()
+	svc, f, id := setupWithMirror(t)
+	f.errs[articleURL] = &content.FetchError{Problem: content.ProblemHTTPStatus, Status: 403}
+	f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(mirrorPage)}
+
+	got, err := svc.Fetch(t.Context(), owner, id)
+	if err != nil {
+		t.Fatalf("Fetch() error: %v", err)
+	}
+	if got.Status != content.StatusComplete || got.Source != content.SourceFetched || got.Problem != nil ||
+		!strings.Contains(got.Markdown, "The whole article") {
+		t.Errorf("got %+v, want the mirror's text saved as complete", got)
+	}
+}
+
+func TestFetch_UsesTheMirrorForAPaidPreview(t *testing.T) {
+	t.Parallel()
+	svc, f, id := setupWithMirror(t)
+	f.responses[articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(`<html><body><article><p>Member-only story</p><p>The first lines.</p></article></body></html>`)}
+	f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(mirrorPage)}
+
+	got, err := svc.Fetch(t.Context(), owner, id)
+	if err != nil {
+		t.Fatalf("Fetch() error: %v", err)
+	}
+	if got.Status != content.StatusComplete || !strings.Contains(got.Markdown, "The whole article") {
+		t.Errorf("got %+v, want the mirror's whole text", got)
+	}
+}
+
+func TestFetch_KeepsTheOriginalOutcomeWhenTheMirrorDoesNotHelp(t *testing.T) {
+	t.Parallel()
+
+	t.Run("paid preview, mirror fails", func(t *testing.T) {
+		t.Parallel()
+		svc, f, id := setupWithMirror(t)
+		f.responses[articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(`<html><body><article><p>Member-only story</p><p>The first lines.</p></article></body></html>`)}
+		f.errs[mirror+articleURL] = &content.FetchError{Problem: content.ProblemTimeout}
+
+		got, err := svc.Fetch(t.Context(), owner, id)
+		if err != nil || got.Status != content.StatusIncomplete || !strings.Contains(got.Markdown, "The first lines") {
+			t.Errorf("got %+v, %v; want the preview saved as incomplete", got, err)
+		}
+	})
+
+	t.Run("original fails, mirror is a paid preview too", func(t *testing.T) {
+		t.Parallel()
+		svc, f, id := setupWithMirror(t)
+		f.errs[articleURL] = &content.FetchError{Problem: content.ProblemHTTPStatus, Status: 403}
+		f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(`<html><body><article><p>Member-only story</p><p>Lines.</p></article></body></html>`)}
+
+		_, err := svc.Fetch(t.Context(), owner, id)
+		var fe *content.FetchError
+		if !errors.As(err, &fe) || fe.Problem != content.ProblemHTTPStatus || fe.Status != 403 {
+			t.Fatalf("Fetch() error = %v, want the original 403", err)
+		}
+		got, err := svc.Get(t.Context(), owner, id)
+		if err != nil || got.Status != content.StatusFailed || got.Problem == nil || *got.Problem != "http_status" {
+			t.Errorf("got %+v, %v; want the original failure recorded", got, err)
+		}
+	})
+}
+
+func TestFetch_DoesNotAskTheMirrorWhenTheOriginalWorks(t *testing.T) {
+	t.Parallel()
+	svc, f, id := setupWithMirror(t)
+	f.responses[articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(`<html><body><article><p>Free text.</p></article></body></html>`)}
+
+	if _, err := svc.Fetch(t.Context(), owner, id); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, u := range f.requested {
+		if strings.HasPrefix(u, mirror) {
+			t.Errorf("requested %s; the mirror must not be asked for a page that works", u)
+		}
+	}
+}
+
+func TestFetch_WithoutAMirrorTheFailureStands(t *testing.T) {
+	t.Parallel()
+	svc, f, _, id := setup(t)
+	f.errs[articleURL] = &content.FetchError{Problem: content.ProblemHTTPStatus, Status: 403}
+	f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(mirrorPage)}
+
+	var fe *content.FetchError
+	if _, err := svc.Fetch(t.Context(), owner, id); !errors.As(err, &fe) {
+		t.Errorf("Fetch() error = %v, want the original failure", err)
+	}
+}
+
+func TestFetch_AMirrorAddressIsNotSentToTheMirrorAgain(t *testing.T) {
+	t.Parallel()
+	_, f, pool, _ := setup(t)
+	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10, content.WithMirror(mirror))
+	saved := mirror + articleURL
+	id := newArticle(t, pool, owner, saved)
+	f.errs[saved] = &content.FetchError{Problem: content.ProblemTimeout}
+
+	_, err := svc.Fetch(t.Context(), owner, id)
+	var fe *content.FetchError
+	if !errors.As(err, &fe) || fe.Problem != content.ProblemTimeout {
+		t.Errorf("Fetch() error = %v, want the timeout", err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.requested) != 1 {
+		t.Errorf("requested %v, want only the saved address", f.requested)
+	}
+}

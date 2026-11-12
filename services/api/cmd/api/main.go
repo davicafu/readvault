@@ -45,6 +45,8 @@ func run() error {
 	}
 	defer pool.Close()
 
+	contents := content.NewService(postgres.NewContentRepository(pool), fetch.New(fetch.PublicAddr), cfg.MaxArticleBytes,
+		content.WithMirror(cfg.ArticleMirrorURL))
 	handler := apihttp.NewHandler(apihttp.Deps{
 		DB:               pool,
 		Logger:           logger,
@@ -53,7 +55,7 @@ func run() error {
 		OwnerID:          postgres.DevOwnerID,
 		MaxUploadBytes:   cfg.MaxUploadBytes,
 		MaxImportRecords: cfg.MaxImportRecords,
-		Content:          content.NewService(postgres.NewContentRepository(pool), fetch.New(fetch.PublicAddr), cfg.MaxArticleBytes),
+		Content:          contents,
 		MaxArticleBytes:  cfg.MaxArticleBytes,
 	})
 	srv := &http.Server{
