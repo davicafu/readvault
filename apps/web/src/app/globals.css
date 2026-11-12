@@ -30,10 +30,18 @@
   --measure: 46rem;
   --wide: 68rem;
   --radius: 6px;
+  /* Height of the sticky header, for whatever sticks or scrolls below it. */
+  --header-h: 4.25rem;
 
   /* The backdrop: two soft glows of the accent family over the paper. */
-  --glow-a: rgb(31 95 139 / 0.13);
-  --glow-b: rgb(64 160 150 / 0.1);
+  --aurora-a: #5b8def;
+  --aurora-b: #35c3b0;
+  --aurora-c: #b07cf0;
+  --aurora-floor: rgb(240 170 110 / 0.12);
+  --aurora-strength: 0.4;
+  --glass: rgb(248 250 251 / 0.72);
+  --glass-rule: rgb(28 36 48 / 0.1);
+  --search-fill: rgb(255 255 255 / 0.6);
   --grain-opacity: 0.05;
 
   color-scheme: light;
@@ -51,8 +59,14 @@
     --ok: #7cc4a0;
     --warn: #e2b562;
     --bad: #f0928b;
-    --glow-a: rgb(70 120 210 / 0.16);
-    --glow-b: rgb(40 170 160 / 0.1);
+    --aurora-a: #3d63d6;
+    --aurora-b: #1f9e8f;
+    --aurora-c: #8a4fd8;
+    --aurora-floor: rgb(230 140 80 / 0.08);
+    --aurora-strength: 0.55;
+    --glass: rgb(21 27 35 / 0.66);
+    --glass-rule: rgb(227 232 238 / 0.09);
+    --search-fill: rgb(255 255 255 / 0.05);
     --grain-opacity: 0.07;
     color-scheme: dark;
   }
@@ -70,11 +84,7 @@ html {
 
 body {
   margin: 0;
-  background:
-    radial-gradient(60rem 40rem at 8% -10%, var(--glow-a), transparent 70%),
-    radial-gradient(50rem 36rem at 100% 15%, var(--glow-b), transparent 70%),
-    var(--paper);
-  background-attachment: fixed;
+  background: var(--paper);
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: var(--step-0);
@@ -126,9 +136,67 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* An aurora behind every page: soft colour fields that drift very slowly,
+   under a fine grain (body::before). Only transforms animate, on their own
+   layer, so scrolling and reading stay smooth. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 50% 120%, var(--aurora-floor), transparent 60%),
+    var(--paper);
+}
+
+.backdrop span {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: var(--aurora-strength);
+  will-change: transform;
+  animation: drift 48s ease-in-out infinite alternate;
+}
+
+.backdrop span:nth-child(1) {
+  top: -28vmax;
+  left: -18vmax;
+  background: radial-gradient(circle, var(--aurora-a), transparent 65%);
+}
+
+.backdrop span:nth-child(2) {
+  top: -14vmax;
+  right: -22vmax;
+  background: radial-gradient(circle, var(--aurora-b), transparent 65%);
+  animation-duration: 62s;
+  animation-direction: alternate-reverse;
+}
+
+.backdrop span:nth-child(3) {
+  bottom: -34vmax;
+  left: 18vw;
+  background: radial-gradient(circle, var(--aurora-c), transparent 65%);
+  animation-duration: 74s;
+}
+
+@keyframes drift {
+  to {
+    transform: translate3d(6vmax, 4vmax, 0) scale(1.12);
+  }
+}
+
+/* The header floats over the page as frosted glass and stays in reach. */
 .masthead {
-  border-bottom: 1px solid var(--rule);
-  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--glass-rule);
+  background: var(--glass);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
 }
 
 .masthead-inner,
@@ -141,10 +209,216 @@ body::before {
 .masthead-inner {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem 2rem;
-  padding-block: 1rem;
+  align-items: center;
+  gap: 0.75rem 1.75rem;
+  padding-block: 0.8rem;
+}
+
+.masthead-inner nav {
+  margin-left: auto;
+}
+
+/* Search: a rounded field with its magnifier, between the name and the menu. */
+.header-search {
+  position: relative;
+  flex: 1 1 18rem;
+  max-width: 30rem;
+  min-height: 2.6rem;
+}
+
+.header-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 0.95rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  translate: 0 -50%;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+  transition: stroke 160ms ease;
+}
+
+.header-search-input {
+  width: 100%;
+  height: 2.6rem;
+  padding: 0 2.6rem 0 2.7rem;
+  border: 1px solid var(--glass-rule);
+  border-radius: 999px;
+  background: var(--search-fill);
+  color: var(--ink);
+  font: inherit;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 200ms ease;
+}
+
+.header-search-input::placeholder {
+  color: var(--ink-soft);
+}
+
+.header-search-input:hover {
+  border-color: var(--rule);
+}
+
+.header-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.header-search:focus-within .header-search-icon {
+  stroke: var(--accent);
+}
+
+.header-search-input::-webkit-search-cancel-button {
+  margin-right: 0.2rem;
+}
+
+.header-search-key {
+  position: absolute;
+  top: 50%;
+  right: 0.8rem;
+  translate: 0 -50%;
+  min-width: 1.4rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--ink-soft);
+  font: 600 0.75rem/1.3 var(--font-ui);
+  text-align: center;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.header-search:focus-within .header-search-key {
+  opacity: 0;
+}
+
+/* Order of a result list, as a segmented control. */
+.sort-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 1.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.sort-links a {
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+  text-decoration: none;
+}
+
+.sort-links a:hover {
+  color: var(--ink);
+}
+
+.sort-links a[aria-current="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* The page settles in as one piece instead of parts popping in. */
+.page {
+  animation: page-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* On a phone the header wraps onto several lines: it scrolls away. */
+@media (max-width: 760px) {
+  :root {
+    --header-h: 0rem;
+  }
+
+  .masthead {
+    position: static;
+  }
+
+  .header-search {
+    flex-basis: 100%;
+    max-width: none;
+    order: 3;
+  }
+
+  .header-search-key {
+    display: none;
+  }
+}
+
+/* Placeholders while a page loads, in the shape of what is coming. */
+.skeleton {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(
+      100deg,
+      transparent 30%,
+      color-mix(in srgb, var(--ink) 7%, transparent) 50%,
+      transparent 70%
+    )
+    0 0 / 220% 100%,
+    color-mix(in srgb, var(--ink) 6%, transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 120% 0, 0 0;
+  }
+  to {
+    background-position: -120% 0, 0 0;
+  }
+}
+
+.skeleton-title {
+  width: 11rem;
+  height: 1.9rem;
+  margin: 0.5rem 0 1.25rem;
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skeleton-card {
+  height: 24rem;
+  border-radius: 14px;
+}
+
+.skeleton-line {
+  height: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.article-loading {
+  max-width: var(--measure);
+  padding-top: 1.5rem;
+}
+
+.skeleton-heading {
+  width: 80%;
+  height: 2.6rem;
+  margin-bottom: 1.5rem;
 }
 
 .wordmark {
@@ -275,19 +549,6 @@ body::before {
 
 /* Library */
 
-.finder {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: end;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.input-search {
-  padding-block: 0.7rem;
-  font-size: var(--step-1);
-}
-
 /* Results on the left, the tag panel beside them. */
 .library {
   display: grid;
@@ -298,10 +559,10 @@ body::before {
 
 .library-side {
   position: sticky;
-  top: 1.5rem;
+  top: calc(var(--header-h) + 1.5rem);
   display: grid;
   gap: 1.75rem;
-  max-height: calc(100vh - 3rem);
+  max-height: calc(100vh - var(--header-h) - 3rem);
   overflow-y: auto;
 }
 
@@ -567,12 +828,100 @@ a.tag:hover {
 
 .dropzone {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.9rem;
   max-width: var(--measure);
-  padding: 1.5rem;
-  border: 1px dashed var(--ink-soft);
-  border-radius: var(--radius);
-  background: var(--surface);
+}
+
+/* A drop zone for one file; the native input stays focusable. */
+.file-picker {
+  position: relative;
+}
+
+.file-picker-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.file-picker-zone {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1.6rem 1.5rem;
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--rule));
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    color-mix(in srgb, var(--surface) 85%, transparent);
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 200ms ease;
+}
+
+.file-picker-zone:hover,
+.file-picker-zone[data-over] {
+  border-color: var(--accent);
+  box-shadow: 0 14px 30px -20px var(--accent);
+}
+
+.file-picker-zone[data-over] {
+  border-style: solid;
+  transform: scale(1.01);
+}
+
+.file-picker-zone[data-chosen] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--ok) 60%, var(--rule));
+}
+
+.file-picker-input:focus-visible + .file-picker-zone {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.file-picker-input:disabled + .file-picker-zone {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.file-picker-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 14px;
+  color: var(--accent-ink);
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 50%, #35c3b0));
+  box-shadow: 0 10px 22px -12px var(--accent);
+}
+
+.file-picker-zone[data-chosen] .file-picker-icon {
+  background: linear-gradient(135deg, var(--ok), color-mix(in srgb, var(--ok) 55%, var(--accent)));
+}
+
+.file-picker-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.file-picker-text {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.file-picker-text strong {
+  overflow-wrap: anywhere;
+}
+
+.file-picker-text span {
+  color: var(--ink-soft);
+  font-size: var(--step--1);
 }
 
 .summary {
@@ -807,8 +1156,8 @@ body:has(.article-with-toc) .masthead-inner {
 
 .toc {
   position: sticky;
-  top: 1.5rem;
-  max-height: calc(100vh - 3rem);
+  top: calc(var(--header-h) + 1.5rem);
+  max-height: calc(100vh - var(--header-h) - 3rem);
   overflow-y: auto;
   padding-right: 0.25rem;
   font-size: var(--step--1);
@@ -858,7 +1207,7 @@ body:has(.article-with-toc) .masthead-inner {
 
 /* Headings reached from the contents stop below the window's edge. */
 .prose :is(h2, h3, h4, h5, h6) {
-  scroll-margin-top: 1.5rem;
+  scroll-margin-top: calc(var(--header-h) + 1.5rem);
 }
 
 /* A hairline at the very top that fills as the text is read. */
@@ -1054,10 +1403,6 @@ body:has(.article-with-toc) .masthead-inner {
 }
 
 @media (max-width: 760px) {
-  .finder {
-    grid-template-columns: 1fr;
-  }
-
   .library {
     grid-template-columns: 1fr;
   }
@@ -1294,8 +1639,8 @@ body:has(.article-with-toc) .masthead-inner {
   border-radius: 14px;
   background: var(--surface);
   /* backwards, not both: once in, the card's transform is free for hover. */
-  animation: shelf-in 900ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-  animation-delay: calc(120ms + var(--i, 0) * 85ms);
+  animation: shelf-in 640ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 8) * 45ms);
   transition:
     transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
     box-shadow 220ms ease,
@@ -1305,11 +1650,7 @@ body:has(.article-with-toc) .masthead-inner {
 @keyframes shelf-in {
   from {
     opacity: 0;
-    filter: blur(6px);
-    transform: translateY(18px) scale(0.985);
-  }
-  60% {
-    filter: blur(0);
+    transform: translateY(12px) scale(0.99);
   }
 }
 
@@ -1644,13 +1985,21 @@ body:has(.article-with-toc) .masthead-inner {
   border-top: 1px solid var(--rule);
 }
 
+/* Icon, name with its count, actions: the actions keep their column
+   whatever the length of the name. */
 .collection-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.5rem 1rem;
+  gap: 0.4rem 1rem;
   padding-block: 0.8rem;
   border-bottom: 1px solid var(--rule);
+}
+
+.collection-title {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
 }
 
 .collection-name {
@@ -1662,14 +2011,24 @@ body:has(.article-with-toc) .masthead-inner {
 .collection-actions {
   display: flex;
   gap: 0.5rem;
-  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .collection-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .collection-actions {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+  }
 }
 
 .collection-rename {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  flex: 1 1 100%;
+  grid-column: 2 / -1;
 }
 
 .collection-rename .input {
@@ -1677,8 +2036,81 @@ body:has(.article-with-toc) .masthead-inner {
 }
 
 .collection-row .field-error {
-  flex-basis: 100%;
+  grid-column: 2 / -1;
   margin: 0;
+}
+
+.collection-row .collection-done {
+  grid-column: 2 / -1;
+  margin: 0;
+}
+
+.collection-form {
+  align-items: center;
+}
+
+/* A collection's icon on a small tile in its own colours, like its card. */
+.collection-chip {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, hsl(var(--hue, 210) 62% 38%), hsl(calc(var(--hue, 210) + 48) 68% 48%));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+  transition: background 300ms ease;
+}
+
+.collection-chip svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.input-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.input-with-icon .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.saved-texts {
+  max-width: var(--measure);
+  margin-top: 3rem;
+  padding: 1.25rem 1.4rem;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+}
+
+.saved-texts h2 {
+  margin: 0 0 0.4rem;
+  font-size: var(--step-1);
+}
+
+.saved-texts p {
+  margin: 0 0 1rem;
+  color: var(--ink-soft);
+}
+
+.saved-texts .fine-print,
+.saved-texts .field-error {
+  margin: 0.75rem 0 0;
+}
+
+.button-danger {
+  background: transparent;
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 55%, transparent);
+}
+
+.button-danger:hover:not([disabled]) {
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
 }
 
 /* Add articles */

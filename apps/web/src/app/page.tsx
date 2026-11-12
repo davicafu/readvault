@@ -6,6 +6,7 @@ import {
   type Article,
   type ArticlePage,
   type Collection,
+  type DownloadSummary,
   type Sort,
   type TagCount,
 } from "@/lib/api";
@@ -125,7 +126,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Sear
       ) : (
         <h1 className="visually-hidden">Library</h1>
       )}
-      <SearchForm filters={filters} withOrder />
+      <SortLinks filters={filters} />
 
       {filters.q || filters.tags.length > 0 || filters.text ? (
         <div className="active-filters">
@@ -190,17 +191,17 @@ export default async function LibraryPage({ searchParams }: { searchParams: Sear
 // explore, the latest articles and the tags. Each part is optional, so a
 // failed request hides that part only.
 async function FrontPage() {
-  const [collectionList, tagList, recentList] = await Promise.allSettled([
+  const [collectionList, tagList, recentList, downloads] = await Promise.allSettled([
     apiGet<{ collections: Collection[] }>("/api/collections"),
     apiGet<{ tags: TagCount[] }>("/api/tags"),
     apiGet<ArticlePage>(`/api/articles?limit=${RECENT_SIZE}`),
+    apiGet<DownloadSummary>("/api/content-downloads"),
   ]);
   if (recentList.status === "rejected") {
     const err = recentList.reason;
     return (
       <>
         <h1 className="visually-hidden">Library</h1>
-        <SearchForm />
         <LibraryError
           error={err instanceof ApiError ? err : new ApiError(0, "unreachable", "The ReadVault API is not reachable.")}
           firstPage="/"
@@ -239,54 +240,26 @@ async function FrontPage() {
   return (
     <>
       <h1 className="visually-hidden">Library</h1>
-      <SearchForm />
-      <TextDownloads />
+      <TextDownloads initial={downloads.status === "fulfilled" ? downloads.value : null} />
       <BrowseHome shelves={shelves} recent={recent} tags={tagList.status === "fulfilled" ? tagList.value.tags : []} />
     </>
   );
 }
 
-function SearchForm({ filters, withOrder = false }: { filters?: Filters; withOrder?: boolean }) {
+// SortLinks orders the list; the search box is in the page header.
+function SortLinks({ filters }: { filters: Filters }) {
   return (
-    <form className="finder" action="/" method="get" role="search">
-      <div className="field">
-        <label className="field-label" htmlFor="q">
-          {filters?.collection ? "Search this collection" : "Search your library"}
-        </label>
-        <input
-          className="input input-search"
-          id="q"
-          name="q"
-          type="search"
-          placeholder="Title, address or tag"
-          defaultValue={filters?.q}
-          maxLength={200}
-          autoFocus={!filters}
-        />
-      </div>
-      {withOrder ? (
-        <div className="field">
-          <label className="field-label" htmlFor="sort">
-            Order
-          </label>
-          <select className="select" id="sort" name="sort" defaultValue={filters?.sort}>
-            {Object.entries(sortLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
-      {filters?.collection ? <input type="hidden" name="collection" value={filters.collection} /> : null}
-      {filters?.text ? <input type="hidden" name="text" value={filters.text} /> : null}
-      {filters?.tags.map((t) => (
-        <input key={t} type="hidden" name="tag" value={t} />
+    <nav className="sort-links" aria-label="Order">
+      {(Object.entries(sortLabels) as [Sort, string][]).map(([value, label]) => (
+        <Link
+          key={value}
+          href={libraryHref(filters, { sort: value, all: true })}
+          aria-current={filters.sort === value ? "true" : undefined}
+        >
+          {label}
+        </Link>
       ))}
-      <button className="button" type="submit">
-        Search
-      </button>
-    </form>
+    </nav>
   );
 }
 

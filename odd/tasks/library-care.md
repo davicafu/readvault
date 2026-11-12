@@ -22,10 +22,10 @@ Already in place, no change (L1 questions): suggestions are computed each time t
 
 | ID | Specs | Route | Status | Evidence |
 |---|---|---|---|---|
-| T1 | S1 (API) | inline | pending | |
-| T2 | S2 (migration) | inline | pending | |
-| T3 | S1, S2 (web) | inline | pending | |
-| T4 | S3-S6 (web) | inline | pending | |
+| T1 | S1 (API) | inline | done (`eae13fd`) | Risk item 1. Service tests RED (build failure: no RemoveTexts) then GREEN: every text, image, failure and queued download of the user removed, articles and other users' texts kept; one collection's only; unknown, malformed or another user's collection is ErrNotFound and removes nothing. HTTP tests RED (404 on the routes) then GREEN. Full Go suite with `-race` passes |
+| T2 | S2 (migration) | inline | done (`d4f114a`) | Risk item 1. Migration test RED (Spanish names kept) then GREEN: the owner's Spanish collections renamed in place with their articles, missing defaults created, the owner's own collection kept, another user gets the defaults, down keeps the data and up again adds nothing. Test databases start without the defaults (testdb.New). Dev DB backed up to the scratchpad, then migrated: nine English collections, same article counts |
+| T3 | S1, S2 (web) | inline | done (web commit) | Collections page: icon tile per collection and a live one while typing a name, Delete texts per row, Delete all saved texts, each with a confirmation. More icon words (security, mobile, testing, career, tools). tsc passes; screenshots |
+| T4 | S3-S6 (web) | inline | done (web commit) | Header search with magnifier, placeholder and `/` shortcut, keeping the library filters; order as a segmented control. Drop-zone file picker. Aurora backdrop and frosted sticky header. Loading skeletons, page fade, card entrance without blur (640 ms, capped 45 ms stagger), text notice rendered on the server so nothing pops in. Fixed a hydration mismatch (number locale) found on the article page. tsc passes; screenshots of home, search, collections, add and article |
 
 ## Log
 

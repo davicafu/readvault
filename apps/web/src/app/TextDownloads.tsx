@@ -3,20 +3,19 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { ApiError, readJSON } from "@/lib/api";
-
-type Summary = { queued: number; missing: number; failed: number; incomplete: number };
+import { ApiError, readJSON, type DownloadSummary as Summary } from "@/lib/api";
 
 const POLL_MS = 8000;
 
-const articles = (n: number) => `${n.toLocaleString()} ${n === 1 ? "article" : "articles"}`;
+const articles = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "article" : "articles"}`;
 
 // TextDownloads tells how the library's texts are doing: articles never
 // downloaded (with a button to download them all), the ones still waiting
 // in the background, and the ones that failed, linked to their list. It
-// shows nothing when every article has its text.
-export function TextDownloads() {
-  const [summary, setSummary] = useState<Summary | null>(null);
+// shows nothing when every article has its text. The page renders it with
+// the summary it loaded, so the notice is there from the first paint.
+export function TextDownloads({ initial }: { initial: Summary | null }) {
+  const [summary, setSummary] = useState<Summary | null>(initial);
   const [queueing, setQueueing] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -27,10 +26,6 @@ export function TextDownloads() {
       // A summary is a convenience: without it the notice stays hidden.
     }
   }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   // While texts download, check again now and then.
   const waiting = (summary?.queued ?? 0) > 0;

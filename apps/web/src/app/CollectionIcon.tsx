@@ -12,6 +12,11 @@ type Kind =
   | "interface"
   | "architecture"
   | "server"
+  | "security"
+  | "mobile"
+  | "testing"
+  | "career"
+  | "tools"
   | "book";
 
 // Checked in order: the first rule with a matching word wins, so the more
@@ -27,6 +32,11 @@ const rules: [Kind, RegExp][] = [
   ["interface", /^(frontend|visualizacion|visualization|ui|ux|css|react|design-systems?)$/],
   ["architecture", /^(arquitectura|architecture|system|sistemas|patrones|patterns|ddd)$/],
   ["server", /^(backend|api|apis|go|golang|java|rust|python|microservicios|microservices)$/],
+  ["security", /^(security|seguridad|auth|authentication|autenticacion|privacy|privacidad|cryptography|criptografia)$/],
+  ["mobile", /^(mobile|movil|moviles|android|ios|swift|kotlin|flutter)$/],
+  ["testing", /^(testing|tests?|qa|quality|calidad|tdd)$/],
+  ["career", /^(career|carrera|management|gestion|leadership|liderazgo|productivity|productividad|business|negocio)$/],
+  ["tools", /^(tools|herramientas|tooling|utilities|utilidades|editor|editors|terminal|vim|neovim|git)$/],
 ];
 
 export function collectionKind(name: string): Kind {
@@ -57,6 +67,11 @@ const paths: Record<Kind, string[]> = {
   interface: ["M3 5h18v14H3z", "M3 9h18", "M7 13h4v3H7z", "M13 13h4", "M13 16h3"],
   architecture: ["M4 4h6v6H4z", "M14 4h6v6h-6z", "M9 14h6v6H9z", "M7 10v2h10v-2", "M12 12v2"],
   server: ["M4 4h16v6H4z", "M4 14h16v6H4z", "M8 7h.01", "M8 17h.01", "M12 7h5", "M12 17h5"],
+  security: ["M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z", "M9.5 12l1.8 1.8L15 10"],
+  mobile: ["M7 3h10v18H7z", "M11 18h2"],
+  testing: ["M9 3h6", "M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3", "M7.5 15h9"],
+  career: ["M4 8h16v11H4z", "M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2", "M4 13h16"],
+  tools: ["M14.5 6.5a4 4 0 0 0-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 0 5.3-5.3l-2.5 2.5-2.5-.5-.5-2.5z"],
   book: ["M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z", "M5 17a3 3 0 0 1 3-3h9", "M9 8h5"],
 };
 

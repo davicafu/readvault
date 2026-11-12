@@ -15,6 +15,8 @@ import {
   type ImportReport,
 } from "@/lib/api";
 
+import { FilePicker } from "./FilePicker";
+
 // Big exports can hold thousands of bookmarks; the table shows a slice at a time.
 const VISIBLE_ROWS = 200;
 
@@ -135,18 +137,13 @@ export function ImportFlow() {
 
       {step.kind === "choose" || step.kind === "previewing" ? (
         <div className="dropzone">
-          <div className="field">
-            <label className="field-label" htmlFor="file">
-              Bookmarks file
-            </label>
-            <input
-              id="file"
-              className="input"
-              type="file"
-              accept=".html,.htm,text/html"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </div>
+          <FilePicker
+            label="Your bookmarks file (HTML)"
+            accept=".html,.htm,text/html"
+            file={file}
+            onFile={setFile}
+            disabled={step.kind === "previewing"}
+          />
           <p className="fine-print">In Chrome: Bookmarks, Bookmark manager, the menu with three dots, Export bookmarks.</p>
           <div className="actions">
             <button className="button" type="button" disabled={!file || step.kind === "previewing"} onClick={preview}>

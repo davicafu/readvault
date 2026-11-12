@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Literata, Schibsted_Grotesk } from "next/font/google";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { brand } from "@/config/brand";
+import { HeaderSearch } from "./HeaderSearch";
 import "./globals.css";
 
 const literata = Literata({ subsets: ["latin", "latin-ext"], variable: "--font-literata", display: "swap" });
@@ -18,11 +19,19 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${literata.variable} ${schibsted.variable}`}>
       <body>
+        <div className="backdrop" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
         <header className="masthead">
           <div className="masthead-inner">
             <Link href="/" className="wordmark">
               {brand.name}
             </Link>
+            <Suspense fallback={<div className="header-search" />}>
+              <HeaderSearch />
+            </Suspense>
             <nav aria-label="Main">
               <ul className="nav">
                 <li>

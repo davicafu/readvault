@@ -113,7 +113,7 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
       ) : (
         <div className="reading-head">
           <p className="fine-print">
-            {content.words.toLocaleString()} words, {content.source === "fetched" ? "downloaded" : "uploaded"} on{" "}
+            {content.words.toLocaleString("en-US")} words, {content.source === "fetched" ? "downloaded" : "uploaded"} on{" "}
             {formatDate(content.savedAt)}
             {content.missingImages > 0
               ? `. ${content.missingImages} ${content.missingImages === 1 ? "image" : "images"} could not be saved`

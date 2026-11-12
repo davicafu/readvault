@@ -15,6 +15,9 @@ export type Collection = CollectionRef & { articles: number };
 // Suggestions for one article, from its content and the user's library.
 export type Suggestions = { collection: CollectionRef | null; tags: Tag[] };
 
+/** How many articles wait for, lack, or failed to get their text (GET /api/content-downloads). */
+export type DownloadSummary = { queued: number; missing: number; failed: number; incomplete: number };
+
 export type Article = {
   id: string;
   originalUrl: string;

@@ -6,6 +6,9 @@ import { useState, type FormEvent } from "react";
 
 import { ApiError, readJSON, type Collection } from "@/lib/api";
 
+import { hueStyle } from "../BrowseHome";
+import { CollectionIcon } from "../CollectionIcon";
+
 function message(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.code === "collection_exists") return "You already have a collection with this name.";
@@ -23,8 +26,18 @@ async function send(method: string, path: string, body?: unknown): Promise<Respo
   });
 }
 
-// CollectionsManager creates, renames and deletes collections. Deleting a
-// collection keeps its articles, without a collection.
+// removeTexts deletes the saved texts of every article, or of one
+// collection's, and returns how many were deleted.
+async function removeTexts(path: string): Promise<number> {
+  return (await readJSON<{ removed: number }>(await send("DELETE", path))).removed;
+}
+
+const removedMessage = (n: number) =>
+  n === 0 ? "There were no saved texts to delete." : `Deleted ${n} saved ${n === 1 ? "text" : "texts"}.`;
+
+// CollectionsManager creates, renames and deletes collections, and deletes
+// saved texts to free space. Deleting a collection keeps its articles,
+// without a collection; deleting texts keeps the articles.
 export function CollectionsManager({ initial }: { initial: Collection[] }) {
   const router = useRouter();
   const [collections, setCollections] = useState(initial);
@@ -53,19 +66,28 @@ export function CollectionsManager({ initial }: { initial: Collection[] }) {
 
   return (
     <>
-      <form className="add-link" onSubmit={create}>
+      <form className="add-link collection-form" onSubmit={create}>
         <div className="field">
           <label className="field-label" htmlFor="new-collection">
             New collection
           </label>
-          <input
-            id="new-collection"
-            className="input"
-            value={name}
-            maxLength={64}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
+          <div className="input-with-icon">
+            <span className="collection-chip" style={hueStyle(name.trim().toLowerCase().split(/\s+/).join("-") || "new")} aria-hidden="true">
+              <CollectionIcon name={name} />
+            </span>
+            <input
+              id="new-collection"
+              className="input"
+              value={name}
+              maxLength={64}
+              onChange={(e) => setName(e.target.value)}
+              aria-describedby="new-collection-hint"
+              required
+            />
+          </div>
+          <p className="fine-print" id="new-collection-hint">
+            The icon is picked from the name.
+          </p>
         </div>
         <button className="button" type="submit" disabled={busy}>
           {busy ? "Creating…" : "Create collection"}
@@ -97,7 +119,50 @@ export function CollectionsManager({ initial }: { initial: Collection[] }) {
           ))}
         </ul>
       )}
+
+      <SavedTexts />
     </>
+  );
+}
+
+// SavedTexts deletes the saved text of every article to free space.
+function SavedTexts() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const removeAll = async () => {
+    const question =
+      "Delete the saved text of every article? The articles, their tags and collections stay; you can download the texts again later. Texts you uploaded are deleted too.";
+    if (!window.confirm(question)) return;
+    setBusy(true);
+    setOutcome(null);
+    try {
+      setOutcome({ ok: true, text: removedMessage(await removeTexts("/api/contents")) });
+      router.refresh();
+    } catch {
+      setOutcome({ ok: false, text: "The texts could not be deleted. Try again in a moment." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="saved-texts" aria-labelledby="saved-texts-title">
+      <h2 id="saved-texts-title">Saved texts</h2>
+      <p>
+        Each article can keep its text and images for reading later. Delete them to free space; the articles stay in
+        your library. To clear one collection, use <strong>Delete texts</strong> on its row.
+      </p>
+      <button className="button button-danger" type="button" onClick={removeAll} disabled={busy}>
+        {busy ? "Deleting…" : "Delete all saved texts"}
+      </button>
+      {outcome ? (
+        <p className={outcome.ok ? "fine-print" : "field-error"} role={outcome.ok ? "status" : "alert"}>
+          {outcome.text}
+        </p>
+      ) : null}
+    </section>
   );
 }
 
@@ -113,7 +178,23 @@ function CollectionRow({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(c.name);
   const [failure, setFailure] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const clearTexts = async () => {
+    const question = `Delete the saved texts of the articles in “${c.name}”? The articles stay in the collection; you can download the texts again later.`;
+    if (!window.confirm(question)) return;
+    setBusy(true);
+    setFailure(null);
+    setDone(null);
+    try {
+      setDone(removedMessage(await removeTexts(`/api/collections/${encodeURIComponent(c.id)}/contents`)));
+    } catch (err) {
+      setFailure(err instanceof ApiError && err.status === 404 ? message(err) : "The texts could not be deleted. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const rename = async (e: FormEvent) => {
     e.preventDefault();
@@ -147,7 +228,10 @@ function CollectionRow({
   };
 
   return (
-    <li className="collection-row">
+    <li className="collection-row" style={hueStyle(c.slug)}>
+      <span className="collection-chip" aria-hidden="true">
+        <CollectionIcon name={editing ? name : c.name} />
+      </span>
       {editing ? (
         <form className="collection-rename" onSubmit={rename}>
           <label className="visually-hidden" htmlFor={`rename-${c.id}`}>
@@ -179,15 +263,20 @@ function CollectionRow({
         </form>
       ) : (
         <>
-          <Link href={`/?collection=${encodeURIComponent(c.slug)}`} className="collection-name">
-            {c.name}
-          </Link>
-          <span className="fine-print">
-            {c.articles} {c.articles === 1 ? "article" : "articles"}
+          <span className="collection-title">
+            <Link href={`/?collection=${encodeURIComponent(c.slug)}`} className="collection-name">
+              {c.name}
+            </Link>
+            <span className="fine-print">
+              {c.articles} {c.articles === 1 ? "article" : "articles"}
+            </span>
           </span>
           <span className="collection-actions">
             <button className="button button-quiet" type="button" onClick={() => setEditing(true)} disabled={busy}>
               Rename
+            </button>
+            <button className="button button-quiet" type="button" onClick={clearTexts} disabled={busy}>
+              Delete texts
             </button>
             <button className="button button-quiet" type="button" onClick={remove} disabled={busy}>
               Delete
@@ -198,6 +287,11 @@ function CollectionRow({
       {failure ? (
         <p className="field-error" role="alert">
           {failure}
+        </p>
+      ) : null}
+      {done ? (
+        <p className="fine-print collection-done" role="status">
+          {done}
         </p>
       ) : null}
     </li>
