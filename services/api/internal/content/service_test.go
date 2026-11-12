@@ -511,3 +511,26 @@ func requestsWithPrefix(f *fakeFetcher, prefix string) int {
 	}
 	return n
 }
+
+// Only a page whose site answered (an HTTP error or a paid preview) goes to
+// the mirror: an address that did not resolve or answer may be an intranet
+// host.
+func TestFetch_SendsOnlyAnsweredFailuresToTheMirror(t *testing.T) {
+	t.Parallel()
+	for _, problem := range []string{content.ProblemUnreachable, content.ProblemTimeout, content.ProblemNotHTML, content.ProblemTooLarge} {
+		t.Run(problem, func(t *testing.T) {
+			t.Parallel()
+			svc, f, id := setupWithMirror(t)
+			f.errs[articleURL] = &content.FetchError{Problem: problem}
+			f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(mirrorPage)}
+
+			var fe *content.FetchError
+			if _, err := svc.Fetch(t.Context(), owner, id); !errors.As(err, &fe) || fe.Problem != problem {
+				t.Errorf("Fetch() error = %v, want %s", err, problem)
+			}
+			if n := requestsWithPrefix(f, mirror); n != 0 {
+				t.Errorf("the mirror was asked %d times, want never for %s", n, problem)
+			}
+		})
+	}
+}

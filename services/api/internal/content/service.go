@@ -172,15 +172,17 @@ func (s *Service) downloadMissing(ctx context.Context, userID, articleID string)
 }
 
 // useMirror says whether the mirror may help: a mirror is configured, the
-// page failed or is a paid preview, and the download was not cancelled. An
-// address already on the mirror is not sent to it again, and one the
-// fetcher refused (a private or local host) never leaves the machine.
+// download was not cancelled, and the site answered without the article (an
+// HTTP error such as 403, a page without text, or a paid preview). An
+// address that did not resolve or answer, or that the fetcher refused, may
+// be a private or intranet host and never leaves the machine. An address
+// already on the mirror is not sent to it again.
 func (s *Service) useMirror(ctx context.Context, rawURL string, ex Extracted, fe *FetchError) bool {
 	switch {
 	case s.mirror == "" || ctx.Err() != nil || strings.HasPrefix(rawURL, s.mirror):
 		return false
 	case fe != nil:
-		return fe.Problem != ProblemBlockedAddress
+		return fe.Problem == ProblemHTTPStatus || fe.Problem == ProblemNoText
 	default:
 		return ex.Paywalled
 	}
