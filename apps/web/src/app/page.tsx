@@ -13,7 +13,8 @@ import {
 import { formatDate } from "@/lib/format";
 import { apiGet } from "@/lib/server-api";
 
-import { BrowseHome, hueStyle, type CollectionShelf } from "./BrowseHome";
+import { BrowseHome, type CollectionShelf } from "./BrowseHome";
+import { CollectionIcon, hueStyle, TagIcon } from "./CollectionIcon";
 import { TextDownloads } from "./TextDownloads";
 
 const PAGE_SIZE = 25;
@@ -219,22 +220,24 @@ async function FrontPage() {
     );
   }
 
+  // The cards render as soon as the collections are known; each card's
+  // latest articles stream in when their request answers.
   let shelves: CollectionShelf[] | null = null;
   if (collectionList.status === "fulfilled") {
-    const collections = collectionList.value.collections;
-    const latest = await Promise.allSettled(
-      collections.slice(0, PREVIEWED_COLLECTIONS).map((c) =>
-        c.articles === 0
-          ? Promise.resolve<ArticlePage>({ items: [], nextCursor: null })
-          : apiGet<ArticlePage>(
-              `/api/articles?${new URLSearchParams({ collection: c.slug, limit: String(PREVIEW_SIZE) })}`,
-            ),
-      ),
-    );
-    shelves = collections.map((collection, i) => {
-      const r = latest[i];
-      return { collection, latest: r?.status === "fulfilled" ? r.value.items : null };
-    });
+    shelves = collectionList.value.collections.map((collection, i) => ({
+      collection,
+      latest:
+        i >= PREVIEWED_COLLECTIONS
+          ? Promise.resolve(null)
+          : collection.articles === 0
+            ? Promise.resolve([])
+            : apiGet<ArticlePage>(
+                `/api/articles?${new URLSearchParams({ collection: collection.slug, limit: String(PREVIEW_SIZE) })}`,
+              ).then(
+                (p) => p.items,
+                () => null,
+              ),
+    }));
   }
 
   return (
@@ -278,7 +281,7 @@ function CollectionHeader({
 }) {
   const others = collections.filter((c) => c.slug !== slug);
   return (
-    <header className="collection-hero" style={hueStyle(current?.slug ?? slug)}>
+    <header className="collection-hero" style={hueStyle(current ?? { name: slug, slug })}>
       <p className="fine-print">
         <Link href="/">All collections</Link>
       </p>
@@ -293,7 +296,7 @@ function CollectionHeader({
           <ul className="collection-hop">
             {others.map((c) => (
               <li key={c.id}>
-                <Link href={libraryHref({ ...filters, collection: c.slug, q: "" })} style={hueStyle(c.slug)}>
+                <Link href={libraryHref({ ...filters, collection: c.slug, q: "" })} style={hueStyle(c)}>
                   {c.name}
                   <span className="tag-count">{c.articles}</span>
                 </Link>
@@ -331,7 +334,10 @@ function CollectionPanel({ collections, filters }: { collections: Collection[] |
                   href={libraryHref(filters, { collection: selected ? "" : c.slug })}
                   aria-current={selected ? "true" : undefined}
                 >
-                  <span className="side-panel-name">{c.name}</span>
+                  <span className="side-panel-name">
+                    <CollectionIcon name={c.name} className="side-panel-icon" />
+                    {c.name}
+                  </span>
                   <span className="side-panel-count">
                     {c.articles}
                     <span className="visually-hidden"> {c.articles === 1 ? "article" : "articles"}</span>
@@ -365,7 +371,10 @@ function TagPanel({ tags, filters }: { tags: TagCount[]; filters: Filters }) {
                 })}
                 aria-current={selected ? "true" : undefined}
               >
-                <span className="side-panel-name">{t.name}</span>
+                <span className="side-panel-name">
+                  <TagIcon name={t.name} className="side-panel-icon" />
+                  {t.name}
+                </span>
                 <span className="side-panel-count">
                   {t.articles}
                   <span className="visually-hidden"> {t.articles === 1 ? "article" : "articles"}</span>
@@ -379,53 +388,54 @@ function TagPanel({ tags, filters }: { tags: TagCount[]; filters: Filters }) {
   );
 }
 
+// Entry is one article of a list: its title, a line of facts (collection,
+// site, date saved, text problems) and its tags. The browser folder it came
+// from is on the article's page.
 function Entry({ article: a, filters }: { article: Article; filters: Filters }) {
+  const saved = a.bookmarkedAt ?? a.createdAt;
   return (
     <li className="entry">
-      <span className="entry-source">{hostname(a.canonicalUrl || a.originalUrl)}</span>
-      <div>
-        <Link href={`/articles/${a.id}`} className="entry-title">
-          {a.title ? a.title : <span className="entry-untitled">Untitled bookmark</span>}
-        </Link>
+      <Link href={`/articles/${a.id}`} className="entry-title">
+        {a.title ? a.title : <span className="entry-untitled">Untitled bookmark</span>}
+      </Link>
+      <div className="entry-facts">
         {a.collection ? (
-          <Link className="entry-collection" href={libraryHref(filters, { collection: a.collection.slug })}>
+          <Link
+            className="entry-collection"
+            href={libraryHref(filters, { collection: a.collection.slug })}
+            style={hueStyle(a.collection)}
+          >
+            <CollectionIcon name={a.collection.name} />
             {a.collection.name}
           </Link>
         ) : null}
+        <span className="entry-source">{hostname(a.canonicalUrl || a.originalUrl)}</span>
+        <span>
+          Saved <time dateTime={saved}>{formatDate(saved)}</time>
+        </span>
         {a.contentStatus === "incomplete" ? (
           <span className="badge badge-warn">Text incomplete</span>
         ) : a.contentStatus === "failed" ? (
           <span className="badge badge-bad">Text not downloaded</span>
         ) : null}
-        <div className="entry-facts">
-          {a.folder.length > 0 ? (
-            <ul className="folder-path" aria-label="Original folder">
-              {a.folder.map((f, i) => (
-                <li key={`${i}-${f}`}>{f}</li>
-              ))}
-            </ul>
-          ) : null}
-          <span>
-            Saved <time dateTime={a.bookmarkedAt ?? a.createdAt}>{formatDate(a.bookmarkedAt ?? a.createdAt)}</time>
-          </span>
-        </div>
-        {a.tags.length > 0 ? (
-          <ul className="tags" aria-label="Tags">
-            {a.tags.map((t) => (
-              <li key={t.slug}>
-                <Link
-                  className="tag"
-                  href={libraryHref(filters, {
-                    tags: filters.tags.includes(t.slug) ? filters.tags : [...filters.tags, t.slug],
-                  })}
-                >
-                  {t.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
+      {a.tags.length > 0 ? (
+        <ul className="tags" aria-label="Tags">
+          {a.tags.map((t) => (
+            <li key={t.slug}>
+              <Link
+                className="tag"
+                href={libraryHref(filters, {
+                  tags: filters.tags.includes(t.slug) ? filters.tags : [...filters.tags, t.slug],
+                })}
+              >
+                <TagIcon name={t.name} className="tag-icon" />
+                {t.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </li>
   );
 }

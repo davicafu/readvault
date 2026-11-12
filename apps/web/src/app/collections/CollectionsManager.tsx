@@ -6,8 +6,7 @@ import { useState, type FormEvent } from "react";
 
 import { ApiError, readJSON, type Collection } from "@/lib/api";
 
-import { hueStyle } from "../BrowseHome";
-import { CollectionIcon } from "../CollectionIcon";
+import { CollectionIcon, hueStyle } from "../CollectionIcon";
 
 function message(err: unknown): string {
   if (err instanceof ApiError) {
@@ -66,32 +65,34 @@ export function CollectionsManager({ initial }: { initial: Collection[] }) {
 
   return (
     <>
-      <form className="add-link collection-form" onSubmit={create}>
-        <div className="field">
-          <label className="field-label" htmlFor="new-collection">
-            New collection
-          </label>
-          <div className="input-with-icon">
-            <span className="collection-chip" style={hueStyle(name.trim().toLowerCase().split(/\s+/).join("-") || "new")} aria-hidden="true">
-              <CollectionIcon name={name} />
-            </span>
-            <input
-              id="new-collection"
-              className="input"
-              value={name}
-              maxLength={64}
-              onChange={(e) => setName(e.target.value)}
-              aria-describedby="new-collection-hint"
-              required
-            />
-          </div>
-          <p className="fine-print" id="new-collection-hint">
-            The icon is picked from the name.
-          </p>
+      <form className="collection-form" onSubmit={create}>
+        <label className="field-label" htmlFor="new-collection">
+          New collection
+        </label>
+        <div className="collection-form-row">
+          <span
+            className="collection-chip"
+            style={hueStyle({ name, slug: name.trim().toLowerCase().split(/\s+/).join("-") || "new" })}
+            aria-hidden="true"
+          >
+            <CollectionIcon name={name} />
+          </span>
+          <input
+            id="new-collection"
+            className="input"
+            value={name}
+            maxLength={64}
+            onChange={(e) => setName(e.target.value)}
+            aria-describedby="new-collection-hint"
+            required
+          />
+          <button className="button" type="submit" disabled={busy}>
+            {busy ? "Creating…" : "Create collection"}
+          </button>
         </div>
-        <button className="button" type="submit" disabled={busy}>
-          {busy ? "Creating…" : "Create collection"}
-        </button>
+        <p className="fine-print" id="new-collection-hint">
+          The icon is picked from the name.
+        </p>
         {failure ? (
           <p className="field-error" role="alert">
             {failure}
@@ -228,7 +229,7 @@ function CollectionRow({
   };
 
   return (
-    <li className="collection-row" style={hueStyle(c.slug)}>
+    <li className="collection-row" style={hueStyle(c)}>
       <span className="collection-chip" aria-hidden="true">
         <CollectionIcon name={editing ? name : c.name} />
       </span>

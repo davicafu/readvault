@@ -1,0 +1,35 @@
+# Library polish
+
+Objective: tidy article entries (one line of facts, tags with logos), make the front page appear smoothly as it loads, search a collection with `:`, simplify the navigation, add a favicon, separate collection colours, and offer alternative collection card designs. Branch: `feat/readvault-20-reading-ui`.
+Delivery strategy: `ask-on-risk`, chain strategy `stacked-to-main`. Test runner: web has no test runner (tsc, screenshots, dev server smoke).
+
+## Specs
+
+- **S1** Article entries (L1): "ahora mismo en los articulos sale la fuente, el nombre cuando se guardo y aparece la coleccion dos veces, una subrayado despues del articulo (ademas sale muy pegado a veces cuando el titulo es muy corto). deberia estar esa info pero prefieor que aparezca en una nueva linea despues del titulo como ya aparece una de las veces que sale repetido y despues los tags que aparecen". The second "collection" is the original bookmarks folder, now redundant in lists.
+- **S2** Tag icons (L1): "en los tags seria genial que tuviera tambien el logo o un icnono caracterisitco en caso de no tenerlos delante del nombre del tag".
+- **S3** Create collection alignment (L1): "en create collection el icono de crear esta desalineado respecto a donde se introduce el nombre".
+- **S4** Loading (L1): "ahora al cargar parece que va lento, lo que quiero no es que tarde por tardar, que vayan creandose las colecciones poco a como como si fueran apareciendo por arte de magia".
+- **S5** Search operators (L1): "al pulsar / e ir a buscar me encanta, se podria hacer para que pulsando :collection buscase en una colecion o similar, o tener la posibilidad del + y - para buscar con temirnos y sin alguno de ellos?". `-word`, `+word` and `"phrase"` already work (checked against the API: "kafka" 100+, "kafka -flink" 76, "kafka flink" 6, "kafka +flink" 6); add `:collection` and show the syntax.
+- **S6** Navigation (L1): "no quiero los links articles y manage encima de collecions, all articles deberia ser el link de Library en la marte superior, y lo de manage ya es lo que sale; readvault debe seguir siendo el home".
+- **S7** Favicon (L1): "añade un favicon que este chulo y que sea acorde a la app".
+- **S8** Colours (L1): "diferencia un poco mejor el color de la tarjeta de backend y artchitecture".
+- **S9** Alternative card designs (L1): "el diseños de las cardas de colecciones no esta mal pero me podrias ofrecer alguno alternativo que fuese como como que se abre una coleccion o algo similar?". A prototype page to compare; the chosen one replaces the cards later.
+
+Answer only (L1): "lo de la api con articles/uuuid es correcto por las convecniones api? no deberia ser /articles para pmostrarlos todos y article/uuid para ver un artiuclo?" Plural collection plus id (`/articles`, `/articles/{id}`) is the convention; no change.
+
+Assumption: S2 brand logos come from Simple Icons (CC0 data) as a pinned dependency; other tags get an icon by topic.
+
+## Tasks
+
+| ID | Specs | Route | Status | Evidence |
+|---|---|---|---|---|
+| T1 | S1, S2 | inline | done (web commit) | Entry: title, one line (collection pill with icon and colour, site, date saved, text badge), tags; browser folder left to the article page. Tags show a subject icon in lists, side panel, tag cloud and editor. Brand logos (Simple Icons) not added: installing the dependency was refused by the permission check; topic icons instead. Screenshot |
+| T2 | S3, S6, S7, S8 | inline | done (web commit) | Create form: icon, name and button on one line. "All articles"/"Manage" removed from the front page; header Library goes to every article; ReadVault stays home. icon.svg favicon (open book with bookmark on the aurora gradient), served as image/svg+xml. Hues by subject (Architecture 40, Backend 125, ...). Screenshots |
+| T3 | S4 | inline | done (web commit) | Cards render once the collection list is known; each card's latest articles stream in (Suspense) with a placeholder of the same height. Card materialises (scale and rise, 70 ms stagger) with one light sweep; list lines rise in one by one. Home skeleton removed. API answers in under 12 ms; the remaining ~0.7 s to first byte is the Next dev server |
+| T4 | S5 | inline | done (web commit) | ":" opens matching collections (arrows, Enter or Tab, Esc), the pick becomes a chip, Backspace removes it, a leftover ":word" resolves on search; help panel on focus. Driven in headless Chrome over CDP: "kafka :back" + Enter + Enter gave /?q=kafka&collection=backend |
+| T5 | S9 | inline | prototype, not committed | /lab/shelves: A book cover that swings open on its spine; B folder whose sheets fan out. Screenshots at rest and hovered. Waits for the user's choice |
+
+## Log
+
+- L1 (2026-11-12, user): "vale mucho mejor, vamos mejorando, cosas que quiero corregir: - ahora mismo en los articulos sale la fuente, el nombre cuando se guardo y aparece la coleccion dos veces, una subrayado despues del articulo (ademas sale muy pegado a veces cuando el titulo es muy corto). deberia estar esa info pero prefieor que aparezca en una nueva linea despues del titulo como ya aparece una de las veces que sale repetido y despues los tags que aparecen - en los tags seria genial que tuviera tambien el logo o un icnono caracterisitco en caso de no tenerlos delante del nombre del tag - en create collection el icono de crear esta desalineado respecto a donde se introduce el nombre - ahora al cargar parece que va lento, lo que quiero no es que tarde por tardar, que vayan creandose las colecciones poco a como como si fueran apareciendo por arte de magia no se si me explico - al pulsar / e ir a buscar me encanta, se podria hacer para que pulsando :collection buscase en una colecion o similar, o tener la posibilidad del + y - para buscar con temirnos y sin alguno de ellos? - lo de la api con articles/uuuid es correcto por las convecniones api? no deberia ser /articles para pmostrarlos todos y article/uuid para ver un artiuclo? - no quiero los links articles y manage encima de collecions, all articles deberia ser el link de Library en la marte superior, y lo de manage ya es lo que sale; readvault debe seguir siendo el home - añade un favicon que este chulo y que sea acorde a la app - diferencia un poco mejor el color de la tarjeta de backend y artchitecture - el diseños de las cardas de colecciones no esta mal pero me podrias ofrecer alguno alternativo que fuese como como que se abre una coleccion o algo similar?"
+- L2: Installing `simple-icons@16.35.0` for brand logos was refused by the permission check; tags use subject icons until the user decides.

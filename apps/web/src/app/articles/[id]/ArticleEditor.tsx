@@ -7,6 +7,8 @@ import Link from "next/link";
 
 import { ApiError, readJSON, type Article, type Collection, type FieldProblem, type Suggestions } from "@/lib/api";
 
+import { TagIcon } from "../../CollectionIcon";
+
 type Props = {
   id: string;
   title: string;
@@ -146,6 +148,7 @@ export function ArticleEditor({
           <div className="tag-input">
             {tags.map((t) => (
               <span key={t.toLowerCase()} className="tag">
+                <TagIcon name={t} className="tag-icon" />
                 {t}
                 <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))} aria-label={`Remove tag ${t}`}>
                   ×

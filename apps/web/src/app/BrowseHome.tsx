@@ -1,20 +1,14 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { Suspense, type CSSProperties } from "react";
 
 import { hostname, type Article, type Collection, type TagCount } from "@/lib/api";
 
-import { CollectionIcon } from "./CollectionIcon";
+import { CollectionIcon, hueStyle, TagIcon } from "./CollectionIcon";
 
-export type CollectionShelf = { collection: Collection; latest: Article[] | null };
+// latest resolves to the collection's newest articles, or null when they
+// were not loaded.
+export type CollectionShelf = { collection: Collection; latest: Promise<Article[] | null> };
 
-/** A stable hue per collection, so each one keeps its colour across visits. */
-export function collectionHue(slug: string): number {
-  let h = 0;
-  for (const ch of slug) h = (h * 31 + ch.codePointAt(0)!) % 360;
-  return h;
-}
-
-export const hueStyle = (slug: string) => ({ "--hue": collectionHue(slug) }) as CSSProperties;
 
 // BrowseHome is the library's front page when nothing is searched: the
 // collections as cards to explore, the latest saved articles and the tags.
@@ -33,10 +27,6 @@ export function BrowseHome({
       <section className="browse-section" aria-labelledby="collections-heading">
         <div className="browse-head">
           <h2 id="collections-heading">Collections</h2>
-          <span className="browse-head-links">
-            <Link href="/?view=all">All articles</Link>
-            <Link href="/collections">Manage</Link>
-          </span>
         </div>
         {shelves === null ? (
           <p className="fine-print">The collections could not be loaded. Reload the page to try again.</p>
@@ -74,7 +64,7 @@ export function BrowseHome({
                   <Link
                     className="recent-collection"
                     href={`/?collection=${encodeURIComponent(a.collection.slug)}`}
-                    style={hueStyle(a.collection.slug)}
+                    style={hueStyle(a.collection)}
                   >
                     {a.collection.name}
                   </Link>
@@ -94,6 +84,7 @@ export function BrowseHome({
             {tags.map((t) => (
               <li key={t.slug}>
                 <Link className="tag" href={`/?tag=${encodeURIComponent(t.slug)}`}>
+                  <TagIcon name={t.name} className="tag-icon" />
                   {t.name}
                   <span className="tag-count">
                     {t.articles}
@@ -112,7 +103,7 @@ export function BrowseHome({
 function ShelfCard({ shelf: { collection: c, latest }, index }: { shelf: CollectionShelf; index: number }) {
   const href = `/?collection=${encodeURIComponent(c.slug)}`;
   return (
-    <li className="shelf-card" style={{ ...hueStyle(c.slug), "--i": index } as CSSProperties}>
+    <li className="shelf-card" style={{ ...hueStyle(c), "--i": index } as CSSProperties}>
       <div className="shelf-cover">
         <CollectionIcon name={c.name} className="shelf-cover-mark" />
         <span className="shelf-cover-icon">
@@ -125,27 +116,49 @@ function ShelfCard({ shelf: { collection: c, latest }, index }: { shelf: Collect
           {c.articles} {c.articles === 1 ? "article" : "articles"}
         </span>
       </div>
-      {latest && latest.length > 0 ? (
-        <ul className="shelf-card-list" aria-label={`Latest in ${c.name}`}>
-          {latest.map((a) => (
-            <li key={a.id}>
-              <Link href={`/articles/${a.id}`}>{a.title || "Untitled bookmark"}</Link>
-              <span className="shelf-card-source">{hostname(a.canonicalUrl || a.originalUrl)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="shelf-card-note">
-          {c.articles === 0
-            ? "No articles yet. Choose this collection on an article's page."
-            : "Open it to see its articles."}
-        </p>
-      )}
+      <Suspense fallback={<ShelfLatestPlaceholder />}>
+        <ShelfLatest collection={c} latest={latest} />
+      </Suspense>
       {c.articles > 0 ? (
         <Link className="shelf-card-more" href={href}>
           Browse {c.name}
         </Link>
       ) : null}
     </li>
+  );
+}
+
+async function ShelfLatest({ collection: c, latest }: { collection: Collection; latest: Promise<Article[] | null> }) {
+  const articles = await latest;
+  if (!articles || articles.length === 0) {
+    return (
+      <p className="shelf-card-note">
+        {c.articles === 0 ? "No articles yet. Choose this collection on an article's page." : "Open it to see its articles."}
+      </p>
+    );
+  }
+  return (
+    <ul className="shelf-card-list" aria-label={`Latest in ${c.name}`}>
+      {articles.map((a, i) => (
+        <li key={a.id} style={{ "--j": i } as CSSProperties}>
+          <Link href={`/articles/${a.id}`}>{a.title || "Untitled bookmark"}</Link>
+          <span className="shelf-card-source">{hostname(a.canonicalUrl || a.originalUrl)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Holds the list's place while it loads, so the card keeps its height.
+function ShelfLatestPlaceholder() {
+  return (
+    <ul className="shelf-card-list shelf-card-list-loading" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <li key={i}>
+          <span className="skeleton skeleton-line" />
+          <span className="skeleton skeleton-line skeleton-short" />
+        </li>
+      ))}
+    </ul>
   );
 }

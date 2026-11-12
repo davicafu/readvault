@@ -218,72 +218,72 @@ body::before {
   margin-left: auto;
 }
 
-/* Search: a rounded field with its magnifier, between the name and the menu. */
+/* Search: a rounded field with its magnifier, between the name and the
+   menu. The field is the form itself, so a collection chip can sit in it. */
 .header-search {
   position: relative;
+  display: flex;
   flex: 1 1 18rem;
+  align-items: center;
+  gap: 0.5rem;
   max-width: 30rem;
   min-height: 2.6rem;
-}
-
-.header-search-icon {
-  position: absolute;
-  top: 50%;
-  left: 0.95rem;
-  width: 1.1rem;
-  height: 1.1rem;
-  translate: 0 -50%;
-  fill: none;
-  stroke: var(--ink-soft);
-  stroke-width: 2;
-  stroke-linecap: round;
-  pointer-events: none;
-  transition: stroke 160ms ease;
-}
-
-.header-search-input {
-  width: 100%;
-  height: 2.6rem;
-  padding: 0 2.6rem 0 2.7rem;
+  padding: 0 0.8rem 0 0.95rem;
   border: 1px solid var(--glass-rule);
   border-radius: 999px;
   background: var(--search-fill);
-  color: var(--ink);
-  font: inherit;
   transition:
     border-color 160ms ease,
     background 160ms ease,
     box-shadow 200ms ease;
 }
 
-.header-search-input::placeholder {
-  color: var(--ink-soft);
-}
-
-.header-search-input:hover {
+.header-search:hover {
   border-color: var(--rule);
 }
 
-.header-search-input:focus {
-  outline: none;
+.header-search:focus-within {
   border-color: var(--accent);
   background: var(--surface);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.header-search-icon {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 2;
+  stroke-linecap: round;
+  transition: stroke 160ms ease;
 }
 
 .header-search:focus-within .header-search-icon {
   stroke: var(--accent);
 }
 
-.header-search-input::-webkit-search-cancel-button {
-  margin-right: 0.2rem;
+.header-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.header-search-input:focus {
+  outline: none;
+}
+
+.header-search-input::placeholder {
+  color: var(--ink-soft);
 }
 
 .header-search-key {
-  position: absolute;
-  top: 50%;
-  right: 0.8rem;
-  translate: 0 -50%;
+  flex: none;
   min-width: 1.4rem;
   padding: 0.05rem 0.35rem;
   border: 1px solid var(--rule);
@@ -291,12 +291,141 @@ body::before {
   color: var(--ink-soft);
   font: 600 0.75rem/1.3 var(--font-ui);
   text-align: center;
-  pointer-events: none;
   transition: opacity 160ms ease;
 }
 
 .header-search:focus-within .header-search-key {
   opacity: 0;
+}
+
+/* The collection being searched, as a chip in its colour. */
+.header-search-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 45%;
+  padding: 0.15rem 0.3rem 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: hsl(var(--hue, 210) 60% 50% / 0.2);
+  color: var(--ink);
+  font-size: var(--step--1);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: chip-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.header-search-chip svg {
+  flex: none;
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.header-search-chip button {
+  padding: 0 0.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.header-search-chip button:hover {
+  color: var(--ink);
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+/* The collections that match ":word", and the syntax help, drop down
+   under the field. */
+.header-search-menu,
+.header-search-help {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 0.35rem;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.45);
+  list-style: none;
+  animation: menu-in 160ms ease-out;
+}
+
+.header-search-menu[hidden] {
+  display: none;
+}
+
+.header-search-menu li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.header-search-menu li[aria-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.header-search-menu-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 7px;
+  color: #fff;
+  background: linear-gradient(135deg, hsl(var(--hue, 210) 62% 38%), hsl(calc(var(--hue, 210) + 48) 68% 48%));
+}
+
+.header-search-menu-icon svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.header-search-menu-count {
+  margin-left: auto;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+}
+
+.header-search-help {
+  padding: 0.6rem 0.9rem;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.header-search-help p {
+  margin: 0.2rem 0;
+}
+
+.header-search-help kbd {
+  display: inline-block;
+  min-width: 7.5rem;
+  color: var(--ink);
+  font: 600 0.8rem/1.4 var(--font-ui);
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 /* Order of a result list, as a segmented control. */
@@ -609,19 +738,23 @@ body::before {
 }
 
 .side-panel-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.side-panel-icon {
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  opacity: 0.75;
 }
 
 .side-panel-count {
   opacity: 0.75;
   font-variant-numeric: tabular-nums;
-}
-
-.entry-collection {
-  display: inline-block;
-  margin-right: 0.4rem;
-  color: var(--ink-soft);
-  font-size: var(--step--1);
 }
 
 .active-filters {
@@ -641,20 +774,16 @@ body::before {
   border-top: 1px solid var(--rule);
 }
 
-/* Each entry reads like a catalogue card: the source site sits in the
-   margin as the shelf mark, the title carries the weight. */
+/* Each entry: the title carries the weight, one line of facts under it,
+   then the tags. */
 .entry {
   display: grid;
-  grid-template-columns: 11rem minmax(0, 1fr);
-  gap: 0.25rem 1.5rem;
+  gap: 0.45rem;
   padding-block: 1.1rem;
   border-bottom: 1px solid var(--rule);
 }
 
 .entry-source {
-  padding-top: 0.3rem;
-  color: var(--ink-soft);
-  font-size: var(--step--1);
   overflow-wrap: anywhere;
 }
 
@@ -679,25 +808,37 @@ body::before {
 .entry-facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  margin: 0.35rem 0 0;
+  align-items: center;
+  gap: 0.35rem 1rem;
   color: var(--ink-soft);
   font-size: var(--step--1);
 }
 
-.folder-path {
+/* The collection as a small pill in its own colour, with its icon. */
+.entry-collection {
   display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.6rem 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: hsl(var(--hue, 210) 60% 50% / 0.16);
+  color: hsl(var(--hue, 210) 70% 32%);
+  font-weight: 600;
+  text-decoration: none;
 }
 
-.folder-path li + li::before {
-  content: "/";
-  margin-right: 0.3rem;
-  color: var(--rule);
+.entry-collection svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.entry-collection:hover {
+  background: hsl(var(--hue, 210) 60% 50% / 0.26);
+  color: hsl(var(--hue, 210) 70% 28%);
+}
+
+.entry .tags {
+  margin: 0.15rem 0 0;
 }
 
 .tags {
@@ -723,6 +864,17 @@ body::before {
 
 a.tag:hover {
   border-color: var(--accent);
+}
+
+.tag-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-left: -0.1rem;
+  color: var(--ink-soft);
+}
+
+a.tag:hover .tag-icon {
+  color: var(--accent);
 }
 
 .tag button {
@@ -1412,15 +1564,6 @@ body:has(.article-with-toc) .masthead-inner {
     max-height: none;
   }
 
-  .entry {
-    grid-template-columns: 1fr;
-  }
-
-  .entry-source {
-    padding-top: 0;
-    order: 2;
-  }
-
   .article,
   .article-with-toc {
     grid-template-columns: minmax(0, 1fr);
@@ -1478,6 +1621,18 @@ body:has(.article-with-toc) .masthead-inner {
   .page-title,
   .article-title {
     font-size: var(--step-2);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .entry-collection {
+    background: hsl(var(--hue, 210) 60% 55% / 0.18);
+    color: hsl(var(--hue, 210) 80% 76%);
+  }
+
+  .entry-collection:hover {
+    background: hsl(var(--hue, 210) 60% 55% / 0.28);
+    color: hsl(var(--hue, 210) 85% 84%);
   }
 }
 
@@ -1607,14 +1762,8 @@ body:has(.article-with-toc) .masthead-inner {
   letter-spacing: -0.01em;
 }
 
-.browse-head-links {
-  display: flex;
-  gap: 1.25rem;
-  font-size: var(--step--1);
-}
-
 /* Each collection is a card under a cover in its own colour: a gradient
-   from --hue (stable per slug) to a neighbouring hue, the collection's icon
+   from --hue (one per subject, see collectionHue) to a neighbouring hue, the collection's icon
    in a glass chip, and the same icon drawn large and faint as a watermark.
    The cards come in one after another when the page loads; that is the one
    moment of motion, and hover only answers the pointer. */
@@ -1639,8 +1788,9 @@ body:has(.article-with-toc) .masthead-inner {
   border-radius: 14px;
   background: var(--surface);
   /* backwards, not both: once in, the card's transform is free for hover. */
-  animation: shelf-in 640ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  animation-delay: calc(min(var(--i, 0), 8) * 45ms);
+  position: relative;
+  animation: shelf-in 720ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 11) * 70ms);
   transition:
     transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
     box-shadow 220ms ease,
@@ -1650,8 +1800,59 @@ body:has(.article-with-toc) .masthead-inner {
 @keyframes shelf-in {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.99);
+    transform: translateY(16px) scale(0.955);
   }
+  55% {
+    opacity: 1;
+  }
+}
+
+/* As each card settles, a band of light crosses it once: the card seems to
+   take shape rather than simply appear. */
+.shelf-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgb(255 255 255 / 0.22) 48%,
+    rgb(255 255 255 / 0.05) 55%,
+    transparent 65%
+  );
+  transform: translateX(-110%);
+  animation: shelf-sheen 1100ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
+  animation-delay: calc(min(var(--i, 0), 11) * 70ms + 220ms);
+}
+
+@keyframes shelf-sheen {
+  to {
+    transform: translateX(110%);
+  }
+}
+
+/* The latest articles arrive after the card: they rise in one by one. */
+.shelf-card-list:not(.shelf-card-list-loading) li {
+  animation: shelf-line-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--j, 0) * 60ms);
+}
+
+@keyframes shelf-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.shelf-card-list-loading .skeleton-line {
+  height: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+.skeleton-short {
+  width: 45%;
 }
 
 .shelf-card:hover,
@@ -2045,8 +2246,38 @@ body:has(.article-with-toc) .masthead-inner {
   margin: 0;
 }
 
+/* Label, then icon, name and button on one line, then the hint. */
 .collection-form {
+  display: grid;
+  gap: 0.4rem;
+  max-width: var(--measure);
+  margin-bottom: 2rem;
+}
+
+.collection-form-row {
+  display: flex;
   align-items: center;
+  gap: 0.6rem;
+}
+
+.collection-form-row .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.collection-form .fine-print,
+.collection-form .field-error {
+  margin: 0;
+}
+
+@media (max-width: 520px) {
+  .collection-form-row {
+    flex-wrap: wrap;
+  }
+
+  .collection-form-row .button {
+    flex: 1 1 100%;
+  }
 }
 
 /* A collection's icon on a small tile in its own colours, like its card. */
@@ -2066,17 +2297,6 @@ body:has(.article-with-toc) .masthead-inner {
 .collection-chip svg {
   width: 1.25rem;
   height: 1.25rem;
-}
-
-.input-with-icon {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.input-with-icon .input {
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 .saved-texts {

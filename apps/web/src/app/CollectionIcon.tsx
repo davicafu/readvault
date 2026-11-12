@@ -2,6 +2,8 @@
 // recognises "Bases de datos" or "Streaming y Kafka" at a glance. Names are
 // the user's own, in any language: unknown ones get a book.
 
+import type { CSSProperties } from "react";
+
 type Kind =
   | "stream"
   | "learning"
@@ -17,29 +19,30 @@ type Kind =
   | "testing"
   | "career"
   | "tools"
+  | "tag"
   | "book";
 
 // Checked in order: the first rule with a matching word wins, so the more
 // specific subjects come first ("ingeniería de datos" is a pipeline, not a
 // database).
 const rules: [Kind, RegExp][] = [
-  ["stream", /^(streaming|stream|streams|kafka|eventos|events|event|flink|pulsar|kinesis)$/],
-  ["learning", /^(machine|learning|ml|analisis|analysis|analytics|estadistica|statistics)$/],
-  ["ai", /^(ia|ai|llm|llms|gpt|agentes|agents|prompts?)$/],
+  ["stream", /^(streaming|stream|streams|kafka|ksqldb|cdc|eventos|events|event|flink|pulsar|kinesis|rabbitmq|nifi)$/],
+  ["learning", /^(machine|learning|ml|analisis|analysis|analytics|estadistica|statistics|r|pandas|numpy|d3|jupyter)$/],
+  ["ai", /^(ia|ai|llm|llms|gpt|agentes|agents|prompts?|claude|openai|rag|mcp)$/],
   ["pipeline", /^(ingenieria|engineering|pipelines?|etl|elt|airflow|dbt|spark|lakehouse)$/],
-  ["database", /^(bases|database|databases|sql|postgres|postgresql|mysql|duckdb|iceberg|clickhouse)$/],
-  ["cloud", /^(devops|cloud|linux|kubernetes|k8s|docker|aws|gcp|azure|infra|infraestructura)$/],
+  ["database", /^(bases|database|databases|sql|nosql|postgres|postgresql|mysql|duckdb|iceberg|clickhouse|redis|mongodb|elasticsearch|neo4j|cassandra|sqlite|registry)$/],
+  ["cloud", /^(devops|cloud|linux|kubernetes|k8s|docker|aws|gcp|azure|infra|infraestructura|terraform|helm|ansible)$/],
   ["interface", /^(frontend|visualizacion|visualization|ui|ux|css|react|design-systems?)$/],
   ["architecture", /^(arquitectura|architecture|system|sistemas|patrones|patterns|ddd)$/],
-  ["server", /^(backend|api|apis|go|golang|java|rust|python|microservicios|microservices)$/],
+  ["server", /^(backend|api|apis|go|golang|java|rust|python|scala|spring|kotlin|microservicios|microservices|grpc)$/],
   ["security", /^(security|seguridad|auth|authentication|autenticacion|privacy|privacidad|cryptography|criptografia)$/],
   ["mobile", /^(mobile|movil|moviles|android|ios|swift|kotlin|flutter)$/],
   ["testing", /^(testing|tests?|qa|quality|calidad|tdd)$/],
-  ["career", /^(career|carrera|management|gestion|leadership|liderazgo|productivity|productividad|business|negocio)$/],
+  ["career", /^(career|carrera|interview|interviews|entrevista|entrevistas|management|gestion|leadership|liderazgo|productivity|productividad|business|negocio)$/],
   ["tools", /^(tools|herramientas|tooling|utilities|utilidades|editor|editors|terminal|vim|neovim|git)$/],
 ];
 
-export function collectionKind(name: string): Kind {
+export function collectionKind(name: string, fallback: Kind = "book"): Kind {
   const words = name
     .toLowerCase()
     .normalize("NFD")
@@ -49,8 +52,39 @@ export function collectionKind(name: string): Kind {
   for (const [kind, pattern] of rules) {
     if (words.some((w) => pattern.test(w))) return kind;
   }
-  return "book";
+  return fallback;
 }
+
+// Each subject has its own hue, spread around the colour wheel so
+// neighbouring cards ("Architecture", "Backend") never look alike. Names with
+// no known subject get a hue from their slug.
+const kindHues: Partial<Record<Kind, number>> = {
+  database: 0,
+  security: 20,
+  architecture: 40,
+  career: 60,
+  interface: 80,
+  testing: 100,
+  server: 125,
+  cloud: 165,
+  stream: 200,
+  pipeline: 240,
+  mobile: 258,
+  learning: 280,
+  tools: 300,
+  ai: 320,
+};
+
+/** A stable hue for a collection, so it keeps its colour across visits. */
+export function collectionHue(c: { name: string; slug: string }): number {
+  const known = kindHues[collectionKind(c.name)];
+  if (known !== undefined) return known;
+  let h = 0;
+  for (const ch of c.slug) h = (h * 31 + ch.codePointAt(0)!) % 360;
+  return h;
+}
+
+export const hueStyle = (c: { name: string; slug: string }) => ({ "--hue": collectionHue(c) }) as CSSProperties;
 
 // 24×24 line drawings, stroked with the current colour.
 const paths: Record<Kind, string[]> = {
@@ -72,10 +106,21 @@ const paths: Record<Kind, string[]> = {
   testing: ["M9 3h6", "M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3", "M7.5 15h9"],
   career: ["M4 8h16v11H4z", "M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2", "M4 13h16"],
   tools: ["M14.5 6.5a4 4 0 0 0-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 0 5.3-5.3l-2.5 2.5-2.5-.5-.5-2.5z"],
+  tag: ["M3 12V4h8l10 10-8 8z", "M7.5 8.5h.01"],
   book: ["M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z", "M5 17a3 3 0 0 1 3-3h9", "M9 8h5"],
 };
 
 export function CollectionIcon({ name, className }: { name: string; className?: string }) {
+  return <KindIcon kind={collectionKind(name)} className={className} />;
+}
+
+// TagIcon is a tag's icon: its subject when the name says one ("kafka",
+// "clickhouse", "interview"), a plain label otherwise.
+export function TagIcon({ name, className }: { name: string; className?: string }) {
+  return <KindIcon kind={collectionKind(name, "tag")} className={className} />;
+}
+
+function KindIcon({ kind, className }: { kind: Kind; className?: string }) {
   return (
     <svg
       className={className}
@@ -88,7 +133,7 @@ export function CollectionIcon({ name, className }: { name: string; className?: 
       aria-hidden="true"
       focusable="false"
     >
-      {paths[collectionKind(name)].map((d) => (
+      {paths[kind].map((d) => (
         <path key={d} d={d} />
       ))}
     </svg>
