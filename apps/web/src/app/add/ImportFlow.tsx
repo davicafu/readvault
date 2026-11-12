@@ -509,6 +509,10 @@ function ReportStep({ report, onAgain }: { report: ImportReport; onAgain: () => 
           </div>
         ))}
       </dl>
+      <p>
+        The text of the imported articles that have none yet is downloaded in the background, a few at a time, even
+        if you close this page. It appears on each article's page as it arrives.
+      </p>
       <div className="actions">
         <Link className="button" href="/">
           Go to the library

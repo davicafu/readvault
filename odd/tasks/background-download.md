@@ -24,7 +24,7 @@ Assumptions: the queue lives in PostgreSQL (one table) and the worker in the API
 |---|---|---|---|---|
 | T1 | S1 | inline | done (first commit) | Service tests RED (build failure: no WithMirror) then GREEN: mirror used when the original fails and for a paid preview; original outcome kept when the mirror fails or is a paid preview too; mirror not asked when the original works or none is configured. Guard test RED (two requests) then GREEN: an address already on the mirror is not sent again. Config test RED then GREEN: unset, set, invalid values rejected. Real page: the user's Freedium article downloaded through ReadVault gives 608 words, complete, cover and images kept, Freedium chrome left out |
 | T2 | S2 | inline | done (second commit) | Risk items 1 (migration) and 4 (concurrent worker). Import tests RED (nothing queued) then GREEN: new article without text queued, article with text or a recorded download not queued, re-import queues nothing twice, existing article without text queued. Worker and queue tests RED (build failure) then GREEN: queued articles downloaded with 2 workers and the queue emptied; an article with a recorded download skipped without a request; a failed download recorded and not retried; a held claim not handed out twice; a claim that ran out handed out again, 3 attempts at most, then dropped; Done removes. Config test RED then GREEN. Full Go suite with `-race` passes; migration up/down/up test passes |
-| T3 | S3 | inline | pending | Web import message, docs |
+| T3 | S3 | inline | done (third commit) | Import report says texts download in the background; README features and configuration, API docs updated in T1/T2. tsc passes |
 
 ## Log
 
