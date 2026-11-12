@@ -20,7 +20,9 @@ import (
 )
 
 // New creates an empty database, applies every migration and returns a pool
-// to it. The database is dropped when the test ends.
+// to it, with an empty library: the default collections the migrations
+// create are removed, so tests start from nothing. The database is dropped
+// when the test ends.
 func New(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dbURL := Empty(t)
@@ -32,6 +34,9 @@ func New(t *testing.T) *pgxpool.Pool {
 		t.Fatalf("opening test database: %v", err)
 	}
 	t.Cleanup(pool.Close)
+	if _, err := pool.Exec(t.Context(), "DELETE FROM collections"); err != nil {
+		t.Fatalf("emptying the default collections: %v", err)
+	}
 	return pool
 }
 
