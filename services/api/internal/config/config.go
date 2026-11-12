@@ -79,6 +79,11 @@ func Load() (Config, error) {
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			errs = append(errs, fmt.Errorf("ARTICLE_MIRROR_URL must be an http or https address, got %q", v))
 		}
+		// The article address is appended as a path: without one, it
+		// would run into the host name.
+		if err == nil && u.Path == "" && u.RawQuery == "" {
+			v += "/"
+		}
 		cfg.ArticleMirrorURL = v
 	}
 

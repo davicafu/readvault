@@ -138,8 +138,7 @@ func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content,
 	}
 
 	ex, fe := s.download(ctx, rawURL)
-	// An address that already points at the mirror is not sent to it again.
-	if s.mirror != "" && !strings.HasPrefix(rawURL, s.mirror) && (fe != nil || ex.Paywalled) {
+	if s.useMirror(ctx, rawURL, ex, fe) {
 		if mex, mfe := s.download(ctx, s.mirror+rawURL); mfe == nil && !mex.Paywalled {
 			ex, fe = mex, nil
 		}
@@ -170,6 +169,21 @@ func (s *Service) downloadMissing(ctx context.Context, userID, articleID string)
 	}
 	_, err = s.Fetch(ctx, userID, articleID)
 	return err
+}
+
+// useMirror says whether the mirror may help: a mirror is configured, the
+// page failed or is a paid preview, and the download was not cancelled. An
+// address already on the mirror is not sent to it again, and one the
+// fetcher refused (a private or local host) never leaves the machine.
+func (s *Service) useMirror(ctx context.Context, rawURL string, ex Extracted, fe *FetchError) bool {
+	switch {
+	case s.mirror == "" || ctx.Err() != nil || strings.HasPrefix(rawURL, s.mirror):
+		return false
+	case fe != nil:
+		return fe.Problem != ProblemBlockedAddress
+	default:
+		return ex.Paywalled
+	}
 }
 
 // download fetches one page and extracts its text.

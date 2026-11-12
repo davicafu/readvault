@@ -73,7 +73,7 @@ func run() error {
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	workerDone := make(chan struct{})
 	if cfg.DownloadWorkers > 0 {
-		worker := content.NewWorker(contents, postgres.NewDownloadQueue(pool), content.WorkerConfig{Workers: cfg.DownloadWorkers})
+		worker := content.NewWorker(contents, postgres.NewDownloadQueue(pool, time.Minute), content.WorkerConfig{Workers: cfg.DownloadWorkers})
 		go func() {
 			defer close(workerDone)
 			worker.Run(workerCtx)

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -27,12 +28,24 @@ type fakeFetcher struct {
 	responses map[string]content.Fetched
 	errs      map[string]error
 	requested []string
+	// delay makes every request take this long, or until ctx ends.
+	delay time.Duration
 }
 
-func (f *fakeFetcher) Fetch(_ context.Context, rawURL string, maxBytes int64, _ []string) (content.Fetched, error) {
+func (f *fakeFetcher) Fetch(ctx context.Context, rawURL string, maxBytes int64, _ []string) (content.Fetched, error) {
+	f.mu.Lock()
+	f.requested = append(f.requested, rawURL)
+	delay := f.delay
+	f.mu.Unlock()
+	if delay > 0 {
+		select {
+		case <-ctx.Done():
+			return content.Fetched{}, ctx.Err()
+		case <-time.After(delay):
+		}
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.requested = append(f.requested, rawURL)
 	if err, ok := f.errs[rawURL]; ok {
 		return content.Fetched{}, err
 	}
@@ -457,4 +470,44 @@ func TestFetch_AMirrorAddressIsNotSentToTheMirrorAgain(t *testing.T) {
 	if len(f.requested) != 1 {
 		t.Errorf("requested %v, want only the saved address", f.requested)
 	}
+}
+
+func TestFetch_NeverSendsABlockedAddressToTheMirror(t *testing.T) {
+	t.Parallel()
+	svc, f, id := setupWithMirror(t)
+	f.errs[articleURL] = &content.FetchError{Problem: content.ProblemBlockedAddress}
+	f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(mirrorPage)}
+
+	var fe *content.FetchError
+	if _, err := svc.Fetch(t.Context(), owner, id); !errors.As(err, &fe) || fe.Problem != content.ProblemBlockedAddress {
+		t.Errorf("Fetch() error = %v, want blocked_address", err)
+	}
+	if n := requestsWithPrefix(f, mirror); n != 0 {
+		t.Errorf("the mirror was asked %d times, want never for a blocked address", n)
+	}
+}
+
+func TestFetch_DoesNotAskTheMirrorOnceCancelled(t *testing.T) {
+	t.Parallel()
+	svc, f, id := setupWithMirror(t)
+	f.delay = 5 * time.Second
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+
+	_, _ = svc.Fetch(ctx, owner, id)
+	if n := requestsWithPrefix(f, mirror); n != 0 {
+		t.Errorf("the mirror was asked %d times after the download was cancelled, want 0", n)
+	}
+}
+
+func requestsWithPrefix(f *fakeFetcher, prefix string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, u := range f.requested {
+		if strings.HasPrefix(u, prefix) {
+			n++
+		}
+	}
+	return n
 }

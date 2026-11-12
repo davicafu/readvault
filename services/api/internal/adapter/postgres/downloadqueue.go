@@ -20,12 +20,16 @@ const maxDownloadAttempts = 3
 // table. Claims skip rows other workers hold, so several workers and API
 // processes can share it.
 type DownloadQueue struct {
-	pool *pgxpool.Pool
+	pool  *pgxpool.Pool
+	delay time.Duration
 }
 
-// NewDownloadQueue returns a DownloadQueue backed by pool.
-func NewDownloadQueue(pool *pgxpool.Pool) *DownloadQueue {
-	return &DownloadQueue{pool: pool}
+// NewDownloadQueue returns a DownloadQueue backed by pool. An article is
+// handed out only once it has been queued for delay, which leaves a link
+// the web app downloads right after adding it to that download: by then
+// the article has its text or a recorded failure and the worker skips it.
+func NewDownloadQueue(pool *pgxpool.Pool, delay time.Duration) *DownloadQueue {
+	return &DownloadQueue{pool: pool, delay: delay}
 }
 
 // Claim implements content.DownloadQueue.
@@ -41,6 +45,7 @@ func (q *DownloadQueue) Claim(ctx context.Context, lease time.Duration) (content
 	err := q.pool.QueryRow(ctx, `WITH next AS (
 			SELECT article_id FROM content_downloads
 			WHERE attempts < $1 AND (claimed_until IS NULL OR claimed_until < now())
+			  AND queued_at <= now() - $3 * interval '1 millisecond'
 			ORDER BY queued_at, article_id
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
@@ -49,7 +54,7 @@ func (q *DownloadQueue) Claim(ctx context.Context, lease time.Duration) (content
 		SET attempts = d.attempts + 1, claimed_until = now() + $2 * interval '1 millisecond'
 		FROM next WHERE d.article_id = next.article_id
 		RETURNING d.article_id, d.user_id`,
-		maxDownloadAttempts, lease.Milliseconds()).Scan(&job.ArticleID, &job.UserID)
+		maxDownloadAttempts, lease.Milliseconds(), q.delay.Milliseconds()).Scan(&job.ArticleID, &job.UserID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return content.DownloadJob{}, false, nil
 	}

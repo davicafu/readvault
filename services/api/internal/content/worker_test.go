@@ -4,6 +4,7 @@ package content_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -27,7 +28,7 @@ func queue(t *testing.T, pool *pgxpool.Pool, articleIDs ...string) {
 func runWorker(t *testing.T, svc *content.Service, pool *pgxpool.Pool) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
-	w := content.NewWorker(svc, postgres.NewDownloadQueue(pool), content.WorkerConfig{Workers: 2, Pause: time.Millisecond, Idle: 10 * time.Millisecond})
+	w := content.NewWorker(svc, postgres.NewDownloadQueue(pool, 0), content.WorkerConfig{Workers: 2, Pause: time.Millisecond, Idle: 10 * time.Millisecond})
 	stopped := make(chan struct{})
 	go func() {
 		w.Run(ctx)
@@ -123,7 +124,7 @@ func TestWorker_RecordsAFailedDownloadAndDoesNotRetryIt(t *testing.T) {
 func TestDownloadQueue_ClaimsEachArticleOnceUntilItsClaimRunsOut(t *testing.T) {
 	t.Parallel()
 	_, _, pool, id := setup(t)
-	q := postgres.NewDownloadQueue(pool)
+	q := postgres.NewDownloadQueue(pool, 0)
 	queue(t, pool, id)
 	ctx := t.Context()
 
@@ -158,7 +159,7 @@ func TestDownloadQueue_ClaimsEachArticleOnceUntilItsClaimRunsOut(t *testing.T) {
 func TestDownloadQueue_DoneRemovesTheArticle(t *testing.T) {
 	t.Parallel()
 	_, _, pool, id := setup(t)
-	q := postgres.NewDownloadQueue(pool)
+	q := postgres.NewDownloadQueue(pool, 0)
 	queue(t, pool, id)
 
 	job, _, err := q.Claim(t.Context(), time.Hour)
@@ -173,5 +174,88 @@ func TestDownloadQueue_DoneRemovesTheArticle(t *testing.T) {
 	}
 	if err := q.Done(t.Context(), job); err != nil {
 		t.Errorf("Done() twice: %v, want no error", err)
+	}
+}
+
+func TestDownloadQueue_WaitsBeforeHandingOutAFreshArticle(t *testing.T) {
+	t.Parallel()
+	_, _, pool, id := setup(t)
+	q := postgres.NewDownloadQueue(pool, time.Minute)
+	queue(t, pool, id)
+
+	if _, ok, err := q.Claim(t.Context(), time.Hour); err != nil || ok {
+		t.Fatalf("Claim() = %v, %v; want nothing for an article queued just now", ok, err)
+	}
+	if _, err := pool.Exec(t.Context(), `UPDATE content_downloads SET queued_at = now() - interval '2 minutes'`); err != nil {
+		t.Fatal(err)
+	}
+	if job, ok, err := q.Claim(t.Context(), time.Hour); err != nil || !ok || job.ArticleID != id {
+		t.Errorf("Claim() = %+v, %v, %v; want the article once it has waited", job, ok, err)
+	}
+}
+
+// A single link is imported (and queued), then downloaded at once by the
+// web app while the worker runs: the page is requested once.
+func TestWorker_LeavesASingleLinkToItsImmediateDownload(t *testing.T) {
+	t.Parallel()
+	svc, f, pool, id := setup(t)
+	f.delay = 300 * time.Millisecond
+	f.responses[articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(`<html><body><article><p>Text.</p></article></body></html>`)}
+	queue(t, pool, id)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	w := content.NewWorker(svc, postgres.NewDownloadQueue(pool, time.Minute), content.WorkerConfig{Workers: 2, Pause: time.Millisecond, Idle: 10 * time.Millisecond})
+	stopped := make(chan struct{})
+	go func() {
+		w.Run(ctx)
+		close(stopped)
+	}()
+	if _, err := svc.Fetch(t.Context(), owner, id); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	<-stopped
+
+	if n := requests(f, articleURL); n != 1 {
+		t.Errorf("the page was requested %d times, want 1", n)
+	}
+}
+
+// Stopping the worker mid-download leaves the article queued and records
+// nothing, so it is downloaded again after the claim runs out.
+func TestWorker_ADownloadCutShortIsTriedAgain(t *testing.T) {
+	t.Parallel()
+	svc, f, pool, id := setup(t)
+	f.delay = 2 * time.Second
+	f.responses[articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(`<html><body><article><p>Text.</p></article></body></html>`)}
+	queue(t, pool, id)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	w := content.NewWorker(svc, postgres.NewDownloadQueue(pool, 0), content.WorkerConfig{Workers: 1, Idle: 10 * time.Millisecond})
+	stopped := make(chan struct{})
+	go func() {
+		w.Run(ctx)
+		close(stopped)
+	}()
+	for requests(f, articleURL) == 0 {
+		time.Sleep(5 * time.Millisecond)
+	}
+	cancel()
+	<-stopped
+
+	if _, err := svc.Get(t.Context(), owner, id); !errors.Is(err, content.ErrNoContent) {
+		t.Errorf("Get() = %v, want nothing recorded for a download cut short", err)
+	}
+	if n := queuedCount(t, pool); n != 1 {
+		t.Fatalf("%d rows queued, want the article still queued", n)
+	}
+	if _, err := pool.Exec(t.Context(), `UPDATE content_downloads SET claimed_until = now() - interval '1 second'`); err != nil {
+		t.Fatal(err)
+	}
+	f.delay = 0
+	runWorker(t, svc, pool)
+	if got, err := svc.Get(t.Context(), owner, id); err != nil || got.Status != content.StatusComplete {
+		t.Errorf("after the retry: %+v, %v; want the text saved", got, err)
 	}
 }
