@@ -310,6 +310,10 @@ Counts the articles by the state of their text: `queued` wait for the background
 
 Queues the background download of every article never downloaded (the ones counted as `missing`) and answers `202` with how many were queued, `{ "queued": 518 }`. Failed and incomplete articles are not queued again; download them from their page. Calling it again queues nothing twice.
 
+### `DELETE /api/contents` and `DELETE /api/collections/{id}/contents`
+
+Deletes the saved texts, with their images and recorded download failures, of every article of the user, or of the articles of one collection, to free space. The articles, their tags and collections stay, and their queued background downloads are dropped. Uploaded texts are deleted too. Answers `200` with how many saved entries were deleted, `{ "removed": 84 }`; an unknown collection is `404` `not_found`. A download already running may still save its text afterwards.
+
 ### `GET /api/articles/{id}/images/{imageId}`
 
 Returns a stored image with its type, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox` and `Cache-Control: private, max-age=86400`.

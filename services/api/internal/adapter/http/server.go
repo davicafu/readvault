@@ -81,6 +81,8 @@ func NewHandler(deps Deps) http.Handler {
 		mux.HandleFunc("POST /api/articles/{id}/content/fetch", h.fetch)
 		mux.HandleFunc("GET /api/content-downloads", h.downloads)
 		mux.HandleFunc("POST /api/content-downloads", h.queueMissing)
+		mux.HandleFunc("DELETE /api/contents", h.removeTexts)
+		mux.HandleFunc("DELETE /api/collections/{id}/contents", h.removeTexts)
 		mux.HandleFunc("GET /api/articles/{id}/images/{imageId}", h.image)
 	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

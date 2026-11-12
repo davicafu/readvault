@@ -174,6 +174,21 @@ func (s *Service) QueueMissing(ctx context.Context, userID string) (int, error) 
 	return s.repo.QueueMissing(ctx, userID)
 }
 
+// RemoveTexts deletes the saved texts of the user's articles, or of one
+// collection's when collectionID is not "", to free space. The articles,
+// their tags and collections stay; their queued downloads are dropped so
+// the texts are not downloaded again behind the user's back. It returns how
+// many saved entries (texts and recorded failures) were deleted.
+//
+// A download already running when the texts are removed may still save its
+// text afterwards.
+func (s *Service) RemoveTexts(ctx context.Context, userID, collectionID string) (int, error) {
+	if collectionID != "" && !uuidPattern.MatchString(collectionID) {
+		return 0, ErrNotFound
+	}
+	return s.repo.RemoveTexts(ctx, userID, collectionID)
+}
+
 // downloadMissing fetches the article's text unless something was saved
 // or a download recorded already, by the person or an earlier download.
 func (s *Service) downloadMissing(ctx context.Context, userID, articleID string) error {

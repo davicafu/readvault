@@ -184,3 +184,43 @@ func (r *ContentRepository) QueueMissing(ctx context.Context, userID string) (in
 	}
 	return int(tag.RowsAffected()), nil
 }
+
+// RemoveTexts implements content.Repository. Images go with their text
+// (ON DELETE CASCADE).
+func (r *ContentRepository) RemoveTexts(ctx context.Context, userID, collectionID string) (int, error) {
+	var collection *string
+	if collectionID != "" {
+		collection = &collectionID
+	}
+	// $2 NULL means every article of the user.
+	const inScope = `SELECT a.id FROM articles a
+		WHERE a.user_id = $1 AND ($2::uuid IS NULL OR a.collection_id = $2::uuid)`
+	var removed int
+	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		if collection != nil {
+			var found bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM collections WHERE id = $1 AND user_id = $2)`,
+				collectionID, userID).Scan(&found); err != nil {
+				return fmt.Errorf("finding collection: %w", err)
+			}
+			if !found {
+				return content.ErrNotFound
+			}
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM content_downloads
+			WHERE user_id = $1 AND article_id IN (`+inScope+`)`, userID, collection); err != nil {
+			return fmt.Errorf("dropping queued downloads: %w", err)
+		}
+		tag, err := tx.Exec(ctx, `DELETE FROM article_contents
+			WHERE user_id = $1 AND article_id IN (`+inScope+`)`, userID, collection)
+		if err != nil {
+			return fmt.Errorf("removing texts: %w", err)
+		}
+		removed = int(tag.RowsAffected())
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return removed, nil
+}

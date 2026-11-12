@@ -101,6 +101,11 @@ type Repository interface {
 	// that has no text and no recorded download and is not queued yet, and
 	// returns how many it queued.
 	QueueMissing(ctx context.Context, userID string) (int, error)
+	// RemoveTexts deletes the saved text, images and recorded failure of
+	// the user's articles, of one collection's when collectionID is not "",
+	// drops their queued downloads, and returns how many entries it
+	// deleted. An unknown collection is ErrNotFound.
+	RemoveTexts(ctx context.Context, userID, collectionID string) (int, error)
 }
 
 // DownloadSummary counts a user's articles by the state of their text.
