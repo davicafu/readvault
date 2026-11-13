@@ -35,7 +35,7 @@ make dev                    # Postgres, migrations, API on :8080, web app on :30
 
 Open http://localhost:3000, choose **Add articles** and import a bookmarks file. To try it without your own export, import `fixtures/bookmarks.html`.
 
-The first `make` run creates `.env` with a random database password; edit it to change ports or limits (`.env.example` lists every variable). `make dev` checks that Node.js 22 or later comes first on `PATH`, installs the web app's dependencies the first time and stops everything with Ctrl+C. Postgres keeps running in Docker; stop it with `make db-down`. The data stays in the `db-data` volume.
+The first `make` run creates `.env` with a random database password; edit it to change ports or limits (`.env.example` lists every variable). `make dev` checks that Node.js 22 or later comes first on `PATH`, installs the web app's dependencies the first time and again whenever `apps/web/package-lock.json` changes (for example after a pull that adds one), and stops everything with Ctrl+C. Go downloads the API's modules on its own the first time it runs. Postgres keeps running in Docker; stop it with `make db-down`. The data stays in the `db-data` volume.
 
 ## Commands
 

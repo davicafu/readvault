@@ -55,8 +55,11 @@ node-check: ## Check that Node.js 22 or later is first on PATH
 web-install: node-check ## Install the web app dependencies from the lockfile
 	cd $(WEB_DIR) && npm ci
 
-$(WEB_DIR)/node_modules: | node-check
+# Installed on the first run and again whenever the lockfile changes (after a
+# pull that adds a dependency); the touch marks the install as current.
+$(WEB_DIR)/node_modules: $(WEB_DIR)/package-lock.json | node-check
 	cd $(WEB_DIR) && npm ci
+	@touch $@
 
 .PHONY: dev
 dev: node-check migrate $(WEB_DIR)/node_modules ## Run Postgres, migrations, the API on :8080 and the web app on :3000
