@@ -460,6 +460,23 @@ body::before {
   color: var(--accent-ink);
 }
 
+/* On a phone the choices stay on one line and slide sideways if needed. */
+@media (max-width: 520px) {
+  .sort-links {
+    display: flex;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .sort-links a {
+    flex: none;
+    padding-inline: 0.65rem;
+    white-space: nowrap;
+  }
+}
+
 /* The page settles in as one piece instead of parts popping in. */
 .page {
   animation: page-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
@@ -490,6 +507,39 @@ body::before {
 
   .header-search-key {
     display: none;
+  }
+
+  /* The menu becomes a row of four equal tabs, icon over label, so it
+     never runs off the screen. */
+  .masthead-inner nav {
+    flex-basis: 100%;
+    order: 2;
+    margin-left: 0;
+  }
+
+  .nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+
+  .nav a {
+    flex-direction: column;
+    gap: 0.2rem;
+    padding-block: 0.3rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+
+  .nav-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .nav a[aria-current="page"] {
+    text-decoration: none;
+    background: var(--surface);
   }
 }
 
@@ -1724,6 +1774,9 @@ body:has(.article-with-toc) .masthead-inner {
 
 .reading {
   display: grid;
+  /* One column no wider than the page: a long code line scrolls inside its
+     block instead of widening the text. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
   margin-top: 2.5rem;
   padding-top: 1.5rem;
@@ -1791,6 +1844,13 @@ body:has(.article-with-toc) .masthead-inner {
 
 .prose code {
   font-size: 0.9em;
+}
+
+/* A wide table scrolls on its own, like a code block. */
+.prose table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .prose img {
@@ -2058,6 +2118,32 @@ body:has(.article-with-toc) .masthead-inner {
   height: 8.5rem;
   opacity: 0.16;
   transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* On a phone the folders sit in one column: lower, closer together, with
+   the sheets still peeking out. */
+@media (max-width: 520px) {
+  .shelf-grid {
+    gap: 1.25rem;
+  }
+
+  .folder {
+    height: 13rem;
+  }
+
+  .folder-back {
+    inset: 2.4rem 0 0;
+  }
+
+  .folder-front {
+    inset: 4.6rem 0 0;
+    padding: 1rem 1.1rem;
+  }
+
+  .folder-mark {
+    width: 6.5rem;
+    height: 6.5rem;
+  }
 }
 
 .folder:hover .folder-mark,
