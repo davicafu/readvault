@@ -1,7 +1,7 @@
 // SVG filters that show an element as a mosaic of square blocks: each block
 // takes the colour of one pixel in its middle. The front page folders step
 // through them, from large blocks to sharp, as they appear.
-export const PIXEL_SIZES = [24, 16, 10, 6, 3] as const;
+export const PIXEL_SIZES = [12, 8, 6, 4, 2] as const;
 
 export function PixelFilters() {
   return (

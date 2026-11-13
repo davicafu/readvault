@@ -1785,34 +1785,34 @@ body:has(.article-with-toc) .masthead-inner {
   position: relative;
   height: 17rem;
   isolation: isolate;
-  animation: folder-in 800ms linear backwards;
+  animation: folder-in 1000ms linear backwards;
   animation-delay: calc(min(var(--i, 0), 11) * 90ms);
   transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* The folder assembles from large square pixels that grow finer until it
+/* The folder assembles from small square pixels that grow finer until it
    is sharp (filters in PixelFilters.tsx). Filters do not blend, so each
    step holds until the next. */
 @keyframes folder-in {
   0% {
     opacity: 0;
-    filter: url(#rv-px-24);
+    filter: url(#rv-px-12);
   }
   14% {
     opacity: 1;
-    filter: url(#rv-px-24);
+    filter: url(#rv-px-12);
   }
   30% {
-    filter: url(#rv-px-16);
+    filter: url(#rv-px-8);
   }
   46% {
-    filter: url(#rv-px-10);
-  }
-  62% {
     filter: url(#rv-px-6);
   }
+  62% {
+    filter: url(#rv-px-4);
+  }
   78% {
-    filter: url(#rv-px-3);
+    filter: url(#rv-px-2);
   }
   92%,
   100% {
