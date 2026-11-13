@@ -53,8 +53,8 @@ type Option func(*Service)
 // WithMirror makes Fetch fall back to a reading mirror when the original page
 // fails or is a paid preview. The mirror address is prefix followed by the
 // original URL, as in https://freedium-mirror.cfd/https://medium.com/....
-// serves says which articles the mirror can read (Freedium reads Medium);
-// others are never sent to it. An empty prefix means no mirror.
+// serves says which articles the mirror can read (Freedium reads Medium and
+// some news sites); others are never sent to it. An empty prefix means no mirror.
 func WithMirror(prefix string, serves func(ctx context.Context, rawURL string) bool) Option {
 	return func(s *Service) {
 		s.mirror = prefix
@@ -257,7 +257,7 @@ func (s *Service) mayAskCopies(ctx context.Context, rawURL string, ex Extracted,
 // does not count.
 func (s *Service) fromCopies(ctx context.Context, rawURL string) (Extracted, bool) {
 	if s.mirror != "" && (s.mirrorServes == nil || s.mirrorServes(ctx, rawURL)) {
-		if ex, fe := s.download(ctx, s.mirror+rawURL, nil); fe == nil && !ex.Paywalled {
+		if ex, fe := s.download(ctx, s.mirror+rawURL, nil); fe == nil && !ex.Paywalled && !ex.mirrorError {
 			return ex, true
 		}
 	}
@@ -271,6 +271,11 @@ func (s *Service) fromCopies(ctx context.Context, rawURL string) (Extracted, boo
 	}
 	return Extracted{}, false
 }
+
+// mirrorErrorData finds the error Freedium embeds in its page data when it
+// cannot read an article (not found, render error, site blocked); it still
+// answers 200 with a page of text. A readable article has error:null.
+var mirrorErrorData = regexp.MustCompile(`\berror:\{status:\d{3},`)
 
 func (s *Service) isCopyAddress(rawURL string) bool {
 	return (s.mirror != "" && strings.HasPrefix(rawURL, s.mirror)) || (s.archive != "" && strings.HasPrefix(rawURL, s.archive))
@@ -289,6 +294,7 @@ func (s *Service) download(ctx context.Context, rawURL string, base *url.URL) (E
 		base, _ = url.Parse(page.URL)
 	}
 	ex, err := FromHTML(bytes.NewReader(cleanText(page.Body)), base)
+	ex.mirrorError = mirrorErrorData.Match(page.Body)
 	switch {
 	case err != nil:
 		return Extracted{}, &FetchError{Problem: ProblemNotHTML, Err: err}

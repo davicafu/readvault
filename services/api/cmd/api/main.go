@@ -46,7 +46,7 @@ func run() error {
 	defer pool.Close()
 
 	contents := content.NewService(postgres.NewContentRepository(pool), fetch.New(fetch.PublicAddr), cfg.MaxArticleBytes,
-		content.WithMirror(cfg.ArticleMirrorURL, fetch.NewMediumDetector(nil).Is),
+		content.WithMirror(cfg.ArticleMirrorURL, fetch.MirrorReads(fetch.NewMediumDetector(nil).Is)),
 		content.WithArchive(cfg.ArticleArchiveURL))
 	handler := apihttp.NewHandler(apihttp.Deps{
 		DB:               pool,

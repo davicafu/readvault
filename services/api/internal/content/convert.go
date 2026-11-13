@@ -30,6 +30,9 @@ type Extracted struct {
 	Words  int
 	// Paywalled means the page says it shows only part of a paid article.
 	Paywalled bool
+	// mirrorError means the page is the reading mirror's error page
+	// (see mirrorErrorData), not an article.
+	mirrorError bool
 }
 
 // minImageSide skips avatars, icons and tracking pixels: an image whose

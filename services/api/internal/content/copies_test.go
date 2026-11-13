@@ -91,6 +91,37 @@ func TestFetch_TriesTheMirrorBeforeTheArchive(t *testing.T) {
 	}
 }
 
+// Freedium answers 200 with an error page when it cannot read an article
+// (not found, render error, site blocked); its page data then holds the
+// error instead of error:null.
+func TestFetch_SkipsTheMirrorsErrorPage(t *testing.T) {
+	t.Parallel()
+	svc, f, id := setupWithCopies(t, true)
+	errorPage := `<html><body><main><h1>404 — Article not found</h1><p>We couldn't find the article you're looking for.</p></main>` +
+		`<script>data: [{eager:{html:null,markdown:null,article:null,error:{status:404,message:"Article not found",code:"ARTICLE_NOT_FOUND"}}}]</script></body></html>`
+	f.errs[articleURL] = &content.FetchError{Problem: content.ProblemHTTPStatus, Status: 403}
+	f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(errorPage)}
+	f.responses[archive+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(archivePage)}
+
+	got, err := svc.Fetch(t.Context(), owner, id)
+	if err != nil || !strings.Contains(got.Markdown, "archived copy") {
+		t.Errorf("got %+v, %v; want the archive's text, not the mirror's error page", got, err)
+	}
+}
+
+func TestFetch_KeepsTheMirrorsArticle(t *testing.T) {
+	t.Parallel()
+	svc, f, id := setupWithCopies(t, true)
+	page := strings.Replace(mirrorPage, "</body>", `<script>data: [{eager:{html:"x",error:null}}]</script></body>`, 1)
+	f.errs[articleURL] = &content.FetchError{Problem: content.ProblemHTTPStatus, Status: 403}
+	f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(page)}
+
+	got, err := svc.Fetch(t.Context(), owner, id)
+	if err != nil || !strings.Contains(got.Markdown, "free to read on the mirror") {
+		t.Errorf("got %+v, %v; want the mirror's text", got, err)
+	}
+}
+
 func TestFetch_KeepsTheOriginalFailureWhenNoCopyHelps(t *testing.T) {
 	t.Parallel()
 	svc, f, id := setupWithCopies(t, false)
