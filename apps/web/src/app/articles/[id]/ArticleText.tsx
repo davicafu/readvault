@@ -99,6 +99,19 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
   const howToUpload =
     "Open the article in your browser, save it as a web page (HTML), and upload that file here. A Markdown file works too.";
 
+  // The latest snapshot of the page on archive.org, for the reader to open,
+  // save and upload when neither the site nor the automatic copies gave the
+  // text.
+  const archived = (
+    <p className="fine-print">
+      {copyLink} or{" "}
+      <a href={`https://web.archive.org/web/2/${articleUrl}`} target="_blank" rel="noreferrer">
+        open the page on archive.org
+      </a>{" "}
+      to save it from there.
+    </p>
+  );
+
   return (
     <section className="reading" aria-labelledby="text-title">
       <h2 id="text-title" className="visually-hidden">
@@ -118,14 +131,14 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
             The download failed because {problemText(content.problem)}. {howToUpload}
           </p>
           {actions}
-          <p className="fine-print">{copyLink}</p>
+          {archived}
         </div>
       ) : content.status === "incomplete" ? (
         <div className="notice notice-warn" role="alert">
           <h3>Only part of this article was saved</h3>
           <p>The page said the full text is for paying members, so this is a preview. {howToUpload}</p>
           {actions}
-          <p className="fine-print">{copyLink}</p>
+          {archived}
         </div>
       ) : (
         <div className="reading-head">

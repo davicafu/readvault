@@ -12,6 +12,9 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 - **S5** (L1) "añade al lado de los textos de arriba algun icono que cuadre con el texto que tiene".
 - **S6** (L3) "el fade final inferior ahroa se nota demasiado, que sea una mezcla entre los dos ultimos intentos".
 - **S7** (L3) "fredium me valdria para articulos de: New york time, whashington post, the atheltic, economist, bloomberg, reuters o quora".
+- **S8** (L4) "cuadno fredium falla quiero que se de la posibilidad de archive.org o mostrar el mensaje para que se descargue y se cargue la web".
+- **S9** (L4) "borra todo y carga la lista nueva completa".
+- **S10** (L4) "la version mobile no esta adaptada, hazla tambien".
 
 ## Tasks
 
@@ -23,9 +26,13 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 | T4 | S3 | inline | done (this commit) | Integration RED (WithArchive, FetchCopy undefined) then GREEN: archive used for http error, no text and paid preview; images resolve against the original site; mirror before archive; unanswered addresses never sent; FetchCopy replaces text without asking the original, keeps text and records nothing when no copy. HTTP: ?from=copy, no_copy 502, bad from 400. Config: ARTICLE_ARCHIVE_URL default, off, invalid. Live: go.dev complete (3005 words); stackoverflow 403 and no archived copy (fails); observablehq complete with 20 words from a JS-rendered page (weak copy, reported) |
 | T5 | S6 | inline | done | Reveal between `a61ab34` and `85f27be`: range entry 0% cover 25%, translate 3.25rem, scale .94, soft 1.4rem; screenshot at 1200x800: bottom row at 0.35 opacity while entering |
 | T6 | S7 | inline | done | Checked on 2026-11-13 with real articles from each site's feed: NYT, Washington Post, The Athletic and Bloomberg came back whole; Economist and Quora gave Freedium RENDER_ERROR, Reuters UPSTREAM_BLOCKED. Found: Freedium's error pages (HTTP 200) were saved as complete text; now skipped. Unit RED (MirrorReads undefined) then GREEN; integration RED (error page saved) then GREEN; full suites with -race pass. Live on an isolated database: 4 complete, Economist and Quora failed with the original 403 instead of an error page |
+| T7 | S8 | inline | done | Failed and incomplete notices keep the upload instructions and add "open the page on archive.org" (latest snapshot, new tab) next to Try another copy; tsc passes; screenshot of a failed Udemy article at 390 px |
+| T8 | S9 | inline | done (data, no commit) | Dev database dumped (pg_dump -Fc, 9 tables) and exported to JSON in the scratchpad first; articles, collections, tags, texts, images and queue truncated (user kept); bookmarks_11_11_26.collections.html imported: 489 inserted, 9 collections, 489 queued for download |
+| T9 | S10 | inline | done | At 390 px: menu as four equal tabs (icon over label), folders lower and closer, reading column pinned to the page width (a code block had widened the page to 809 px), wide tables scroll, sort choices on one sliding line. Page width 390 on the front page, search, article, collections, add and import; desktop at 1300 px unchanged |
 
 ## Log
 
 - L1 (2026-11-13, user): "vale los articulos quiero que hagas una limpieza en el bookmark final: - elimna los archive.ph - los que tengan freedium quitale la parte de freedium asi queda la fuente original y si no se puede leer salta a freedium - añade freedium como fallback para cualquier link que no se puede leer, o en caso de que no se pueda leer completamente, ofrece la posibilidad de decargarlo por ahi pero sutilmente, sin nombrar freediu, - el export debe funcionar como un backup, me parece bien que guarde todo eso pero deberia ser una forma tambien para que exista un import y se pierda la coleccion que sea recuperable desde ahi - añade al lado de los textos de arriba algun icono que cuadre con el texto que tiene"
 - L2 (2026-11-13, user answer): "Archive, automatic + link (Recommended)".
 - L3 (2026-11-13, user): "- el fade final inferior ahroa se nota demasiado, que sea una mezcla entre los dos ultimos intentos - fredium me valdria para articulos de: New york time, whashington post, the atheltic, economist, bloomberg, reuters o quora"
+- L4 (2026-11-13, user): "cuadno fredium falla quiero que se de la posibilidad de archive.org o mostrar el mensaje para que se descargue y se cargue la web - borra todo y carga la lista nueva completa - la version mobile no esta adaptada, hazla tambien"
