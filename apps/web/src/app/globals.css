@@ -956,22 +956,30 @@ a.tag:hover .tag-icon {
 /* Article editor: suggested tags and collection */
 .suggestions {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.4rem;
   margin-top: 0.4rem;
 }
 
-/* The label keeps its place; the tags wrap under one another beside it. */
+/* The label and the tags share one line; tags that do not fit slide
+   sideways instead of dropping under the label. */
 .suggestions > .fine-print {
   flex: none;
-  line-height: 1.6rem;
+  margin: 0;
 }
 
 .suggestion-list {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.suggestion-list .suggestion {
+  flex: none;
+  white-space: nowrap;
 }
 
 .suggestion {
@@ -983,6 +991,16 @@ a.tag:hover .tag-icon {
   font: inherit;
   font-size: var(--step--1);
   cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .suggestion-list {
+    gap: 0.3rem;
+  }
+
+  .suggestion {
+    padding-inline: 0.45rem;
+  }
 }
 
 .suggestion:hover,
