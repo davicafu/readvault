@@ -149,7 +149,6 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
               ? `. ${content.missingImages} ${content.missingImages === 1 ? "image" : "images"} could not be saved`
               : ""}
             {content.problem ? `. The last download failed (${problemText(content.problem)}); this text was kept` : ""}.
-            {content.source === "fetched" ? <> Text cut short? {copyLink}</> : null}
           </p>
           {/* The text is here: replacing it is rare, so it stays folded. */}
           <details className="text-options">

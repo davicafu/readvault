@@ -15,6 +15,7 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 - **S8** (L4) "cuadno fredium falla quiero que se de la posibilidad de archive.org o mostrar el mensaje para que se descargue y se cargue la web".
 - **S9** (L4) "borra todo y carga la lista nueva completa".
 - **S10** (L4) "la version mobile no esta adaptada, hazla tambien".
+- **S11** (L5) "en los tag sugeridos no esta muy bien alineado, salta una linea, revisalo"; "la barra del menu superiro se deberia adaptar al ancho de la pantalla, proqeu sobra mucho de la derecha"; "el try another copy deberia ser solo con textos cortados o que no fue bien no? me sale la opcoin para un texto de 1700 words".
 
 ## Tasks
 
@@ -29,6 +30,7 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 | T7 | S8 | inline | done | Failed and incomplete notices keep the upload instructions and add "open the page on archive.org" (latest snapshot, new tab) next to Try another copy; tsc passes; screenshot of a failed Udemy article at 390 px |
 | T8 | S9 | inline | done (data, no commit) | Dev database dumped (pg_dump -Fc, 9 tables) and exported to JSON in the scratchpad first; articles, collections, tags, texts, images and queue truncated (user kept); bookmarks_11_11_26.collections.html imported: 489 inserted, 9 collections, 489 queued for download |
 | T9 | S10 | inline | done | At 390 px: menu as four equal tabs (icon over label), folders lower and closer, reading column pinned to the page width (a code block had widened the page to 809 px), wide tables scroll, sort choices on one sliding line. Page width 390 on the front page, search, article, collections, add and import; desktop at 1300 px unchanged |
+| T10 | S11 | inline | done | Suggested tags wrap beside their label (+ postgres under + sql, not under the label). Menu: the phone rules came before the base .nav rules and lost to them, so T9's four equal tabs never applied; moved after them: tabs span 16-374 px at 390 and 16-414 at 430, desktop at 1300 unchanged. Try another copy dropped from complete texts (1,729-word article shows none); kept on failed and incomplete. tsc passes |
 
 ## Log
 
@@ -36,3 +38,4 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 - L2 (2026-11-13, user answer): "Archive, automatic + link (Recommended)".
 - L3 (2026-11-13, user): "- el fade final inferior ahroa se nota demasiado, que sea una mezcla entre los dos ultimos intentos - fredium me valdria para articulos de: New york time, whashington post, the atheltic, economist, bloomberg, reuters o quora"
 - L4 (2026-11-13, user): "cuadno fredium falla quiero que se de la posibilidad de archive.org o mostrar el mensaje para que se descargue y se cargue la web - borra todo y carga la lista nueva completa - la version mobile no esta adaptada, hazla tambien"
+- L5 (2026-11-13, user): "casi perfecta la versión movil: - en los tag sugeridos no esta muy bien alineado, salta una linea, revisalo - la barra del menu superiro se deberia adaptar al ancho de la pantalla, proqeu sobra mucho de la derecha - el try another copy deberia ser solo con textos cortados o que no fue bien no? me sale la opcoin para un texto de 1700 words"

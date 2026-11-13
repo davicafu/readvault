@@ -190,17 +190,19 @@ export function ArticleEditor({
           {suggestedTags.length > 0 ? (
             <div className="suggestions">
               <span className="fine-print">Suggested:</span>
-              {suggestedTags.map((s) => (
-                <button
-                  key={s.slug}
-                  type="button"
-                  className="suggestion"
-                  onClick={() => setTags([...tags, s.name])}
-                  aria-label={`Add suggested tag ${s.name}`}
-                >
-                  + {s.name}
-                </button>
-              ))}
+              <span className="suggestion-list">
+                {suggestedTags.map((s) => (
+                  <button
+                    key={s.slug}
+                    type="button"
+                    className="suggestion"
+                    onClick={() => setTags([...tags, s.name])}
+                    aria-label={`Add suggested tag ${s.name}`}
+                  >
+                    + {s.name}
+                  </button>
+                ))}
+              </span>
             </div>
           ) : null}
           {tagsError ? <p className="field-error">{tagsError}</p> : null}
