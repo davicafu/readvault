@@ -131,3 +131,7 @@ The JSON export (**Export JSON** in the web app, or `GET /api/export`) is a read
 | `npm: command not found` | Install Node.js 22 or later and make sure it is on `PATH` |
 | The import says the file is too large | Raise `MAX_UPLOAD_BYTES`, or export a smaller bookmarks folder |
 | Integration tests fail with `TEST_DATABASE_URL (or DATABASE_URL) must be set` | Run them with `make test-integration`, which reads `.env`, or set `TEST_DATABASE_URL` to a database whose user may create databases |
+
+## License
+
+ReadVault is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md): you may use, change and share it for any noncommercial purpose, such as personal use, study, research or a hobby, and charities, schools and public bodies may use it too. Selling it or using it to make money is not allowed without the author's permission. Brand logos on tags come from [Simple Icons](https://simpleicons.org) (CC0 data); the marks belong to their owners.
