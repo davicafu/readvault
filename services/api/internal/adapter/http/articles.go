@@ -23,6 +23,7 @@ type LibraryService interface {
 	CreateCollection(ctx context.Context, userID, name string) (library.Collection, error)
 	RenameCollection(ctx context.Context, userID, collectionID, name string) (library.Collection, error)
 	DeleteCollection(ctx context.Context, userID, collectionID string) error
+	Delete(ctx context.Context, userID, articleID string) error
 	Suggest(ctx context.Context, userID, articleID string) (library.Suggestions, error)
 }
 
@@ -179,6 +180,16 @@ func (h *articleHandler) renameCollection(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, c)
+}
+
+// remove serves DELETE /api/articles/{id}: the article goes for good, with
+// its tags, saved text and images.
+func (h *articleHandler) remove(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.Delete(r.Context(), h.ownerID, r.PathValue("id")); err != nil {
+		h.fail(w, r, err, http.StatusBadRequest, "invalid_request", "the request is not valid")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // deleteCollection serves DELETE /api/collections/{id}. The collection's

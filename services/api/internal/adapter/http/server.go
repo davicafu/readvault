@@ -66,6 +66,7 @@ func NewHandler(deps Deps) http.Handler {
 		mux.HandleFunc("GET /api/articles", h.list)
 		mux.HandleFunc("GET /api/articles/{id}", h.get)
 		mux.HandleFunc("PATCH /api/articles/{id}", h.update)
+		mux.HandleFunc("DELETE /api/articles/{id}", h.remove)
 		mux.HandleFunc("GET /api/articles/{id}/suggestions", h.suggestions)
 		mux.HandleFunc("GET /api/export", h.export)
 		mux.HandleFunc("GET /api/tags", h.tags)

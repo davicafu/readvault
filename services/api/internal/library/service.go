@@ -258,6 +258,19 @@ func (s *Service) Get(ctx context.Context, userID, articleID string) (Article, e
 	return a, err
 }
 
+// Delete deletes one of the user's articles for good, with its tags,
+// saved text, images and queued download.
+func (s *Service) Delete(ctx context.Context, userID, articleID string) error {
+	if !uuidPattern.MatchString(articleID) {
+		return ErrNotFound
+	}
+	err := s.repo.Delete(ctx, userID, articleID)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return fmt.Errorf("deleting article: %w", err)
+	}
+	return err
+}
+
 // Suggest suggests a collection and tags for one of the user's articles from
 // its content, among the user's own collections and tags. See Suggest.
 func (s *Service) Suggest(ctx context.Context, userID, articleID string) (Suggestions, error) {

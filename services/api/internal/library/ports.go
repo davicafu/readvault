@@ -38,6 +38,10 @@ type Repository interface {
 	// RenameCollection renames one collection of the user, or returns
 	// ErrCollectionNotFound or ErrCollectionExists.
 	RenameCollection(ctx context.Context, userID, collectionID string, name tag.Tag) (Collection, error)
+	// Delete deletes one article of the user with its tags, saved text,
+	// images and queued download; ErrNotFound when the user has no such
+	// article.
+	Delete(ctx context.Context, userID, articleID string) error
 	// DeleteCollection deletes one collection of the user; its articles
 	// stay, without a collection. Returns ErrCollectionNotFound.
 	DeleteCollection(ctx context.Context, userID, collectionID string) error

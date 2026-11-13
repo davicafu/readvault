@@ -205,6 +205,10 @@ Send it as `application/json`. Every field is optional, but at least one is requ
 
 Returns the updated article. Field problem codes: `body/empty`, `collectionId/not_found` (no collection with that id for this user), `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
 
+### `DELETE /api/articles/{id}`
+
+Deletes the article for good, with its tags, saved text, images and queued download. A tag left without articles no longer appears in `GET /api/tags`. Returns `204`; `404 not_found` when the user has no such article (including a malformed id). Importing the same URL again saves it as a new article.
+
 ### `GET /api/articles/{id}/suggestions`
 
 Suggests a collection and tags for one article from its content: its title, the words of its URL and its saved text, when it has one (the first 200,000 characters). Nothing is changed; apply a suggestion with `PATCH /api/articles/{id}`.

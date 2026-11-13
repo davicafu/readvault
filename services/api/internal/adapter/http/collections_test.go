@@ -2,6 +2,7 @@ package http_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -151,5 +152,28 @@ func TestListArticles_PassesTheCollectionFilter(t *testing.T) {
 
 	if svc.gotParams.Collection != "reading" {
 		t.Errorf("collection = %q, want reading", svc.gotParams.Collection)
+	}
+}
+
+func (s *stubLibrary) Delete(_ context.Context, userID, id string) error {
+	s.gotUser, s.gotID = userID, id
+	return s.err
+}
+
+func TestDeleteArticle_ForTheServerOwner(t *testing.T) {
+	t.Parallel()
+	svc := &stubLibrary{}
+	rec := send(t, svc, http.MethodDelete, "/api/articles/a1", "")
+	if rec.Code != http.StatusNoContent || rec.Body.Len() != 0 || svc.gotID != "a1" || svc.gotUser != testOwner {
+		t.Errorf("delete: status %d id %q user %q body %q", rec.Code, svc.gotID, svc.gotUser, rec.Body.String())
+	}
+
+	rec = send(t, &stubLibrary{err: library.ErrNotFound}, http.MethodDelete, "/api/articles/a9", "")
+	if rec.Code != http.StatusNotFound || errorCode(t, rec) != "not_found" {
+		t.Errorf("missing: status %d code %q", rec.Code, errorCode(t, rec))
+	}
+	rec = send(t, &stubLibrary{err: errors.New("db down")}, http.MethodDelete, "/api/articles/a1", "")
+	if rec.Code != http.StatusInternalServerError || errorCode(t, rec) != "internal" {
+		t.Errorf("failure: status %d code %q", rec.Code, errorCode(t, rec))
 	}
 }

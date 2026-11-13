@@ -41,6 +41,7 @@ export function ArticleEditor({
   const [failure, setFailure] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, startSaving] = useTransition();
+  const [deleting, setDeleting] = useState(false);
 
   const problemFor = (field: string) => problems.find((p) => p.field === field)?.message;
 
@@ -94,6 +95,24 @@ export function ArticleEditor({
         }
       }
     });
+  };
+
+  // Deleting is for good: the article goes with its tags and saved text.
+  // Afterwards the page goes back to the article's collection.
+  const remove = async () => {
+    if (!window.confirm(`Delete “${title || "Untitled bookmark"}”? Its tags and saved text go with it. This cannot be undone.`)) return;
+    setDeleting(true);
+    setFailure(null);
+    try {
+      const res = await fetch(`/api/articles/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 404) await readJSON(res);
+      const slug = collections?.find((c) => c.id === initialCollection)?.slug;
+      router.push(slug ? `/?collection=${encodeURIComponent(slug)}` : "/");
+      router.refresh();
+    } catch {
+      setFailure("The article could not be deleted. Try again in a moment.");
+      setDeleting(false);
+    }
   };
 
   // A suggestion is offered until it is in the form; nothing is saved
@@ -235,6 +254,9 @@ export function ArticleEditor({
           <span role="status" aria-live="polite">
             {saved ? <span className="saved">Changes saved</span> : null}
           </span>
+          <button className="button button-danger actions-end" type="button" onClick={remove} disabled={deleting || saving}>
+            {deleting ? "Deleting…" : "Delete article"}
+          </button>
         </div>
         {failure ? (
           <p className="field-error" role="alert">

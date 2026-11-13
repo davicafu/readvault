@@ -92,6 +92,19 @@ func (r *LibraryRepository) RenameCollection(ctx context.Context, userID, collec
 	return c, nil
 }
 
+// Delete implements library.Repository. The foreign keys remove the
+// article's tags, saved text, images and queued download with it.
+func (r *LibraryRepository) Delete(ctx context.Context, userID, articleID string) error {
+	res, err := r.pool.Exec(ctx, `DELETE FROM articles WHERE user_id = $1 AND id = $2`, userID, articleID)
+	if err != nil {
+		return fmt.Errorf("deleting article: %w", err)
+	}
+	if res.RowsAffected() == 0 {
+		return library.ErrNotFound
+	}
+	return nil
+}
+
 // DeleteCollection implements library.Repository. The foreign key clears
 // collection_id on the collection's articles.
 func (r *LibraryRepository) DeleteCollection(ctx context.Context, userID, collectionID string) error {
