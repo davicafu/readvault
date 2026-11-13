@@ -17,8 +17,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${literata.variable} ${schibsted.variable}`}>
+    <html lang="en" className={`${literata.variable} ${schibsted.variable}`} suppressHydrationWarning>
       <body>
+        {/* Marks the page once its first frame is on screen, so entrances
+            start when they can be seen rather than while the page is still
+            loading (see .folder in globals.css). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "requestAnimationFrame(function(){requestAnimationFrame(function(){document.documentElement.dataset.painted=''})})",
+          }}
+        />
         <div className="backdrop" aria-hidden="true">
           <span />
           <span />

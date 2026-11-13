@@ -4,7 +4,6 @@ import { Suspense, type CSSProperties } from "react";
 import { hostname, type Article, type Collection, type TagCount } from "@/lib/api";
 
 import { CollectionIcon, hueStyle } from "./CollectionIcon";
-import { PixelFilters } from "./PixelFilters";
 import { TagLogo } from "./TagLogo";
 
 // latest resolves to the collection's newest articles, or null when they
@@ -42,7 +41,6 @@ export function BrowseHome({
           </div>
         ) : (
           <>
-            <PixelFilters />
             <ul className="shelf-grid">
               {shelves.map((s, i) => (
                 <FolderCard key={s.collection.id} shelf={s} index={i} />
@@ -111,6 +109,7 @@ export function BrowseHome({
 function FolderCard({ shelf: { collection: c, latest }, index }: { shelf: CollectionShelf; index: number }) {
   return (
     <li className="folder" style={{ ...hueStyle(c), "--i": index } as CSSProperties}>
+      <span className="folder-dust" aria-hidden="true" />
       <span className="folder-glow" aria-hidden="true" />
       <span className="folder-back" aria-hidden="true" />
       <Suspense fallback={null}>

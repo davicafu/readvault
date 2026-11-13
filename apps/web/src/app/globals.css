@@ -1790,73 +1790,64 @@ body:has(.article-with-toc) .masthead-inner {
   position: relative;
   height: 17rem;
   isolation: isolate;
-  animation: folder-in 1300ms linear backwards;
-  animation-delay: calc(min(var(--i, 0), 11) * 100ms);
   transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* The folder gathers from tiny sparks: a few bright dots, then more and
-   more until it is whole (filters in PixelFilters.tsx). Filters do not
-   blend, so each step holds until the next. */
-@keyframes folder-in {
-  0% {
-    opacity: 0;
-    filter: url(#rv-dust-1) brightness(1.9);
-  }
-  6% {
-    opacity: 1;
-    filter: url(#rv-dust-1) brightness(1.9);
-  }
-  12.2% {
-    filter: url(#rv-dust-2) brightness(1.83);
-  }
-  18.3% {
-    filter: url(#rv-dust-3) brightness(1.76);
-  }
-  24.5% {
-    filter: url(#rv-dust-4) brightness(1.69);
-  }
-  30.6% {
-    filter: url(#rv-dust-5) brightness(1.62);
-  }
-  36.8% {
-    filter: url(#rv-dust-6) brightness(1.55);
-  }
-  42.9% {
-    filter: url(#rv-dust-7) brightness(1.48);
-  }
-  49.1% {
-    filter: url(#rv-dust-8) brightness(1.42);
-  }
-  55.2% {
-    filter: url(#rv-dust-9) brightness(1.35);
-  }
-  61.4% {
-    filter: url(#rv-dust-10) brightness(1.28);
-  }
-  67.5% {
-    filter: url(#rv-dust-11) brightness(1.21);
-  }
-  73.7% {
-    filter: url(#rv-dust-12) brightness(1.14);
-  }
-  79.8% {
-    filter: url(#rv-dust-13) brightness(1.07);
-  }
-  86% {
-    filter: url(#rv-dust-14);
-  }
-  92%,
-  100% {
-    filter: none;
+/* The folder gathers from tiny sparks: a veil of bright dots in its colour
+   closes in and fades as the folder shows through it. Only opacity and
+   transform move, and the dots are a still image, so the browser runs it
+   off the main thread: it keeps its pace while the page is still loading
+   its scripts. */
+.folder > :not(.folder-dust, .folder-glow) {
+  animation: folder-solid 1300ms cubic-bezier(0.4, 0, 0.2, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 11) * 100ms);
+}
+
+/* Held until the first frame is on screen (layout.tsx), so none of it plays
+   unseen. Without scripts it runs at once. */
+@media (scripting: enabled) {
+  html:not([data-painted]) .folder > * {
+    animation-play-state: paused;
   }
 }
 
-.pixel-filters {
+@keyframes folder-solid {
+  0%,
+  30% {
+    opacity: 0;
+  }
+}
+
+.folder-dust {
   position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
+  inset: 0.4rem 0 0;
+  z-index: 3;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #fff, hsl(var(--hue, 210) 90% 72%));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='1' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 40 0 0 0 -26'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 240px 240px repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='1' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 40 0 0 0 -26'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 240px 240px repeat;
+  opacity: 0;
+  pointer-events: none;
+  animation: folder-dust 1300ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 11) * 100ms);
+}
+
+@keyframes folder-dust {
+  0% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+  25% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
 }
 
 .folder:hover,
@@ -2033,6 +2024,10 @@ body:has(.article-with-toc) .masthead-inner {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .folder-dust {
+    display: none;
+  }
+
   .folder,
   .folder-glow,
   .folder-sheet,
