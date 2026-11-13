@@ -1689,7 +1689,7 @@ body:has(.article-with-toc) .masthead-inner {
   .prose > * {
     animation: scroll-reveal linear both;
     animation-timeline: view();
-    animation-range: entry 0% cover 35%;
+    animation-range: entry 0% cover 25%;
   }
 
   .prose > * {
@@ -1700,15 +1700,15 @@ body:has(.article-with-toc) .masthead-inner {
 @keyframes scroll-reveal {
   from {
     opacity: 0;
-    translate: 0 4rem;
-    scale: 0.92;
+    translate: 0 3.25rem;
+    scale: 0.94;
   }
 }
 
 @keyframes scroll-reveal-soft {
   from {
     opacity: 0;
-    translate: 0 1.75rem;
+    translate: 0 1.4rem;
   }
 }
 
