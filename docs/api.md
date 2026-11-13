@@ -172,7 +172,7 @@ Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lo
 
 | Parameter | Meaning |
 |---|---|
-| `q` | Matches words of the title and URL, and any part of the title, URL or a tag name. Up to 200 characters |
+| `q` | Matches words of the title and URL, and any part of the title, URL or a tag name. `-word` leaves out articles with a word and `"exact words"` matches a phrase. Up to 200 characters |
 | `tag` | Keeps articles that have this tag (name or slug). Repeat it to require several tags, up to 10 |
 | `collection` | Keeps the articles of this collection (name or slug); an unknown collection gives an empty list, and a blank value is ignored |
 | `text` | Keeps the articles whose saved text is `complete`, `incomplete` (a paid preview), `failed` (the download failed and nothing was saved) or `missing` (never downloaded); any other value is `text/invalid` |
@@ -240,7 +240,7 @@ A collection groups articles. An article is in at most one collection; its tags 
 { "id": "0b6f4c1e-5b3a-4a52-9a49-3f1d2b7c8e10", "name": "Reading", "slug": "reading", "articles": 12 }
 ```
 
-Names follow the tag rules: spaces are collapsed, up to 64 characters, and the slug (lowercase, spaces as hyphens) is unique per user. Field problem codes: `name/required`, `name/too_long`, `name/invalid`.
+A new library starts with nine collections (AI and tools, Architecture and system design, Backend, Data engineering, Databases and SQL, DevOps, cloud and Linux, Frontend and visualization, Machine learning and analytics, Streaming and Kafka), which can be renamed or deleted like any other. Names follow the tag rules: spaces are collapsed, up to 64 characters, and the slug (lowercase, spaces as hyphens) is unique per user. Field problem codes: `name/required`, `name/too_long`, `name/invalid`.
 
 ### `GET /api/collections`
 

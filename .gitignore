@@ -23,3 +23,6 @@ next-env.d.ts
 .atl/
 *.tsbuildinfo
 next-env.d.ts
+
+# Personal bookmarks exports (private data; fixtures/ holds the sample)
+/bookmarks_*

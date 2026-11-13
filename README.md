@@ -1,8 +1,21 @@
 # ReadVault
 
-ReadVault is a private library for the articles you save to read. Import your browser bookmarks, find articles by title, address or tag, edit titles and tags, and export everything as JSON.
+ReadVault is a private library for the articles you save to read. Import your browser bookmarks, keep each article's text to read later, organise articles in collections and tags, find them again, and export everything as JSON.
 
 It runs locally: a Go API, PostgreSQL in Docker and a Next.js web app. It needs no AI keys and no Medium credentials.
+
+## Features
+
+- **Import bookmarks** from a browser export (Chrome, Firefox, Safari, Edge) with a preview first, or add a single link. Collections and tags are suggested from the bookmark folders and can be changed before importing. Importing the same file again adds nothing twice.
+- **Saved text**: each article's text is downloaded as Markdown with its images, in the background after an import or one by one. Medium articles that Medium refuses are read from a mirror. When a download fails, upload the page saved from your browser (HTML) or a Markdown file instead.
+- **Reading**: an article page shows the saved text with a table of contents and a reading progress bar.
+- **Collections**: nine to start with, which you can rename, delete or add to. Each collection gets an icon and a colour from its name. An article is in one collection at most.
+- **Tags**: any number per article, shown with the logo of the technology they name or an icon for their subject.
+- **Suggestions**: an article page suggests a collection and tags from its content, among your own.
+- **Search** from the header on every page (press `/`): by title, address or tag, `:name` to search one collection, `-word` to leave a word out, `"exact words"` for a phrase. Results can be filtered by collection, tag and saved text, and ordered.
+- **Front page**: your collections as folders with their latest articles, the articles added last and your tags.
+- **Clean up**: delete one article for good, or free space by deleting the saved texts of every article or of one collection (the articles stay).
+- **Export** everything as JSON, and back up the database with `pg_dump`.
 
 ## Quick start
 
@@ -67,7 +80,7 @@ The defaults are for local development. In production, pass the variables from y
 browser ──> apps/web (Next.js, :3000) ──/api/*──> services/api (Go, :8080) ──> Postgres (Docker)
 ```
 
-- `services/api`: the Go API. Code is grouped by domain (`internal/importing`, `internal/library`, `internal/urlnorm`, `internal/tag`), with adapters in `internal/adapter/http` and `internal/adapter/postgres`. Migrations are in `services/api/migrations` and are embedded in the binaries.
+- `services/api`: the Go API. Code is grouped by domain (`internal/importing`, `internal/library`, `internal/content` for saved texts and downloads, `internal/urlnorm`, `internal/tag`), with adapters in `internal/adapter/http`, `internal/adapter/postgres` and `internal/adapter/fetch` (article downloads). Migrations are in `services/api/migrations` and are embedded in the binaries.
 - `apps/web`: the web app. Server components read the API directly. The browser goes through the `/api/*` route handler, so there is a single origin. Brand settings are in `apps/web/src/config/brand.ts`.
 - `deploy/compose.yaml`: Postgres for local development.
 - `fixtures/bookmarks.html`: a sample export with nested folders, tags, tracking parameters, a duplicate, Unicode titles and entries that cannot be imported.
@@ -86,9 +99,15 @@ Until accounts exist, everything belongs to a fixed development owner created by
 
 ## Organizing the library
 
-The search box is in the page header on every page (press `/` to jump to it); on a collection it searches that collection. Type `:` and a collection's name to search in it, `-word` to leave out articles with a word, and `"exact words"` to match a phrase. **Library** in the header lists every article; the ReadVault name goes back to the front page. The front page shows your collections as folders with their latest articles, the most recently added articles and your tags, so you can browse and discover what you saved. Open a collection to see its articles and move to the others from its header; **All articles** lists everything. Searching shows the results, which you can order, with **Collections** and **Tags** panels beside them. A collection groups articles; each article is in one collection at most and keeps its tags. The library starts with nine collections (AI and tools, Architecture and system design, Backend, Data engineering, Databases and SQL, DevOps, cloud and Linux, Frontend and visualization, Machine learning and analytics, Streaming and Kafka). Create, rename and delete collections on the **Collections** page, and pick an article's collection on its page. Each collection gets an icon and a colour picked from the words of its name, and each tag the logo of the technology it names (from [Simple Icons](https://simpleicons.org), CC0 data; the marks belong to their owners) or else an icon for its subject. Alternative collection card designs to compare are at `/lab/shelves`. Deleting a collection keeps its articles. An article can be deleted for good from its page (**Delete article**), with its tags and saved text. Adding articles (one link, or a bookmarks file) is on the **Add articles** page. A single link has its text downloaded right after it is saved; the articles of a bookmarks file that have no text yet are downloaded in the background, a few at a time, and keep downloading if you close the page. If a download fails, the link is still saved and its page offers to try again. A Medium article that Medium refuses (such as a 403) or shows only as a paid preview is read from Freedium instead; set `ARTICLE_MIRROR_URL` to change the mirror or to `off`.
-
-An article's page shows its saved text with a table of contents built from its headings (two or more) and a thin bar at the top that fills as you read. It also suggests a collection and up to five tags from its content: its title, the words of its address and its saved text. Only your own collections and tags are suggested. The collection comes from the most similar articles in your library, and the tags are ones named in the article or carried by similar articles. Click a suggestion to put it in the form; nothing changes until you save.
+- **Front page**: the ReadVault name in the header goes back to it. It shows your collections as folders with their latest articles, the most recently added articles and your tags. The folders gather in from a veil of sparks as the page opens, and entries fade in as you scroll (both are off when your system asks for reduced motion).
+- **Library**: **Library** in the header lists every article. Opening a collection lists its articles, with the other collections in its header. Search results can be ordered and narrowed with the **Collections** and **Tags** panels beside them.
+- **Search**: the search box is in the page header on every page; press `/` to jump to it. On a collection it searches that collection. Type `:` and a collection's name to search in it (pick it from the list with the arrow keys and Enter), `-word` to leave out articles with a word, and `"exact words"` to match a phrase.
+- **Collections**: a collection groups articles; each article is in one collection at most and keeps its tags. The library starts with nine collections: AI and tools, Architecture and system design, Backend, Data engineering, Databases and SQL, DevOps, cloud and Linux, Frontend and visualization, Machine learning and analytics, Streaming and Kafka. Create, rename and delete collections on the **Collections** page, and pick an article's collection on its page. Deleting a collection keeps its articles.
+- **Icons and colours**: each collection gets an icon and a colour picked from the words of its name. Each tag shows the logo of the technology it names (from [Simple Icons](https://simpleicons.org), CC0 data; the marks belong to their owners), or else an icon for its subject.
+- **Deleting an article**: **Delete article** on its page deletes it for good, with its tags and saved text, after a confirmation.
+- **Adding articles**: one link, or a bookmarks file, on the **Add articles** page. A single link has its text downloaded right after it is saved. The articles of a bookmarks file that have no text yet are downloaded in the background, a few at a time, and keep downloading if you close the page. If a download fails, the link is still saved and its page offers to try again. A Medium article that Medium refuses (such as a 403) or shows only as a paid preview is read from Freedium instead; set `ARTICLE_MIRROR_URL` to change the mirror or to `off`.
+- **Article page**: the saved text with a table of contents built from its headings (two or more) and a thin bar at the top that fills as you read. It also suggests a collection and up to five tags from its content: its title, the words of its address and its saved text. Only your own collections and tags are suggested; the collection comes from the most similar articles in your library, and the tags are ones named in the article or carried by similar articles. Click a suggestion to put it in the form; nothing changes until you save.
+- **Card designs**: alternative designs for the collection cards, to compare, are at `/lab/shelves`.
 
 ## Article text
 
