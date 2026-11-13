@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 
 import { brand } from "@/config/brand";
+import { NavIcon } from "./NavIcon";
 import { HeaderSearch } from "./HeaderSearch";
 import "./globals.css";
 
@@ -43,16 +44,26 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <nav aria-label="Main">
               <ul className="nav">
                 <li>
-                  <Link href="/?view=all">Library</Link>
+                  <Link href="/?view=all">
+                    <NavIcon name="library" />
+                    Library
+                  </Link>
                 </li>
                 <li>
-                  <Link href="/collections">Collections</Link>
+                  <Link href="/collections">
+                    <NavIcon name="collections" />
+                    Collections
+                  </Link>
                 </li>
                 <li>
-                  <Link href="/add">Add articles</Link>
+                  <Link href="/add">
+                    <NavIcon name="add" />
+                    Add articles
+                  </Link>
                 </li>
                 <li>
                   <a href="/api/export" download>
+                    <NavIcon name="export" />
                     Export JSON
                   </a>
                 </li>

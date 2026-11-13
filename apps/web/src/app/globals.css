@@ -574,8 +574,18 @@ body::before {
 }
 
 .nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   text-decoration: none;
   color: var(--ink-soft);
+}
+
+.nav-icon {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  opacity: 0.85;
 }
 
 .nav a:hover,
