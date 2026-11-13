@@ -57,6 +57,7 @@ export const downloadProblems: Record<string, string> = {
   not_html: "the address is not a web page",
   too_large: "the page is too large",
   no_text: "the page holds no article text",
+  no_copy: "no other copy of the article was found",
 };
 
 export type ArticlePage = { items: Article[]; nextCursor: string | null };

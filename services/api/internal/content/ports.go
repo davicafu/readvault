@@ -143,6 +143,8 @@ const (
 	ProblemNotHTML        = "not_html"
 	ProblemTooLarge       = "too_large"
 	ProblemNoText         = "no_text"
+	// ProblemNoCopy: no other copy of the article holds its whole text.
+	ProblemNoCopy = "no_copy"
 )
 
 // FetchError is a failed download, with a stable problem code.

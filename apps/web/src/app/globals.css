@@ -1483,6 +1483,27 @@ body:has(.article-with-toc) .masthead-inner {
 }
 
 /* Replacing a saved text is rare: its buttons stay folded. */
+/* A text-like button for a quiet, secondary action. */
+.link-quiet {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+
+.link-quiet:hover:not([disabled]) {
+  color: var(--ink);
+}
+
+.link-quiet[disabled] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
 .text-options > summary {
   width: fit-content;
   color: var(--ink-soft);

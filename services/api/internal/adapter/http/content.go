@@ -16,6 +16,7 @@ type ContentService interface {
 	Get(ctx context.Context, userID, articleID string) (content.Content, error)
 	Upload(ctx context.Context, userID, articleID, fileName string, file io.Reader) (content.Content, error)
 	Fetch(ctx context.Context, userID, articleID string) (content.Content, error)
+	FetchCopy(ctx context.Context, userID, articleID string) (content.Content, error)
 	Image(ctx context.Context, userID, articleID, imageID string) (content.Image, error)
 	DownloadSummary(ctx context.Context, userID string) (content.DownloadSummary, error)
 	QueueMissing(ctx context.Context, userID string) (int, error)
@@ -102,9 +103,20 @@ func (h *contentHandler) upload(w http.ResponseWriter, r *http.Request) {
 }
 
 // fetch serves POST /api/articles/{id}/content/fetch: download the article
-// from its original URL.
+// from its original URL, or with ?from=copy from another copy only, without
+// asking the original site.
 func (h *contentHandler) fetch(w http.ResponseWriter, r *http.Request) {
-	c, err := h.svc.Fetch(r.Context(), h.ownerID, r.PathValue("id"))
+	fetch := h.svc.Fetch
+	switch r.URL.Query().Get("from") {
+	case "":
+	case "copy":
+		fetch = h.svc.FetchCopy
+	default:
+		writeErrorDetails(w, http.StatusBadRequest, "invalid_query", "the query parameters are not valid",
+			[]map[string]string{{"field": "from", "code": "invalid", "message": `from must be "copy" or absent`}})
+		return
+	}
+	c, err := fetch(r.Context(), h.ownerID, r.PathValue("id"))
 	if err != nil {
 		h.fail(w, r, err)
 		return

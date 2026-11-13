@@ -44,6 +44,7 @@ type Service struct {
 	maxPageBytes int64
 	mirror       string
 	mirrorServes func(ctx context.Context, rawURL string) bool
+	archive      string
 }
 
 // Option configures a Service.
@@ -59,6 +60,14 @@ func WithMirror(prefix string, serves func(ctx context.Context, rawURL string) b
 		s.mirror = prefix
 		s.mirrorServes = serves
 	}
+}
+
+// WithArchive makes Fetch fall back to an archived copy of the page, after
+// the mirror, for any site. The archive address is prefix followed by the
+// original URL, as in https://web.archive.org/web/2id_/https://example.com/...
+// An empty prefix means no archive.
+func WithArchive(prefix string) Option {
+	return func(s *Service) { s.archive = prefix }
 }
 
 // NewService returns a Service. maxPageBytes bounds an uploaded file and a
@@ -130,8 +139,8 @@ func (s *Service) Upload(ctx context.Context, userID, articleID, fileName string
 
 // Fetch downloads the article from its original URL and saves its text. A
 // page that says it is a paid preview is saved as incomplete. When the page
-// fails or is a paid preview and a mirror is configured, the mirror's copy is
-// saved instead if it holds the whole text. A failed download keeps any saved
+// fails or is a paid preview, another copy is saved instead if one holds the
+// whole text: the mirror's for the pages it serves, then the archive's. A failed download keeps any saved
 // text, is recorded and is returned as *FetchError.
 func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content, error) {
 	if !uuidPattern.MatchString(articleID) {
@@ -142,10 +151,10 @@ func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content,
 		return Content{}, err
 	}
 
-	ex, fe := s.download(ctx, rawURL)
-	if s.useMirror(ctx, rawURL, ex, fe) {
-		if mex, mfe := s.download(ctx, s.mirror+rawURL); mfe == nil && !mex.Paywalled {
-			ex, fe = mex, nil
+	ex, fe := s.download(ctx, rawURL, nil)
+	if s.mayAskCopies(ctx, rawURL, ex, fe) {
+		if cex, ok := s.fromCopies(ctx, rawURL); ok {
+			ex, fe = cex, nil
 		}
 	}
 	if fe != nil {
@@ -160,6 +169,28 @@ func (s *Service) Fetch(ctx context.Context, userID, articleID string) (Content,
 		status = StatusIncomplete
 	}
 	return s.save(ctx, userID, articleID, ex, status, SourceFetched)
+}
+
+// FetchCopy saves the text of another copy of the article, the mirror's or
+// the archive's, without asking the original site: for a text that came out
+// cut short. When no copy holds the whole text it returns a *FetchError
+// with ProblemNoCopy and keeps whatever was saved, recording nothing.
+func (s *Service) FetchCopy(ctx context.Context, userID, articleID string) (Content, error) {
+	if !uuidPattern.MatchString(articleID) {
+		return Content{}, ErrNotFound
+	}
+	rawURL, err := s.repo.ArticleURL(ctx, userID, articleID)
+	if err != nil {
+		return Content{}, err
+	}
+	if s.isCopyAddress(rawURL) {
+		return Content{}, &FetchError{Problem: ProblemNoCopy}
+	}
+	ex, ok := s.fromCopies(ctx, rawURL)
+	if !ok {
+		return Content{}, &FetchError{Problem: ProblemNoCopy}
+	}
+	return s.save(ctx, userID, articleID, ex, StatusComplete, SourceFetched)
 }
 
 // DownloadSummary counts the user's articles by the state of their text.
@@ -203,34 +234,60 @@ func (s *Service) downloadMissing(ctx context.Context, userID, articleID string)
 	return err
 }
 
-// useMirror says whether the mirror may help: a mirror is configured, the
-// download was not cancelled, and the site answered without the article (an
-// HTTP error such as 403, a page without text, or a paid preview), and the
-// mirror serves the article. An address that did not resolve or answer, or
-// that the fetcher refused, may be a private or intranet host and never
-// leaves the machine. An address already on the mirror is not sent to it
-// again.
-func (s *Service) useMirror(ctx context.Context, rawURL string, ex Extracted, fe *FetchError) bool {
+// mayAskCopies says whether another copy may help: the download was not
+// cancelled and the site answered without the article (an HTTP error such
+// as 403, a page without text, or a paid preview). An address that did not
+// resolve or answer, or that the fetcher refused, may be a private or
+// intranet host and never leaves the machine. An address that is already a
+// copy is not sent for a copy again.
+func (s *Service) mayAskCopies(ctx context.Context, rawURL string, ex Extracted, fe *FetchError) bool {
 	switch {
-	case s.mirror == "" || ctx.Err() != nil || strings.HasPrefix(rawURL, s.mirror):
+	case ctx.Err() != nil || s.isCopyAddress(rawURL):
 		return false
 	case fe != nil && fe.Problem != ProblemHTTPStatus && fe.Problem != ProblemNoText:
 		return false
 	case fe == nil && !ex.Paywalled:
 		return false
 	}
-	return s.mirrorServes == nil || s.mirrorServes(ctx, rawURL)
+	return true
 }
 
-// download fetches one page and extracts its text.
-func (s *Service) download(ctx context.Context, rawURL string) (Extracted, *FetchError) {
+// fromCopies downloads the whole text from another copy: the mirror's, for
+// the pages it serves, then the archive's. A copy that is a paid preview too
+// does not count.
+func (s *Service) fromCopies(ctx context.Context, rawURL string) (Extracted, bool) {
+	if s.mirror != "" && (s.mirrorServes == nil || s.mirrorServes(ctx, rawURL)) {
+		if ex, fe := s.download(ctx, s.mirror+rawURL, nil); fe == nil && !ex.Paywalled {
+			return ex, true
+		}
+	}
+	if s.archive != "" && ctx.Err() == nil {
+		// The archived page is the original as it was: its relative links
+		// and images belong to the original site.
+		base, _ := url.Parse(rawURL)
+		if ex, fe := s.download(ctx, s.archive+rawURL, base); fe == nil && !ex.Paywalled {
+			return ex, true
+		}
+	}
+	return Extracted{}, false
+}
+
+func (s *Service) isCopyAddress(rawURL string) bool {
+	return (s.mirror != "" && strings.HasPrefix(rawURL, s.mirror)) || (s.archive != "" && strings.HasPrefix(rawURL, s.archive))
+}
+
+// download fetches one page and extracts its text. Links and images are
+// resolved against base, or against the page's own address when base is nil.
+func (s *Service) download(ctx context.Context, rawURL string, base *url.URL) (Extracted, *FetchError) {
 	pageCtx, cancel := context.WithTimeout(ctx, pageTimeout)
 	page, err := s.fetcher.Fetch(pageCtx, rawURL, s.maxPageBytes, []string{"text/html", "application/xhtml+xml"})
 	cancel()
 	if err != nil {
 		return Extracted{}, asFetchError(err)
 	}
-	base, _ := url.Parse(page.URL)
+	if base == nil {
+		base, _ = url.Parse(page.URL)
+	}
 	ex, err := FromHTML(bytes.NewReader(cleanText(page.Body)), base)
 	switch {
 	case err != nil:

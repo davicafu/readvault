@@ -60,3 +60,28 @@ func TestLoad_DownloadWorkers(t *testing.T) {
 		}
 	}
 }
+
+func TestLoad_ArticleArchive(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://example")
+
+	t.Setenv("ARTICLE_ARCHIVE_URL", "")
+	cfg, err := config.Load()
+	if err != nil || cfg.ArticleArchiveURL != "https://web.archive.org/web/2id_/" {
+		t.Errorf("unset: %q, %v; want the Wayback Machine by default", cfg.ArticleArchiveURL, err)
+	}
+
+	t.Setenv("ARTICLE_ARCHIVE_URL", "off")
+	if cfg, err = config.Load(); err != nil || cfg.ArticleArchiveURL != "" {
+		t.Errorf("off: %q, %v; want no archive", cfg.ArticleArchiveURL, err)
+	}
+
+	t.Setenv("ARTICLE_ARCHIVE_URL", "https://archive.example")
+	if cfg, err = config.Load(); err != nil || cfg.ArticleArchiveURL != "https://archive.example/" {
+		t.Errorf("without a path: %q, %v; want the slash added", cfg.ArticleArchiveURL, err)
+	}
+
+	t.Setenv("ARTICLE_ARCHIVE_URL", "archive.example")
+	if _, err := config.Load(); err == nil || !strings.Contains(err.Error(), "ARTICLE_ARCHIVE_URL") {
+		t.Errorf("error = %v, want ARTICLE_ARCHIVE_URL rejected", err)
+	}
+}

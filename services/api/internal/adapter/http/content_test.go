@@ -22,6 +22,7 @@ type stubContent struct {
 	gotID    string
 	gotImage string
 	gotName  string
+	gotCopy  bool
 	gotFile  string
 }
 
@@ -49,6 +50,11 @@ func (s *stubContent) Upload(_ context.Context, userID, articleID, fileName stri
 
 func (s *stubContent) Fetch(_ context.Context, userID, articleID string) (content.Content, error) {
 	s.gotUser, s.gotID = userID, articleID
+	return s.result(articleID)
+}
+
+func (s *stubContent) FetchCopy(_ context.Context, userID, articleID string) (content.Content, error) {
+	s.gotUser, s.gotID, s.gotCopy = userID, articleID, true
 	return s.result(articleID)
 }
 
@@ -198,4 +204,31 @@ func post_(path string) func(*testing.T) *http.Request {
 
 func upload_(name, body string) func(*testing.T) *http.Request {
 	return func(t *testing.T) *http.Request { return articleUpload(t, name, body) }
+}
+
+func TestContent_FetchFromAnotherCopy(t *testing.T) {
+	t.Parallel()
+	svc := &stubContent{}
+	rec := serveContent(t, svc, httptest.NewRequest(http.MethodPost, "/api/articles/a1/content/fetch?from=copy", nil))
+	if rec.Code != http.StatusOK || !svc.gotCopy || svc.gotID != "a1" || svc.gotUser != testOwner {
+		t.Errorf("status %d copy %v id %q; body %s", rec.Code, svc.gotCopy, svc.gotID, rec.Body.String())
+	}
+
+	svc = &stubContent{}
+	rec = serveContent(t, svc, httptest.NewRequest(http.MethodPost, "/api/articles/a1/content/fetch", nil))
+	if rec.Code != http.StatusOK || svc.gotCopy {
+		t.Errorf("plain fetch: status %d, used a copy: %v", rec.Code, svc.gotCopy)
+	}
+
+	rec = serveContent(t, &stubContent{}, httptest.NewRequest(http.MethodPost, "/api/articles/a1/content/fetch?from=elsewhere", nil))
+	if rec.Code != http.StatusBadRequest || errorCode(t, rec) != "invalid_query" {
+		t.Errorf("unknown source: status %d code %q", rec.Code, errorCode(t, rec))
+	}
+
+	rec = serveContent(t, &stubContent{err: &content.FetchError{Problem: content.ProblemNoCopy}}, httptest.NewRequest(http.MethodPost, "/api/articles/a1/content/fetch?from=copy", nil))
+	errBody, _ := decode(t, rec)["error"].(map[string]any)
+	details, _ := errBody["details"].(map[string]any)
+	if rec.Code != http.StatusBadGateway || errBody["code"] != "fetch_failed" || details["problem"] != "no_copy" {
+		t.Errorf("no copy: status %d body %s", rec.Code, rec.Body.String())
+	}
 }

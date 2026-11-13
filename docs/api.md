@@ -287,7 +287,11 @@ Saves the text of a file the user chose, sent as `multipart/form-data` in the `f
 
 ### `POST /api/articles/{id}/content/fetch`
 
-Downloads the article from its original URL and saves its text the same way. A page whose schema.org data says `isAccessibleForFree: false`, or that shows Medium's "Member-only story" label, is saved as `incomplete`. When a Medium article (on medium.com, a subdomain, or its own domain served by Medium, recognised by Medium's addresses in DNS) answers without the article (an HTTP error such as 403, or a page without text) or with a paid preview, the mirror's copy (`ARTICLE_MIRROR_URL`, Freedium by default, `off` to turn it off; the prefix followed by the article's URL) is downloaded the same way; if it has text and is not a paid preview, it is saved as `complete`, otherwise the original outcome stands. An article whose URL already starts with the prefix is not sent to the mirror again, and an address that did not resolve or answer, or that the API refuses to download (`blocked_address`), is never sent to it, since it may be a private or intranet host. On failure the answer is `502 fetch_failed` with `details.problem`:
+Downloads the article from its original URL and saves its text the same way. A page whose schema.org data says `isAccessibleForFree: false`, or that shows Medium's "Member-only story" label, is saved as `incomplete`. When a Medium article (on medium.com, a subdomain, or its own domain served by Medium, recognised by Medium's addresses in DNS) answers without the article (an HTTP error such as 403, or a page without text) or with a paid preview, the mirror's copy (`ARTICLE_MIRROR_URL`, Freedium by default, `off` to turn it off; the prefix followed by the article's URL) is downloaded the same way; if it has text and is not a paid preview, it is saved as `complete`, otherwise the original outcome stands. Any article, Medium or not, that answers the same way and that the mirror did not save is then looked up in the archive (`ARTICLE_ARCHIVE_URL`, the Wayback Machine by default, `off` to turn it off; the prefix followed by the article's URL), whose relative image addresses resolve against the original site. An article whose URL already starts with either prefix is not sent to a copy again, and an address that did not resolve or answer, or that the API refuses to download (`blocked_address`), is never sent to one, since it may be a private or intranet host.
+
+`?from=copy` skips the original and asks only the copies (mirror, then archive); the web app offers it as **Try another copy** when a download failed or saved a paid preview. A copy with text replaces the saved text; when no copy has text the answer is `502 fetch_failed` with problem `no_copy`, and the saved text and recorded download are left as they were. Any other `from` value is `400 invalid_query`.
+
+On failure the answer is `502 fetch_failed` with `details.problem`:
 
 | Problem | Meaning |
 |---|---|
@@ -298,6 +302,7 @@ Downloads the article from its original URL and saves its text the same way. A p
 | `not_html` | The answer is not an HTML page |
 | `too_large` | The page is larger than `MAX_ARTICLE_BYTES` |
 | `no_text` | The page holds no article text |
+| `no_copy` | `?from=copy` only: neither the mirror nor the archive has the article's text |
 
 A failed download keeps any saved text. Requests identify themselves as `ReadVault/0.1`.
 

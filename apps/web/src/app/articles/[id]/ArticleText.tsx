@@ -20,10 +20,10 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"download" | "upload" | null>(null);
+  const [busy, setBusy] = useState<"download" | "copy" | "upload" | null>(null);
   const [, startRefresh] = useTransition();
 
-  const run = async (kind: "download" | "upload", request: () => Promise<Response>) => {
+  const run = async (kind: "download" | "copy" | "upload", request: () => Promise<Response>) => {
     setBusy(kind);
     setFailure(null);
     try {
@@ -31,7 +31,11 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
     } catch (err) {
       if (err instanceof ApiError && err.code === "fetch_failed") {
         const d = err.details as { problem?: string; status?: number } | undefined;
-        setFailure(`The text could not be downloaded: ${problemText(d?.problem ?? null, d?.status)}.`);
+        setFailure(
+          d?.problem === "no_copy"
+            ? "No other copy of this article was found; the text you had is kept."
+            : `The text could not be downloaded: ${problemText(d?.problem ?? null, d?.status)}.`,
+        );
       } else if (err instanceof ApiError && err.code === "no_text") {
         setFailure("That file holds no article text. Choose the page you saved from the browser.");
       } else if (err instanceof ApiError && err.code === "file_too_large") {
@@ -47,6 +51,17 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
 
   const download = () =>
     run("download", () => fetch(`/api/articles/${articleId}/content/fetch`, { method: "POST" }));
+
+  // Another copy of the page, for a text that could not be read or came out
+  // cut short. Offered quietly: the download already tries one on its own.
+  const fromCopy = () =>
+    run("copy", () => fetch(`/api/articles/${articleId}/content/fetch?from=copy`, { method: "POST" }));
+
+  const copyLink = (
+    <button className="link-quiet" type="button" disabled={busy !== null} onClick={fromCopy}>
+      {busy === "copy" ? "Looking for another copy…" : "Try another copy"}
+    </button>
+  );
 
   const upload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -103,12 +118,14 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
             The download failed because {problemText(content.problem)}. {howToUpload}
           </p>
           {actions}
+          <p className="fine-print">{copyLink}</p>
         </div>
       ) : content.status === "incomplete" ? (
         <div className="notice notice-warn" role="alert">
           <h3>Only part of this article was saved</h3>
           <p>The page said the full text is for paying members, so this is a preview. {howToUpload}</p>
           {actions}
+          <p className="fine-print">{copyLink}</p>
         </div>
       ) : (
         <div className="reading-head">
@@ -119,6 +136,7 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
               ? `. ${content.missingImages} ${content.missingImages === 1 ? "image" : "images"} could not be saved`
               : ""}
             {content.problem ? `. The last download failed (${problemText(content.problem)}); this text was kept` : ""}.
+            {content.source === "fetched" ? <> Text cut short? {copyLink}</> : null}
           </p>
           {/* The text is here: replacing it is rare, so it stays folded. */}
           <details className="text-options">
