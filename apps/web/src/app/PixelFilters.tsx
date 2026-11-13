@@ -2,7 +2,7 @@
 // decides which pixels show, and each step lets more of them through. The
 // front page folders step through them, from a few sparks to whole, as they
 // appear. Every step uses the same noise, so dots that showed stay.
-export const DUST_THRESHOLDS = [0.72, 0.64, 0.57, 0.5, 0.42] as const;
+export const DUST_THRESHOLDS = [0.74, 0.69, 0.64, 0.6, 0.56, 0.52, 0.47, 0.42] as const;
 
 export function PixelFilters() {
   return (
