@@ -1,21 +1,19 @@
-// SVG filters that show an element as a mosaic of square blocks: each block
-// takes the colour of one pixel in its middle. The front page folders step
-// through them, from large blocks to sharp, as they appear.
-export const PIXEL_SIZES = [12, 8, 6, 4, 2] as const;
+// SVG filters that show an element as a scatter of tiny dots: a fine noise
+// decides which pixels show, and each step lets more of them through. The
+// front page folders step through them, from a few sparks to whole, as they
+// appear. Every step uses the same noise, so dots that showed stay.
+export const DUST_THRESHOLDS = [0.72, 0.64, 0.57, 0.5, 0.42] as const;
 
 export function PixelFilters() {
   return (
     <svg className="pixel-filters" width="0" height="0" aria-hidden="true" focusable="false">
       <defs>
-        {PIXEL_SIZES.map((n) => (
-          <filter key={n} id={`rv-px-${n}`} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
-            {/* One opaque pixel in the middle of an n×n tile, repeated. */}
-            <feFlood x={Math.floor(n / 2)} y={Math.floor(n / 2)} width="1" height="1" />
-            <feComposite width={n} height={n} />
-            <feTile result="grid" />
-            {/* Keep the source only at those pixels, then grow each into its block. */}
-            <feComposite in="SourceGraphic" in2="grid" operator="in" />
-            <feMorphology operator="dilate" radius={Math.floor(n / 2)} />
+        {DUST_THRESHOLDS.map((t, i) => (
+          <filter key={t} id={`rv-dust-${i + 1}`} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="1" seed="7" result="noise" />
+            {/* Alpha = 40 * noise - 40 * threshold: a sharp cut, so a pixel either shows or not. */}
+            <feColorMatrix in="noise" type="matrix" values={`0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  40 0 0 0 ${-40 * t}`} result="dots" />
+            <feComposite in="SourceGraphic" in2="dots" operator="in" />
           </filter>
         ))}
       </defs>

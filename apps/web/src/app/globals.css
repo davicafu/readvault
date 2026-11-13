@@ -1254,7 +1254,12 @@ a.tag:hover .tag-icon {
 .actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.75rem;
+}
+
+.actions-end {
+  margin-left: auto;
 }
 
 .fine-print {
@@ -1790,31 +1795,31 @@ body:has(.article-with-toc) .masthead-inner {
   transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* The folder assembles from small square pixels that grow finer until it
-   is sharp (filters in PixelFilters.tsx). Filters do not blend, so each
-   step holds until the next. */
+/* The folder gathers from tiny sparks: a few bright dots, then more and
+   more until it is whole (filters in PixelFilters.tsx). Filters do not
+   blend, so each step holds until the next. */
 @keyframes folder-in {
   0% {
     opacity: 0;
-    filter: url(#rv-px-12);
+    filter: url(#rv-dust-1) brightness(1.9);
   }
-  14% {
+  10% {
     opacity: 1;
-    filter: url(#rv-px-12);
+    filter: url(#rv-dust-1) brightness(1.9);
   }
-  30% {
-    filter: url(#rv-px-8);
+  24% {
+    filter: url(#rv-dust-2) brightness(1.6);
   }
-  46% {
-    filter: url(#rv-px-6);
+  40% {
+    filter: url(#rv-dust-3) brightness(1.35);
   }
-  62% {
-    filter: url(#rv-px-4);
+  56% {
+    filter: url(#rv-dust-4) brightness(1.15);
   }
-  78% {
-    filter: url(#rv-px-2);
+  72% {
+    filter: url(#rv-dust-5);
   }
-  92%,
+  88%,
   100% {
     filter: none;
   }
