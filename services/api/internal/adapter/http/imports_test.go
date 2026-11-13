@@ -180,6 +180,11 @@ func TestImportEndpoints_RejectBadUploads(t *testing.T) {
 			expectedDetails: map[string]any{"maxRecords": float64(testMaxRecords)},
 		},
 		{
+			name: "json that is not a readvault export", fields: map[string]string{"file": "{}"},
+			serviceErr:     fmt.Errorf("%w: schemaVersion 0", importing.ErrInvalidFile),
+			expectedStatus: http.StatusUnprocessableEntity, expectedCode: "invalid_file",
+		},
+		{
 			name: "internal failure", fields: map[string]string{"file": "x"},
 			serviceErr:     errors.New(`checking existing articles: ERROR: relation "articles" does not exist (SQLSTATE 42P01)`),
 			expectedStatus: http.StatusInternalServerError, expectedCode: "internal",

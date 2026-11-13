@@ -15,7 +15,7 @@ It runs locally: a Go API, PostgreSQL in Docker and a Next.js web app. It needs 
 - **Search** from the header on every page (press `/`): by title, address or tag, `:name` to search one collection, `-word` to leave a word out, `"exact words"` for a phrase. Results can be filtered by collection, tag and saved text, and ordered.
 - **Front page**: your collections as folders with their latest articles, the articles added last and your tags.
 - **Clean up**: delete one article for good, or free space by deleting the saved texts of every article or of one collection (the articles stay).
-- **Export** everything as JSON, and back up the database with `pg_dump`.
+- **Backup and restore**: export everything as JSON and import that file to bring back lost articles and collections; back up the whole database, saved texts included, with `pg_dump`.
 
 ## Quick start
 
@@ -133,7 +133,7 @@ make migrate   # applies any migration newer than the backup
 
 Check the restore by opening the library, or with `curl http://localhost:8080/readyz`.
 
-The JSON export (**Export JSON** in the web app, or `GET /api/export`) is a readable copy of your articles, tags and metadata for keeping or moving elsewhere. It cannot be imported back; use the database backup to restore.
+The JSON export (**Export JSON** in the web app, or `GET /api/export`) is a readable backup of your articles: their addresses, titles, tags, collections and bookmark dates. To restore from it, import the file on the **Add articles** page like a bookmarks file. Articles missing from the library come back, a deleted collection is created again and its articles go back into it, and tags are added; nothing is duplicated and nothing you changed since is overwritten. Restored articles download their text again in the background. The export does not hold the saved texts and images, nor collections without articles; the database backup above keeps everything.
 
 ## Troubleshooting
 

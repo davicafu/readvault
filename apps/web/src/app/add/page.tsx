@@ -27,11 +27,11 @@ export default function AddPage() {
         id="bookmarks"
         aria-labelledby="bookmarks-heading"
       >
-        <h2 id="bookmarks-heading">Import a bookmarks file</h2>
+        <h2 id="bookmarks-heading">Import a bookmarks file or a backup</h2>
         <p className="add-section-lede">
-          Choose the HTML file your browser exports. You see what will happen
-          before anything is saved, and importing the same file again never
-          creates duplicates.
+          Choose the HTML file your browser exports, or a ReadVault export to
+          restore. You see what will happen before anything is saved, and
+          importing the same file again never creates duplicates.
         </p>
         <ImportFlow />
       </section>

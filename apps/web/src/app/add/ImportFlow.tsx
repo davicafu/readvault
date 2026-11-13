@@ -83,6 +83,8 @@ function describe(err: unknown): string {
     case "invalid_upload":
     case "missing_file":
       return "The file could not be read. Choose the HTML file your browser exported.";
+    case "invalid_file":
+      return "This JSON file is not a ReadVault export. Choose the file from Export JSON, or your browser's bookmarks file.";
     case "invalid_choices":
       return `Your changes could not be applied: ${err.message}. Fix them and import again.`;
     default:
@@ -138,13 +140,17 @@ export function ImportFlow() {
       {step.kind === "choose" || step.kind === "previewing" ? (
         <div className="dropzone">
           <FilePicker
-            label="Your bookmarks file (HTML)"
-            accept=".html,.htm,text/html"
+            label="Your bookmarks file (HTML) or a ReadVault export (JSON)"
+            accept=".html,.htm,text/html,.json,application/json"
             file={file}
             onFile={setFile}
             disabled={step.kind === "previewing"}
           />
           <p className="fine-print">In Chrome: Bookmarks, Bookmark manager, the menu with three dots, Export bookmarks.</p>
+          <p className="fine-print">
+            To restore from a backup, choose the file from <strong>Export JSON</strong>: articles missing from the library
+            come back, deleted collections are created again and their articles go back into them.
+          </p>
           <div className="actions">
             <button className="button" type="button" disabled={!file || step.kind === "previewing"} onClick={preview}>
               {step.kind === "previewing" ? "Checking the file…" : "Check the file"}

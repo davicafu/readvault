@@ -109,7 +109,7 @@ func NewService(repo Repository, maxRecords int) *Service {
 
 // Preview parses and validates a bookmark HTML file without writing anything.
 func (s *Service) Preview(ctx context.Context, userID string, file io.Reader) (Preview, error) {
-	records, err := ParseHTML(file, s.maxRecords)
+	records, err := Parse(file, s.maxRecords)
 	if err != nil {
 		return Preview{}, err
 	}
@@ -181,7 +181,7 @@ func (s *Service) Preview(ctx context.Context, userID string, file io.Reader) (P
 // choices return a *ChoiceError before anything is written. A failing batch
 // is reported as failed without discarding the batches that succeeded.
 func (s *Service) Import(ctx context.Context, userID string, choices Choices, file io.Reader) (Report, error) {
-	records, err := ParseHTML(file, s.maxRecords)
+	records, err := Parse(file, s.maxRecords)
 	if err != nil {
 		return Report{}, err
 	}

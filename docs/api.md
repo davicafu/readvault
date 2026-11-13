@@ -28,6 +28,7 @@ Every error has the same shape:
 | 415 | `unsupported_media_type` | A JSON endpoint received a body whose `Content-Type` is not `application/json` |
 | 422 | `too_many_records` | The file has more bookmarks than `MAX_IMPORT_RECORDS`; `details.maxRecords` |
 | 422 | `invalid_choices` | An import choice breaks the rules (a name too long or blank, a position or suggestion not in the file); `details.field` names it, such as `bookmarks.12.tags` |
+| 422 | `invalid_file` | An imported JSON file is not a ReadVault export this version can read |
 | 422 | `no_text` | An uploaded article file holds no text |
 | 409 | `collection_exists` | The user already has a collection with that name (compared by slug) |
 | 422 | `validation_failed` | An article edit or a collection name is invalid; `details` is a list of field problems |
@@ -46,7 +47,7 @@ A field problem is `{ "field": "limit", "code": "out_of_range", "message": "limi
 
 ## Imports
 
-Imports take a browser bookmarks export in the Netscape HTML format (Chrome, Firefox, Safari, Edge). Send it as `multipart/form-data` with the file in the `file` field. The file is streamed and never stored: the preview and the import each upload it.
+Imports take a browser bookmarks export in the Netscape HTML format (Chrome, Firefox, Safari, Edge), or a ReadVault export (`GET /api/export`) to restore a library. A file whose first non-blank character is `{` is read as an export: each article becomes a bookmark with its original URL, title, folder, bookmark date, tags and its collection as the suggested collection, so the rules below apply as for any import (a missing article is added, a missing collection is created, an article without a collection goes back to it). A JSON file that is not an export of `schemaVersion` 1 is rejected with `422 invalid_file`. Send it as `multipart/form-data` with the file in the `file` field. The file is streamed and never stored: the preview and the import each upload it.
 
 Limits: `MAX_UPLOAD_BYTES` (default 10 MiB) and `MAX_IMPORT_RECORDS` (default 20,000 bookmarks).
 
@@ -336,4 +337,4 @@ Downloads every article of the user, oldest first, as `readvault-export-<date>-<
 }
 ```
 
-`schemaVersion` changes when a field is removed or changes meaning. A new optional field does not change it. The export holds only the current user's articles. Each article carries its `collection`; collections without articles are not part of it. Saved article text and images are not part of it; the database backup keeps them.
+`schemaVersion` changes when a field is removed or changes meaning. A new optional field does not change it. The export holds only the current user's articles. Each article carries its `collection`; collections without articles are not part of it. Saved article text and images are not part of it; the database backup keeps them. Import the file (`POST /api/imports`) to restore it.

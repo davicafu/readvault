@@ -177,6 +177,9 @@ func (h *importHandler) fail(w http.ResponseWriter, r *http.Request, file *uploa
 	case errors.Is(err, importing.ErrTooManyRecords):
 		writeErrorDetails(w, http.StatusUnprocessableEntity, "too_many_records",
 			"the file has more bookmarks than an import allows", map[string]int{"maxRecords": h.maxRecords})
+	case errors.Is(err, importing.ErrInvalidFile):
+		writeError(w, http.StatusUnprocessableEntity, "invalid_file",
+			"the file is a JSON file but not a ReadVault export this version can read")
 	case file.err != nil:
 		writeUploadError(w, file.err, h.maxBytes, importUpload)
 	default:
