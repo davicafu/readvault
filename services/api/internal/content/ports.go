@@ -106,6 +106,9 @@ type Repository interface {
 	// drops their queued downloads, and returns how many entries it
 	// deleted. An unknown collection is ErrNotFound.
 	RemoveTexts(ctx context.Context, userID, collectionID string) (int, error)
+	// RemoveText does the same for one article of the user. An unknown
+	// article is ErrNotFound.
+	RemoveText(ctx context.Context, userID, articleID string) (int, error)
 }
 
 // DownloadSummary counts a user's articles by the state of their text.

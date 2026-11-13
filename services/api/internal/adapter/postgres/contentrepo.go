@@ -224,3 +224,33 @@ func (r *ContentRepository) RemoveTexts(ctx context.Context, userID, collectionI
 	}
 	return removed, nil
 }
+
+// RemoveText implements content.Repository. Images go with their text
+// (ON DELETE CASCADE).
+func (r *ContentRepository) RemoveText(ctx context.Context, userID, articleID string) (int, error) {
+	var removed int
+	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		var found bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM articles WHERE id = $1 AND user_id = $2)`,
+			articleID, userID).Scan(&found); err != nil {
+			return fmt.Errorf("finding article: %w", err)
+		}
+		if !found {
+			return content.ErrNotFound
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM content_downloads WHERE user_id = $1 AND article_id = $2`,
+			userID, articleID); err != nil {
+			return fmt.Errorf("dropping queued download: %w", err)
+		}
+		tag, err := tx.Exec(ctx, `DELETE FROM article_contents WHERE user_id = $1 AND article_id = $2`, userID, articleID)
+		if err != nil {
+			return fmt.Errorf("removing text: %w", err)
+		}
+		removed = int(tag.RowsAffected())
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return removed, nil
+}

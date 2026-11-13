@@ -16,6 +16,8 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 - **S9** (L4) "borra todo y carga la lista nueva completa".
 - **S10** (L4) "la version mobile no esta adaptada, hazla tambien".
 - **S11** (L5) "en los tag sugeridos no esta muy bien alineado, salta una linea, revisalo"; "la barra del menu superiro se deberia adaptar al ancho de la pantalla, proqeu sobra mucho de la derecha"; "el try another copy deberia ser solo con textos cortados o que no fue bien no? me sale la opcoin para un texto de 1700 words".
+- **S12** (L6) "el sugested yo creo que daba para poner en la misma linea, simpelmente era cuestion de alinearlo".
+- **S13** (L6) "el de delete article borra el articulo, pero tendria que haber uno tambien de vaciar texto solo, igual que en las colecciones o con todos".
 
 ## Tasks
 
@@ -31,6 +33,8 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 | T8 | S9 | inline | done (data, no commit) | Dev database dumped (pg_dump -Fc, 9 tables) and exported to JSON in the scratchpad first; articles, collections, tags, texts, images and queue truncated (user kept); bookmarks_11_11_26.collections.html imported: 489 inserted, 9 collections, 489 queued for download |
 | T9 | S10 | inline | done | At 390 px: menu as four equal tabs (icon over label), folders lower and closer, reading column pinned to the page width (a code block had widened the page to 809 px), wide tables scroll, sort choices on one sliding line. Page width 390 on the front page, search, article, collections, add and import; desktop at 1300 px unchanged |
 | T10 | S11 | inline | done | Suggested tags wrap beside their label (+ postgres under + sql, not under the label). Menu: the phone rules came before the base .nav rules and lost to them, so T9's four equal tabs never applied; moved after them: tabs span 16-374 px at 390 and 16-414 at 430, desktop at 1300 unchanged. Try another copy dropped from complete texts (1,729-word article shows none); kept on failed and incomplete. tsc passes |
+| T11 | S12 | inline | done | Label and tags on one centred line; tighter pills under 520 px and a sideways slide if they still do not fit. At 390 px the four suggestions (sql, docker, dbt, postgres) fit on the label's line |
+| T12 | S13 | inline | done | DELETE /api/articles/{id}/content: integration RED (RemoveText undefined) then GREEN (text and images gone, article and other texts kept, queued download dropped, unknown/other user's/malformed id is ErrNotFound); HTTP 200 {removed} and 404 not_found. Full suites with -race pass (one infra ping timeout, package rerun green). Delete text button with confirmation under Replace or delete the text; live route probe 404 on an unknown id; docs updated |
 
 ## Log
 
@@ -39,3 +43,4 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 - L3 (2026-11-13, user): "- el fade final inferior ahroa se nota demasiado, que sea una mezcla entre los dos ultimos intentos - fredium me valdria para articulos de: New york time, whashington post, the atheltic, economist, bloomberg, reuters o quora"
 - L4 (2026-11-13, user): "cuadno fredium falla quiero que se de la posibilidad de archive.org o mostrar el mensaje para que se descargue y se cargue la web - borra todo y carga la lista nueva completa - la version mobile no esta adaptada, hazla tambien"
 - L5 (2026-11-13, user): "casi perfecta la versión movil: - en los tag sugeridos no esta muy bien alineado, salta una linea, revisalo - la barra del menu superiro se deberia adaptar al ancho de la pantalla, proqeu sobra mucho de la derecha - el try another copy deberia ser solo con textos cortados o que no fue bien no? me sale la opcoin para un texto de 1700 words"
+- L6 (2026-11-13, user): "- el sugested yo creo que daba para poner en la misma linea, simpelmente era cuestion de alinearlo - el de delete article borra el articulo, pero tendria que haber uno tambien de vaciar texto solo, igual que en las colecciones o con todos"

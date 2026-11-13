@@ -20,10 +20,10 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"download" | "copy" | "upload" | null>(null);
+  const [busy, setBusy] = useState<"download" | "copy" | "upload" | "remove" | null>(null);
   const [, startRefresh] = useTransition();
 
-  const run = async (kind: "download" | "copy" | "upload", request: () => Promise<Response>) => {
+  const run = async (kind: "download" | "copy" | "upload" | "remove", request: () => Promise<Response>) => {
     setBusy(kind);
     setFailure(null);
     try {
@@ -63,6 +63,14 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
     </button>
   );
 
+  // Frees the space of this one text; the article stays and its text can be
+  // downloaded or uploaded again.
+  const removeText = () => {
+    if (!window.confirm("Delete the saved text of this article, with its images? The article, its tags and collection stay; you can download the text again."))
+      return;
+    run("remove", () => fetch(`/api/articles/${articleId}/content`, { method: "DELETE" }));
+  };
+
   const upload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -92,6 +100,11 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
       <button className="button button-quiet" type="button" disabled={busy !== null} onClick={download}>
         {busy === "download" ? "Downloading…" : content?.status === "complete" ? "Download again" : "Download text"}
       </button>
+      {content ? (
+        <button className="button button-danger actions-end" type="button" disabled={busy !== null} onClick={removeText}>
+          {busy === "remove" ? "Deleting…" : "Delete text"}
+        </button>
+      ) : null}
       <input ref={fileInput} type="file" accept={accepted} hidden onChange={upload} />
     </div>
   );
@@ -152,7 +165,7 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
           </p>
           {/* The text is here: replacing it is rare, so it stays folded. */}
           <details className="text-options">
-            <summary>Replace the text</summary>
+            <summary>Replace or delete the text</summary>
             {actions}
           </details>
         </div>

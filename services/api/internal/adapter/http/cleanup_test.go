@@ -45,3 +45,25 @@ func TestRemoveTexts_UnknownCollectionAndFailure(t *testing.T) {
 		t.Errorf("failure: %d %s, want 500 internal", rec.Code, rec.Body)
 	}
 }
+
+func (s *stubContent) RemoveText(_ context.Context, userID, articleID string) (int, error) {
+	s.gotUser, s.gotID = userID, articleID
+	return 1, s.err
+}
+
+func TestRemoveText_OneArticleForTheServerOwner(t *testing.T) {
+	t.Parallel()
+	svc := &stubContent{}
+	rec := serveContent(t, svc, httptest.NewRequest(http.MethodDelete, "/api/articles/a1/content", nil))
+	if rec.Code != http.StatusOK || rec.Body.String() != `{"removed":1}`+"\n" {
+		t.Errorf("DELETE: %d %s, want 200 {\"removed\":1}", rec.Code, rec.Body)
+	}
+	if svc.gotUser != testOwner || svc.gotID != "a1" {
+		t.Errorf("removed for user %q article %q, want %q a1", svc.gotUser, svc.gotID, testOwner)
+	}
+	rec = serveContent(t, &stubContent{err: content.ErrNotFound},
+		httptest.NewRequest(http.MethodDelete, "/api/articles/nope/content", nil))
+	if rec.Code != http.StatusNotFound || errorCode(t, rec) != "not_found" {
+		t.Errorf("unknown article: %d %s, want 404 not_found", rec.Code, rec.Body)
+	}
+}

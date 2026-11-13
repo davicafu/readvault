@@ -220,6 +220,17 @@ func (s *Service) RemoveTexts(ctx context.Context, userID, collectionID string) 
 	return s.repo.RemoveTexts(ctx, userID, collectionID)
 }
 
+// RemoveText deletes the saved text of one article, with its images and
+// recorded failure, and drops its queued download; the article stays. It
+// returns how many saved entries were deleted (0 or 1). An unknown article
+// is ErrNotFound.
+func (s *Service) RemoveText(ctx context.Context, userID, articleID string) (int, error) {
+	if !uuidPattern.MatchString(articleID) {
+		return 0, ErrNotFound
+	}
+	return s.repo.RemoveText(ctx, userID, articleID)
+}
+
 // downloadMissing fetches the article's text unless something was saved
 // or a download recorded already, by the person or an earlier download.
 func (s *Service) downloadMissing(ctx context.Context, userID, articleID string) error {

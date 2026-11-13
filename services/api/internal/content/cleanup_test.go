@@ -132,3 +132,61 @@ func TestRemoveTexts_UnknownCollectionIsNotFound(t *testing.T) {
 		t.Errorf("text removed by a refused cleanup")
 	}
 }
+
+func TestRemoveText_ClearsOneArticleAndKeepsTheRest(t *testing.T) {
+	t.Parallel()
+	svc, _, pool, done := setup(t)
+	other := newArticle(t, pool, owner, "https://blog.example/other")
+	withText(t, svc, done, other)
+	queued := newArticle(t, pool, owner, "https://blog.example/queued-one")
+	queue(t, pool, queued)
+
+	n, err := svc.RemoveText(t.Context(), owner, done)
+	if err != nil || n != 1 {
+		t.Fatalf("RemoveText = %d, %v; want its 1 text", n, err)
+	}
+	if got := count(t, pool, `SELECT count(*) FROM article_contents WHERE article_id = $1`, done); got != 0 {
+		t.Errorf("text still saved")
+	}
+	if got := count(t, pool, `SELECT count(*) FROM article_images WHERE article_id = $1`, done); got != 0 {
+		t.Errorf("%d images left, want none", got)
+	}
+	if got := count(t, pool, `SELECT count(*) FROM articles WHERE id = $1`, done); got != 1 {
+		t.Errorf("article removed, want it kept")
+	}
+	if got := count(t, pool, `SELECT count(*) FROM article_contents WHERE article_id = $1`, other); got != 1 {
+		t.Errorf("another article's text removed")
+	}
+	if _, err := svc.Get(t.Context(), owner, done); !errors.Is(err, content.ErrNoContent) {
+		t.Errorf("Get after = %v, want ErrNoContent", err)
+	}
+
+	// An article waiting for its download has no text yet: the queued
+	// download is dropped so it is not downloaded behind the user's back.
+	n, err = svc.RemoveText(t.Context(), owner, queued)
+	if err != nil || n != 0 {
+		t.Errorf("RemoveText(queued) = %d, %v; want 0 and no error", n, err)
+	}
+	if got := queuedFor(t, pool, queued); got != 0 {
+		t.Errorf("download still queued")
+	}
+}
+
+func TestRemoveText_UnknownArticleIsNotFound(t *testing.T) {
+	t.Parallel()
+	svc, _, pool, _ := setup(t)
+	other := newUser(t, pool)
+	othersArticle := newArticle(t, pool, other, "https://blog.example/theirs")
+	if _, err := pool.Exec(t.Context(), `INSERT INTO article_contents (article_id, user_id, status, source, markdown, words)
+		VALUES ($1, $2, 'complete', 'fetched', 'kept', 1)`, othersArticle, other); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"not-a-uuid", "00000000-0000-0000-0000-00000000dead", othersArticle} {
+		if _, err := svc.RemoveText(t.Context(), owner, id); !errors.Is(err, content.ErrNotFound) {
+			t.Errorf("RemoveText(%q) error = %v, want ErrNotFound", id, err)
+		}
+	}
+	if got := count(t, pool, `SELECT count(*) FROM article_contents WHERE article_id = $1`, othersArticle); got != 1 {
+		t.Errorf("other user's text removed")
+	}
+}

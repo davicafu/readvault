@@ -324,6 +324,10 @@ Queues the background download of every article never downloaded (the ones count
 
 Deletes the saved texts, with their images and recorded download failures, of every article of the user, or of the articles of one collection, to free space. The articles, their tags and collections stay, and their queued background downloads are dropped. Uploaded texts are deleted too. Answers `200` with how many saved entries were deleted, `{ "removed": 84 }`; an unknown collection is `404` `not_found`. A download already running may still save its text afterwards.
 
+### `DELETE /api/articles/{id}/content`
+
+Deletes one article's saved text, with its images and recorded download failure, and drops its queued download. The article, its tags and collection stay; its text can be downloaded or uploaded again. Answers `200` with `{ "removed": 1 }` (`0` when it had nothing saved); `404 not_found` when the user has no such article (including a malformed id).
+
 ### `GET /api/articles/{id}/images/{imageId}`
 
 Returns a stored image with its type, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox` and `Cache-Control: private, max-age=86400`.

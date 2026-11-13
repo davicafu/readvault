@@ -21,6 +21,7 @@ type ContentService interface {
 	DownloadSummary(ctx context.Context, userID string) (content.DownloadSummary, error)
 	QueueMissing(ctx context.Context, userID string) (int, error)
 	RemoveTexts(ctx context.Context, userID, collectionID string) (int, error)
+	RemoveText(ctx context.Context, userID, articleID string) (int, error)
 }
 
 var articleUpload = uploadKind{noun: "article page or Markdown file", tooLarge: "the file is larger than an article allows"}
@@ -70,6 +71,23 @@ func (h *contentHandler) removeTexts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.logger.InfoContext(r.Context(), "saved texts removed", slog.Int("removed", n), slog.String("collection", collectionID))
+	writeJSON(w, http.StatusOK, map[string]int{"removed": n})
+}
+
+// removeText serves DELETE /api/articles/{id}/content: delete one
+// article's saved text, keeping the article.
+func (h *contentHandler) removeText(w http.ResponseWriter, r *http.Request) {
+	articleID := r.PathValue("id")
+	n, err := h.svc.RemoveText(r.Context(), h.ownerID, articleID)
+	if errors.Is(err, content.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found", "article not found")
+		return
+	}
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	h.logger.InfoContext(r.Context(), "saved text removed", slog.Int("removed", n), slog.String("article", articleID))
 	writeJSON(w, http.StatusOK, map[string]int{"removed": n})
 }
 
