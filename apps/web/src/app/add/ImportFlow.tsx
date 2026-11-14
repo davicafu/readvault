@@ -15,6 +15,7 @@ import {
   type ImportReport,
 } from "@/lib/api";
 
+import { ActionIcon } from "../ActionIcon";
 import { FilePicker } from "./FilePicker";
 
 // Big exports can hold thousands of bookmarks; the table shows a slice at a time.
@@ -152,7 +153,13 @@ export function ImportFlow() {
             come back, deleted collections are created again and their articles go back into them.
           </p>
           <div className="actions">
-            <button className="button" type="button" disabled={!file || step.kind === "previewing"} onClick={preview}>
+            <button
+              className="button button-with-icon"
+              type="button"
+              disabled={!file || step.kind === "previewing"}
+              onClick={preview}
+            >
+              <ActionIcon name="upload" />
               {step.kind === "previewing" ? "Checking the file…" : "Check the file"}
             </button>
           </div>
@@ -269,11 +276,12 @@ function PreviewStep({
 
       <div className="actions">
         <button
-          className="button"
+          className="button button-with-icon"
           type="button"
           disabled={importing || importableCount === 0 || problems.length > 0}
           onClick={() => onConfirm(choices())}
         >
+          <ActionIcon name="add" />
           {importing ? "Importing…" : `Import ${importableCount.toLocaleString()} bookmarks`}
         </button>
         <button className="button button-quiet" type="button" disabled={importing} onClick={onCancel}>
@@ -517,10 +525,11 @@ function ReportStep({ report, onAgain }: { report: ImportReport; onAgain: () => 
         if you close this page. It appears on each article's page as it arrives.
       </p>
       <div className="actions">
-        <Link className="button" href="/">
+        <Link className="button" href="/articles">
           Go to the library
         </Link>
-        <button className="button button-quiet" type="button" onClick={onAgain}>
+        <button className="button button-quiet button-with-icon" type="button" onClick={onAgain}>
+          <ActionIcon name="upload" />
           Import another file
         </button>
       </div>

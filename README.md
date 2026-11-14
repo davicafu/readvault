@@ -33,23 +33,28 @@ You need:
   Docker Desktop works too. `make` uses `docker compose`, or `docker-compose` when the plugin is missing.
 - Node.js 22 or later, with npm
 
-Compose runs PostgreSQL 17. To use your own server instead (PostgreSQL 15 or later, no Docker needed), set `DATABASE_URL` in `.env` to point at it and add `DB=external` to the database commands: `make dev DB=external`, `make migrate DB=external`, `make test-integration DB=external`. The web app and the API work the same either way.
+Compose runs PostgreSQL 17. To use your own server instead (PostgreSQL 15 or later, no Docker needed), set `DATABASE_URL` in `.env` to point at it and add `DB=external` to the database commands: `make start DB=external`, `make dev DB=external`, `make migrate DB=external`, `make test-integration DB=external`. The web app and the API work the same either way.
 
 Then:
 
 ```bash
-make dev                    # Postgres, migrations, API on :8080, web app on :3000
+make start                  # Postgres, migrations, build, then the app on http://localhost:3000
 ```
+
+This is how to use ReadVault day to day. It builds the API and the web app and runs them as in production: faster pages and no Next.js development tools. Each run builds again, so it takes a minute to start; Ctrl+C stops both.
 
 Open http://localhost:3000, choose **Add articles** and import a bookmarks file. To try it without your own export, import `fixtures/bookmarks.html`.
 
-The first `make` run creates `.env` with a random database password; edit it to change ports or limits (`.env.example` lists every variable). `make dev` checks that Node.js 22 or later comes first on `PATH`, installs the web app's dependencies the first time and again whenever `apps/web/package-lock.json` changes (for example after a pull that adds one), and stops everything with Ctrl+C. Go downloads the API's modules on its own the first time it runs. If no Docker engine is running, `make` says so and stops. Postgres keeps running in Docker; stop it with `make db-down`. The data stays in the `db-data` volume, inside Colima's virtual machine: `colima stop` keeps it, `colima delete` deletes it.
+To work on the code, run `make dev` instead: the API runs from source and the web app reloads on every change, with Next.js's development tools.
+
+The first `make` run creates `.env` with a random database password; edit it to change ports or limits (`.env.example` lists every variable). `make dev` checks that Node.js 22 or later comes first on `PATH`, installs the web app's dependencies the first time and again whenever `apps/web/package-lock.json` changes (for example after a pull that adds one), and stops everything with Ctrl+C. `make start` does the same. Go downloads the API's modules on its own the first time it runs. If no Docker engine is running, `make` says so and stops. Postgres keeps running in Docker; stop it with `make db-down`. The data stays in the `db-data` volume, inside Colima's virtual machine: `colima stop` keeps it, `colima delete` deletes it.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `make dev` | Starts Postgres, applies migrations, runs the API and the web app |
+| `make start` | Starts Postgres, applies migrations, builds, and runs the compiled API and the built web app, as in production |
+| `make dev` | Starts Postgres, applies migrations, runs the API from source and the web app in development mode, for working on the code |
 | `make migrate` | Applies pending migrations |
 | `make migrate-down` | Rolls back the last migration |
 | `make test` | Runs the unit tests (no database needed) |

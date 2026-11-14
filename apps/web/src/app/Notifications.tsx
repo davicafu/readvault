@@ -126,7 +126,8 @@ export function Notifications() {
           {missing > 0 ? (
             <p className="bell-item">
               {articles(missing)} {missing === 1 ? "has" : "have"} no text yet.
-              <button className="button button-small" type="button" disabled={queueing} onClick={downloadAll}>
+              <button className="button button-small button-with-icon" type="button" disabled={queueing} onClick={downloadAll}>
+                <ActionIcon name="download" />
                 {queueing ? "Queueing…" : "Download all"}
               </button>
             </p>

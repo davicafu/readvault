@@ -33,7 +33,7 @@ export default async function CollectionsPage() {
       ) : (
         <section className="notice notice-error" role="alert">
           <h2>The collections could not be loaded</h2>
-          <p>The ReadVault API is not running or not reachable. Start it with make dev and reload this page.</p>
+          <p>The ReadVault API is not running or not reachable. Start it with make start and reload this page.</p>
         </section>
       )}
     </>

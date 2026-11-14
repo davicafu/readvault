@@ -97,6 +97,13 @@ dev: node-check migrate $(WEB_DIR)/node_modules ## Run Postgres (unless DB=exter
 	(cd $(WEB_DIR) && npm run dev) & \
 	wait
 
+.PHONY: start
+start: node-check migrate build ## Build and run the app as in production: the compiled API on :8080 and the built web app on :3000
+	@trap 'kill 0' EXIT; \
+	$(API_DIR)/bin/api & \
+	(cd $(WEB_DIR) && npm start) & \
+	wait
+
 .PHONY: build
 build: node-check $(WEB_DIR)/node_modules ## Build the API binaries and the production web app
 	cd $(API_DIR) && go build -o bin/api ./cmd/api && go build -o bin/migrate ./cmd/migrate

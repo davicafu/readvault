@@ -36,7 +36,7 @@ export function LibraryError({ error, firstPage }: { error: ApiError; firstPage:
         {invalidQuery
           ? (error.fieldProblems[0]?.message ?? error.message)
           : error.code === "unreachable"
-            ? "The ReadVault API is not running or not reachable. Start it with make dev and reload this page."
+            ? "The ReadVault API is not running or not reachable. Start it with make start and reload this page."
             : "The server could not answer this time. Reload the page to try again."}
       </p>
       <Link className="button button-quiet" href={invalidQuery ? firstPage : "/"}>

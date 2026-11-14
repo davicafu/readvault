@@ -28,6 +28,7 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 - **S20** (L9, L10) the list of all articles lives at `/articles`, without `view=all` ("el endpoint de libary cuando muestra todos los articulos no deberia ser /articles sin view=all ni nada?"), with its filters in the query as in `GET /api/articles` (`/articles?collection=backend&q=kafka`, `/articles?text=failed`); `/` stays the front page; old `/?view=all`, `/?collection=…` addresses redirect to the new ones.
 - **S21** (L9) "seria facil de cambiar el makefile apra eso? la app quedaria igual?": `make dev DB=external` uses your own Postgres 15+ at `DATABASE_URL` from `.env` and skips Docker; the app is the same.
 - **S22** (L12, L13) "reorganiza por modulo": each API module (library, importing, content, tag) owns its adapters (`http`, `postgres`, `fetch`); what they share goes in `internal/platform`; domain packages import no adapter; endpoints and responses stay the same. Postgres stays (L13: "me parece perfecto lo de postgres entonces").
+- **S23** (L14, L15) "ponselo a los botones que falten tambien": every action button has an icon. "si añade lo del make al readme y quickstart que relmente seria como se deberia usar": `make start` runs the built app as in production, without Next.js development tools, and is the Quick start's way to run it.
 
 ## Tasks
 
@@ -52,6 +53,7 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 | T17 | S20 | inline | done | List moved to `app/articles/page.tsx`; `/` keeps the front page and answers 308 for list queries (`/?view=all` → `/articles`, `/?collection=backend&q=kafka` → `/articles?q=kafka&collection=backend`, tags and sort kept); every list link, the header search and the bell point to `/articles`; tsc, lint and build pass; `/articles` renders 25 entries |
 | T18 | S21 | inline | done | `DB ?= docker`, `DB=external` swaps `db-up` for `db-external` in migrate, migrate-down and test-integration, unknown values stop make; `make -n dev DB=external` runs no Docker command; `make migrate DB=external` applied migrations against `DATABASE_URL` |
 | T19 | S22 | inline | done | `internal/adapter/*` moved to `<module>/http`, `<module>/postgres`, `content/fetch`, `tag/postgres` (shared `CreateTags`) and `platform/{httpapi,postgres}`; each module's `http.New(...).Register(mux)`; `importing/http` no longer imports `library`; 186 tests before and after; unit and integration (`-race -tags=integration`) pass; 10 live endpoints answer byte for byte the same before and after |
+| T20 | S23 | inline | done | Icons on Create collection, Save name, Check the file, Import N bookmarks, Import another file, Download all and Try again (new `retry` icon); screenshots of the import buttons. `make start` (migrate, build, `bin/api` and `next start`); real run: next-server and bin/api serve `/`, `/articles`, `/collections`, `/add` with 200, `/?view=all` with 308, no development markers in the page |
 
 ## Log
 
@@ -68,3 +70,5 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 - L11 (2026-11-14): `make build` first failed with "No space left on device"; removing this session's scratch Chrome profiles freed about 1.8 GB, then the build passed. The disk stays nearly full.
 - L12 (2026-11-14, user): "vale, una cosa la api y el backend esta diseñado como monolito modular en arquitectura hexagonal?" Answer: hexagonal yes; modular only in the core, adapters grouped by technology.
 - L13 (2026-11-14, user): "si tiene sentido si, otra cosa, postgres es necesario? para que se utiliza? seria mas util aprovechar ya el json de export/import y que se vaya escribiendo ahi? o no?" then "vale, reorganiza por modulo y me parece perfecto lo de postgres entonces"
+- L14 (2026-11-14, user): "en create colelcion el boton no teine icono, ademas revisa que esta todo en el readme y actualiza el product spec" and "y como se deberia ejecutar, como si fuera producion y que no salgan las heramientas de desarrollados de next?"
+- L15 (2026-11-14, user): "puse ponselo a los botones que falten tambien; quita la importacion csv del spec, realmente no la quiero, quiero las que hay / si añade lo del make al readme y quickstart que relmente seria como se deberia usar"

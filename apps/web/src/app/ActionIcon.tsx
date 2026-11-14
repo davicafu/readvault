@@ -20,6 +20,8 @@ const paths = {
   save: ["M5 12.5l4.5 4.5L19 7.5"],
   // A plus in a circle: adding links.
   add: ["M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 1 0 0-17z", "M12 8.5v7", "M8.5 12h7"],
+  // A circling arrow: trying again.
+  retry: ["M19.5 12a7.5 7.5 0 1 1-2.2-5.3", "M19.5 4.5v4h-4"],
   // A bell: notifications.
   bell: [
     "M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z",

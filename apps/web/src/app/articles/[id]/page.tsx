@@ -163,7 +163,7 @@ function ArticleError({ error }: { error: ApiError }) {
       <h2>The article could not be loaded</h2>
       <p>
         {error.code === "unreachable"
-          ? `The ${brand.name} API is not running or not reachable. Start it with make dev and reload this page.`
+          ? `The ${brand.name} API is not running or not reachable. Start it with make start and reload this page.`
           : "The server could not answer this time. Reload the page to try again."}
       </p>
       <Link className="button button-quiet" href="/">
