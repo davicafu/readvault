@@ -87,7 +87,8 @@ export function CollectionsManager({ initial }: { initial: Collection[] }) {
             aria-describedby="new-collection-hint"
             required
           />
-          <button className="button" type="submit" disabled={busy}>
+          <button className="button button-with-icon" type="submit" disabled={busy}>
+            <ActionIcon name="add" />
             {busy ? "Creating…" : "Create collection"}
           </button>
         </div>
@@ -249,7 +250,8 @@ function CollectionRow({
             autoFocus
             required
           />
-          <button className="button" type="submit" disabled={busy}>
+          <button className="button button-with-icon" type="submit" disabled={busy}>
+            <ActionIcon name="save" />
             Save name
           </button>
           <button
