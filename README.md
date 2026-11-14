@@ -33,7 +33,7 @@ You need:
   Docker Desktop works too. `make` uses `docker compose`, or `docker-compose` when the plugin is missing.
 - Node.js 22 or later, with npm
 
-Compose runs PostgreSQL 17. To use your own server instead, it must be PostgreSQL 15 or later; set `DATABASE_URL` to point at it.
+Compose runs PostgreSQL 17. To use your own server instead (PostgreSQL 15 or later, no Docker needed), set `DATABASE_URL` in `.env` to point at it and add `DB=external` to the database commands: `make dev DB=external`, `make migrate DB=external`, `make test-integration DB=external`. The web app and the API work the same either way.
 
 Then:
 
@@ -58,6 +58,7 @@ The first `make` run creates `.env` with a random database password; edit it to 
 | `make build` | Builds `services/api/bin/api`, `services/api/bin/migrate` and the production web app |
 | `make db-up` / `make db-down` | Starts or stops Postgres |
 | `make docker-check` | Checks that a Docker engine (Colima or Docker Desktop) is running; `make db-up` runs it first |
+| `make db-external` | With `DB=external`: checks that `DATABASE_URL` is set, in place of starting the compose Postgres |
 | `make web-install` | Reinstalls the web app's dependencies from the lockfile |
 
 ## Configuration

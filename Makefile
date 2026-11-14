@@ -8,6 +8,17 @@ ENV_FILE ?= .env
 # that answers `version` with its help, so only a real version number counts.
 COMPOSE_CMD ?= $(shell docker compose version --short 2>/dev/null | grep -Eq '^v?([2-9]|[1-9][0-9])\.' && echo 'docker compose' || echo docker-compose)
 COMPOSE := $(COMPOSE_CMD) -f deploy/compose.yaml --env-file $(ENV_FILE)
+# Where the database runs: docker (default) starts the compose Postgres;
+# external uses your own PostgreSQL 15 or later at DATABASE_URL (from the env
+# file) and needs no Docker, for example: make dev DB=external
+DB ?= docker
+ifeq ($(DB),docker)
+DB_READY := db-up
+else ifeq ($(DB),external)
+DB_READY := db-external
+else
+$(error DB must be docker or external, not "$(DB)")
+endif
 API_DIR := services/api
 WEB_DIR := apps/web
 
@@ -43,16 +54,21 @@ db-up: $(ENV_FILE) docker-check ## Start Postgres and wait until it is healthy
 	@until [ "$$(docker inspect -f '{{.State.Health.Status}}' $$($(COMPOSE) ps -q db))" = "healthy" ]; do sleep 1; done
 	@echo "postgres is ready"
 
+.PHONY: db-external
+db-external: $(ENV_FILE) ## Check that DATABASE_URL names your own Postgres (DB=external)
+	@test -n "$$DATABASE_URL" || { echo 'DB=external needs DATABASE_URL in $(ENV_FILE), pointing at PostgreSQL 15 or later.'; exit 1; }
+	@echo "using the database at DATABASE_URL; Docker is not used"
+
 .PHONY: db-down
 db-down: ## Stop Postgres (data is kept in the db-data volume)
 	$(COMPOSE) down
 
 .PHONY: migrate
-migrate: db-up ## Apply pending database migrations
+migrate: $(DB_READY) ## Apply pending database migrations
 	cd $(API_DIR) && go run ./cmd/migrate up
 
 .PHONY: migrate-down
-migrate-down: db-up ## Roll back the last migration
+migrate-down: $(DB_READY) ## Roll back the last migration
 	cd $(API_DIR) && go run ./cmd/migrate down
 
 .PHONY: node-check
@@ -75,7 +91,7 @@ $(WEB_DIR)/node_modules: $(WEB_DIR)/package-lock.json | node-check
 	@touch $@
 
 .PHONY: dev
-dev: node-check migrate $(WEB_DIR)/node_modules ## Run Postgres, migrations, the API on :8080 and the web app on :3000
+dev: node-check migrate $(WEB_DIR)/node_modules ## Run Postgres (unless DB=external), migrations, the API on :8080 and the web app on :3000
 	@trap 'kill 0' EXIT; \
 	(cd $(API_DIR) && go run ./cmd/api) & \
 	(cd $(WEB_DIR) && npm run dev) & \
@@ -91,7 +107,7 @@ test: ## Run unit tests (no database needed)
 	cd $(API_DIR) && go test -race ./...
 
 .PHONY: test-integration
-test-integration: db-up ## Run integration tests against the compose Postgres
+test-integration: $(DB_READY) ## Run integration tests against the compose Postgres (or DATABASE_URL with DB=external)
 	cd $(API_DIR) && go test -race -tags=integration -p 1 ./...
 
 .PHONY: lint
