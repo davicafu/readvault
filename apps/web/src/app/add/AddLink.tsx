@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { ApiError, readJSON, type ArticlePage } from "@/lib/api";
+import { ActionIcon } from "../ActionIcon";
 import { downloadsChanged } from "../Notifications";
 
 type Report = {
@@ -164,7 +165,8 @@ export function AddLink() {
             : "Paste one link, or several separated by spaces or new lines (Shift+Enter starts a new line)."}
         </p>
       </div>
-      <button className="button" type="submit" disabled={saving}>
+      <button className="button button-with-icon" type="submit" disabled={saving}>
+        <ActionIcon name="add" />
         {saving ? stage : several ? "Add links" : "Add link"}
       </button>
       {done ? (

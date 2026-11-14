@@ -16,6 +16,10 @@ const paths = {
   upload: ["M12 15V4", "M7.5 8.5L12 4l4.5 4.5", "M4.5 16.5v2a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-2"],
   // An arrow into a tray: downloading.
   download: ["M12 4v11", "M7.5 10.5L12 15l4.5-4.5", "M4.5 16.5v2a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-2"],
+  // A tick: saving changes.
+  save: ["M5 12.5l4.5 4.5L19 7.5"],
+  // A plus in a circle: adding links.
+  add: ["M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 1 0 0-17z", "M12 8.5v7", "M8.5 12h7"],
   // A bell: notifications.
   bell: [
     "M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z",

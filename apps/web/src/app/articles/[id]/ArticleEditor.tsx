@@ -7,6 +7,7 @@ import Link from "next/link";
 
 import { ApiError, readJSON, type Article, type Collection, type FieldProblem, type Suggestions } from "@/lib/api";
 
+import { ActionIcon } from "../../ActionIcon";
 import { TagLogo } from "../../TagLogo";
 
 type Props = {
@@ -250,13 +251,15 @@ export function ArticleEditor({
         </div>
 
         <div className="actions">
-          <button className="button" type="submit" disabled={saving}>
+          <button className="button button-with-icon" type="submit" disabled={saving}>
+            <ActionIcon name="save" />
             {saving ? "Saving…" : "Save changes"}
           </button>
           <span role="status" aria-live="polite">
             {saved ? <span className="saved">Changes saved</span> : null}
           </span>
-          <button className="button button-danger actions-end" type="button" onClick={remove} disabled={deleting || saving}>
+          <button className="button button-danger button-with-icon actions-end" type="button" onClick={remove} disabled={deleting || saving}>
+            <ActionIcon name="delete" />
             {deleting ? "Deleting…" : "Delete article"}
           </button>
         </div>
