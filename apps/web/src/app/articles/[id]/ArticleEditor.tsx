@@ -108,7 +108,7 @@ export function ArticleEditor({
       const res = await fetch(`/api/articles/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!res.ok && res.status !== 404) await readJSON(res);
       const slug = collections?.find((c) => c.id === initialCollection)?.slug;
-      router.push(slug ? `/?collection=${encodeURIComponent(slug)}` : "/");
+      router.push(slug ? `/articles?collection=${encodeURIComponent(slug)}` : "/");
       router.refresh();
     } catch {
       setFailure("The article could not be deleted. Try again in a moment.");

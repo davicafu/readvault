@@ -267,7 +267,7 @@ function CollectionRow({
       ) : (
         <>
           <span className="collection-title">
-            <Link href={`/?collection=${encodeURIComponent(c.slug)}`} className="collection-name">
+            <Link href={`/articles?collection=${encodeURIComponent(c.slug)}`} className="collection-name">
               {c.name}
             </Link>
             <span className="fine-print">

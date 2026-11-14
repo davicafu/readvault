@@ -54,7 +54,7 @@ export function BrowseHome({
         <section className="browse-section" aria-labelledby="recent-heading">
           <div className="browse-head">
             <h2 id="recent-heading">Recently added</h2>
-            <Link href="/?view=all">See all</Link>
+            <Link href="/articles">See all</Link>
           </div>
           <ul className="recent-grid">
             {recent.map((a) => (
@@ -66,7 +66,7 @@ export function BrowseHome({
                 {a.collection ? (
                   <Link
                     className="recent-collection"
-                    href={`/?collection=${encodeURIComponent(a.collection.slug)}`}
+                    href={`/articles?collection=${encodeURIComponent(a.collection.slug)}`}
                     style={hueStyle(a.collection)}
                   >
                     {a.collection.name}
@@ -86,7 +86,7 @@ export function BrowseHome({
           <ul className="tag-cloud">
             {tags.map((t) => (
               <li key={t.slug}>
-                <Link className="tag" href={`/?tag=${encodeURIComponent(t.slug)}`}>
+                <Link className="tag" href={`/articles?tag=${encodeURIComponent(t.slug)}`}>
                   <TagLogo name={t.name} className="tag-icon" />
                   {t.name}
                   <span className="tag-count">
@@ -115,7 +115,7 @@ function FolderCard({ shelf: { collection: c, latest }, index }: { shelf: Collec
       <Suspense fallback={null}>
         <FolderSheets collection={c} latest={latest} />
       </Suspense>
-      <Link className="folder-front" href={`/?collection=${encodeURIComponent(c.slug)}`}>
+      <Link className="folder-front" href={`/articles?collection=${encodeURIComponent(c.slug)}`}>
         <CollectionIcon name={c.name} className="folder-mark" />
         <span className="folder-icon" aria-hidden="true">
           <CollectionIcon name={c.name} />

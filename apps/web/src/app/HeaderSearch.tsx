@@ -38,7 +38,7 @@ export function HeaderSearch() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const onLibrary = pathname === "/";
+  const onLibrary = pathname === "/articles";
   const listId = useId();
   const input = useRef<HTMLInputElement>(null);
 
@@ -155,16 +155,15 @@ export function HeaderSearch() {
       }
       for (const t of params.getAll("tag")) next.append("tag", t);
     }
-    if (next.size === 0) next.set("view", "all");
     setToken(null);
     input.current?.blur();
-    router.push(`/?${next}`);
+    router.push(next.size > 0 ? `/articles?${next}` : "/articles");
   };
 
   const showHelp = focused && !open && text === "" && !picked;
 
   return (
-    <form className="header-search" action="/" method="get" role="search" onSubmit={onSubmit}>
+    <form className="header-search" action="/articles" method="get" role="search" onSubmit={onSubmit}>
       <label className="visually-hidden" htmlFor="q">
         {picked ? `Search ${picked.name}` : "Search your library"}
       </label>

@@ -46,7 +46,7 @@ export default async function ShelvesLab() {
                   <CollectionIcon name={c.name} />
                 </span>
                 <h3>
-                  <Link href={`/?collection=${encodeURIComponent(c.slug)}`}>{c.name}</Link>
+                  <Link href={`/articles?collection=${encodeURIComponent(c.slug)}`}>{c.name}</Link>
                 </h3>
                 <span className="orig-card-count">{c.articles} articles</span>
               </div>
@@ -58,7 +58,7 @@ export default async function ShelvesLab() {
                   </li>
                 ))}
               </ul>
-              <Link className="orig-card-more" href={`/?collection=${encodeURIComponent(c.slug)}`}>
+              <Link className="orig-card-more" href={`/articles?collection=${encodeURIComponent(c.slug)}`}>
                 Browse {c.name}
               </Link>
             </li>
@@ -81,11 +81,11 @@ export default async function ShelvesLab() {
                     </li>
                   ))}
                 </ol>
-                <Link className="lab-more" href={`/?collection=${encodeURIComponent(c.slug)}`}>
+                <Link className="lab-more" href={`/articles?collection=${encodeURIComponent(c.slug)}`}>
                   Browse all {c.articles}
                 </Link>
               </div>
-              <Link className="lab-book-cover" href={`/?collection=${encodeURIComponent(c.slug)}`}>
+              <Link className="lab-book-cover" href={`/articles?collection=${encodeURIComponent(c.slug)}`}>
                 <CollectionIcon name={c.name} className="lab-book-mark" />
                 <span className="lab-book-icon">
                   <CollectionIcon name={c.name} />
@@ -109,7 +109,7 @@ export default async function ShelvesLab() {
                   <CollectionIcon name={c.name} />
                 </span>
               </span>
-              <Link className="lab-vinyl-sleeve" href={`/?collection=${encodeURIComponent(c.slug)}`}>
+              <Link className="lab-vinyl-sleeve" href={`/articles?collection=${encodeURIComponent(c.slug)}`}>
                 <span className="lab-folder-title">{c.name}</span>
                 <ol className="lab-vinyl-tracks">
                   {latest[i].map((a, j) => (
@@ -132,7 +132,7 @@ export default async function ShelvesLab() {
         <ul className="lab-grid">
           {shown.map((c, i) => (
             <li key={c.id} className="lab-holo-wrap" style={{ ...hueStyle(c), "--i": i } as CSSProperties}>
-              <Link className="lab-holo" href={`/?collection=${encodeURIComponent(c.slug)}`}>
+              <Link className="lab-holo" href={`/articles?collection=${encodeURIComponent(c.slug)}`}>
                 <span className="lab-holo-icon" aria-hidden="true">
                   <CollectionIcon name={c.name} />
                 </span>

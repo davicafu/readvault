@@ -134,7 +134,7 @@ export function Notifications() {
           {failed > 0 ? (
             <p className="bell-item bell-item-bad">
               The text of {articles(failed)} could not be downloaded.
-              <Link href="/?text=failed" onClick={() => setOpen(false)}>
+              <Link href="/articles?text=failed" onClick={() => setOpen(false)}>
                 See them
               </Link>
             </p>
