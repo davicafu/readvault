@@ -227,6 +227,9 @@ body::before {
   position: relative;
   display: flex;
   flex: 1 1 18rem;
+  /* Shrink below its content (a collection chip widens it) rather than
+     push the menu or the bell onto another line. */
+  min-width: 0;
   align-items: center;
   gap: 0.5rem;
   max-width: 30rem;
@@ -486,6 +489,20 @@ body::before {
   from {
     opacity: 0;
     transform: translateY(6px);
+  }
+}
+
+/* Too narrow for name, search, menu and bell on one line: the search takes
+   its own line below them. */
+@media (min-width: 761px) and (max-width: 1100px) {
+  :root {
+    --header-h: 7.5rem;
+  }
+
+  .header-search {
+    flex-basis: 100%;
+    max-width: none;
+    order: 3;
   }
 }
 

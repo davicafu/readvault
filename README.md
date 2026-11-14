@@ -158,6 +158,7 @@ The JSON export (**Export JSON** in the web app, or `GET /api/export`) is a read
 | `set POSTGRES_PASSWORD in .env` | Add `POSTGRES_PASSWORD` to `.env`, or delete `.env` so `make` creates a new one. Compose refuses to start Postgres without a password |
 | `Node.js 22 or later is required` | An older `node` comes first on `PATH`. Put Node 22 first, for example `export PATH="$HOME/.local/node/bin:$PATH"` in your shell profile |
 | `No Docker engine is running` | Run `colima start` (or open Docker Desktop) |
+| The library is empty after moving to Colima (or another Docker engine) | Each engine keeps its own `db-data` volume, and uninstalling Docker Desktop deletes its volumes. Before switching, back up with `pg_dump` (see Backup and restore) and restore into the new engine, or import your JSON export or bookmarks file again |
 | `make db-up` waits forever | Check `docker compose -f deploy/compose.yaml --env-file .env logs db` |
 | `port is already allocated` on 5432 | Another Postgres is running. Set `POSTGRES_PORT=55432` in `.env` and use the same port in `DATABASE_URL` |
 | `address already in use` on 8080 | Set `HTTP_ADDR=:8081` and `API_ORIGIN=http://127.0.0.1:8081` in `.env` |
