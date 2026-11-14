@@ -11,14 +11,14 @@ export default function AddPage() {
       <div className="page-head">
         <h1 className="page-title">Add articles</h1>
         <p className="lede">
-          Save one link, or bring in every bookmark from your browser at once.
+          Add one link or several, or bring in every bookmark from your browser at once.
           When a site blocks the download of an article&apos;s text, open the
           article and upload the page you saved from your browser.
         </p>
       </div>
 
       <section className="add-section" aria-labelledby="add-link-heading">
-        <h2 id="add-link-heading">Save a link</h2>
+        <h2 id="add-link-heading">Add links</h2>
         <AddLink />
       </section>
 

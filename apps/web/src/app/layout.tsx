@@ -5,6 +5,7 @@ import { Suspense, type ReactNode } from "react";
 
 import { brand } from "@/config/brand";
 import { NavIcon } from "./NavIcon";
+import { Notifications } from "./Notifications";
 import { HeaderSearch } from "./HeaderSearch";
 import "./globals.css";
 
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </li>
               </ul>
             </nav>
+            <Notifications />
           </div>
         </header>
         <main className="page">{children}</main>

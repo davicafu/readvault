@@ -456,7 +456,7 @@ function EmptyLibrary({ filtered, clearHref }: { filtered: boolean; clearHref: s
   return (
     <section className="notice">
       <h2>Your library is empty</h2>
-      <p>Save a link, or export your bookmarks from Chrome, Firefox, Safari or Edge as an HTML file and import them.</p>
+      <p>Add one or more links, or export your bookmarks from Chrome, Firefox, Safari or Edge as an HTML file and import them.</p>
       <Link className="button" href="/add">
         Add articles
       </Link>

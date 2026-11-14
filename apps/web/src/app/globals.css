@@ -647,6 +647,123 @@ body::before {
   }
 }
 
+/* The bell: waiting texts and failed downloads. A red count means failures;
+   a dot means texts are waiting, pulsing while they download. */
+.bell {
+  position: relative;
+  flex: none;
+}
+
+.bell-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.bell-button:hover,
+.bell-button[aria-expanded="true"] {
+  border-color: var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.bell-icon {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.bell-badge {
+  position: absolute;
+  top: 0.05rem;
+  right: 0;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: var(--bad);
+  color: var(--paper);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+  text-align: center;
+}
+
+.bell-dot {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.5rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.bell-dot-busy {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.bell-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 0.7rem;
+  width: min(21rem, calc(100vw - 2rem));
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 14px 36px rgb(0 0 0 / 0.28);
+}
+
+.bell-item {
+  margin: 0;
+  font-size: var(--step--1);
+  line-height: 1.5;
+}
+
+.bell-item .text-downloads-pulse {
+  display: inline-block;
+  margin-right: 0.45rem;
+  vertical-align: 0.05rem;
+}
+
+.bell-item > a,
+.bell-item > .button {
+  margin-left: 0.5rem;
+}
+
+.bell-item-bad {
+  color: var(--bad);
+}
+
+.bell-empty {
+  color: var(--ink-soft);
+}
+
+/* On a phone the bell sits on the name's line, at the right. */
+@media (max-width: 760px) {
+  .bell {
+    order: 1;
+    margin-left: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bell-dot-busy {
+    animation: none;
+  }
+}
+
 .page {
   padding-block: 2rem 4rem;
 }
@@ -2627,20 +2744,31 @@ body:has(.article-with-toc) .masthead-inner {
   color: var(--ink-soft);
 }
 
+/* The box, its hint, then the button: the box grows a line per link. */
 .add-link {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
+  display: grid;
+  justify-items: start;
   gap: 0.75rem;
   max-width: var(--measure);
   margin-bottom: 2rem;
 }
 
 .add-link .field {
-  flex: 1 1 18rem;
+  justify-self: stretch;
 }
 
-.add-link .field-error {
-  flex-basis: 100%;
+.add-link-box {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  max-height: 50vh;
+  overflow-y: auto;
+  resize: none;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.add-link .field-error,
+.add-link .fine-print {
   margin: 0;
 }

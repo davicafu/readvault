@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/format";
 import { Markdown } from "@/lib/markdown";
 
 import { ActionIcon } from "../../ActionIcon";
+import { downloadsChanged } from "../../Notifications";
 
 type Props = { articleId: string; articleUrl: string; content: ArticleContent | null };
 
@@ -47,6 +48,7 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
       }
     } finally {
       setBusy(null);
+      downloadsChanged();
       startRefresh(() => router.refresh());
     }
   };
