@@ -18,9 +18,9 @@ const articles = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "artic
 
 // Notifications is the bell in the menu: texts still downloading in the
 // background, articles without a text yet (with Download all) and failed
-// downloads. Waiting texts are only told here; failures are also on the
-// front page. The bell checks again on every page change, every few
-// seconds while texts download, and when a page says it queued some.
+// downloads. They are told only here. The bell checks again on every page
+// change, every few seconds while texts download, and when a page says it
+// queued some.
 export function Notifications() {
   const pathname = usePathname();
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -119,7 +119,7 @@ export function Notifications() {
         <div id="bell-panel" className="bell-panel" role="region" aria-label="Notifications" aria-live="polite">
           {queued > 0 ? (
             <p className="bell-item">
-              <span className="text-downloads-pulse" aria-hidden="true" />
+              <span className="pulse-dot" aria-hidden="true" />
               Downloading texts in the background: {articles(queued)} left.
             </p>
           ) : null}

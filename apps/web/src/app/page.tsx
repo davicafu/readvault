@@ -6,7 +6,6 @@ import {
   type Article,
   type ArticlePage,
   type Collection,
-  type DownloadSummary,
   type Sort,
   type TagCount,
 } from "@/lib/api";
@@ -16,7 +15,6 @@ import { apiGet } from "@/lib/server-api";
 import { BrowseHome, type CollectionShelf } from "./BrowseHome";
 import { CollectionIcon, hueStyle } from "./CollectionIcon";
 import { TagLogo } from "./TagLogo";
-import { TextDownloads } from "./TextDownloads";
 
 const PAGE_SIZE = 25;
 // The front page previews the latest articles of this many collections.
@@ -193,11 +191,10 @@ export default async function LibraryPage({ searchParams }: { searchParams: Sear
 // explore, the latest articles and the tags. Each part is optional, so a
 // failed request hides that part only.
 async function FrontPage() {
-  const [collectionList, tagList, recentList, downloads] = await Promise.allSettled([
+  const [collectionList, tagList, recentList] = await Promise.allSettled([
     apiGet<{ collections: Collection[] }>("/api/collections"),
     apiGet<{ tags: TagCount[] }>("/api/tags"),
     apiGet<ArticlePage>(`/api/articles?limit=${RECENT_SIZE}`),
-    apiGet<DownloadSummary>("/api/content-downloads"),
   ]);
   if (recentList.status === "rejected") {
     const err = recentList.reason;
@@ -244,7 +241,6 @@ async function FrontPage() {
   return (
     <>
       <h1 className="visually-hidden">Library</h1>
-      <TextDownloads initial={downloads.status === "fulfilled" ? downloads.value : null} />
       <BrowseHome shelves={shelves} recent={recent} tags={tagList.status === "fulfilled" ? tagList.value.tags : []} />
     </>
   );

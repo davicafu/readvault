@@ -731,7 +731,7 @@ body::before {
   line-height: 1.5;
 }
 
-.bell-item .text-downloads-pulse {
+.bell-item .pulse-dot {
   display: inline-block;
   margin-right: 0.45rem;
   vertical-align: 0.05rem;
@@ -1715,31 +1715,8 @@ body:has(.article-with-toc) .masthead-inner {
   margin-bottom: 0.75rem;
 }
 
-/* Home: how the library's texts are doing. */
-.text-downloads {
-  display: grid;
-  gap: 0.4rem;
-  margin: 0 0 2rem;
-  padding: 0.85rem 1.1rem;
-  border: 1px solid var(--rule);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface) 80%, transparent);
-  backdrop-filter: blur(8px);
-}
-
-.text-downloads-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.9rem;
-  margin: 0;
-}
-
-.text-downloads-bad {
-  color: var(--bad);
-}
-
-.text-downloads-pulse {
+/* A dot that breathes while texts download (the bell). */
+.pulse-dot {
   width: 0.55rem;
   height: 0.55rem;
   border-radius: 50%;
