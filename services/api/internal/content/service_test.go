@@ -15,8 +15,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/content"
+	contentpg "readvault/api/internal/content/postgres"
+	"readvault/api/internal/platform/postgres"
 	"readvault/api/internal/testdb"
 )
 
@@ -111,7 +112,7 @@ func setup(t *testing.T) (*content.Service, *fakeFetcher, *pgxpool.Pool, string)
 		},
 		errs: map[string]error{},
 	}
-	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10)
+	svc := content.NewService(contentpg.NewRepository(pool), f, 64<<10)
 	return svc, f, pool, newArticle(t, pool, owner, articleURL)
 }
 
@@ -325,7 +326,7 @@ func TestUpload_SkipsAnImageWhoseAddressIsTooLongToStore(t *testing.T) {
 func TestUpload_TextTooLargeToStoreIsRejected(t *testing.T) {
 	t.Parallel()
 	pool := testdb.New(t)
-	svc := content.NewService(postgres.NewContentRepository(pool), &fakeFetcher{}, 8<<20)
+	svc := content.NewService(contentpg.NewRepository(pool), &fakeFetcher{}, 8<<20)
 	id := newArticle(t, pool, owner, articleURL)
 
 	// 3 MiB where every other byte is invalid become 6 MiB once each one is
@@ -356,7 +357,7 @@ func everyPage(context.Context, string) bool { return true }
 func setupWithMirror(t *testing.T) (*content.Service, *fakeFetcher, string) {
 	t.Helper()
 	_, f, pool, id := setup(t)
-	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10, content.WithMirror(mirror, everyPage))
+	svc := content.NewService(contentpg.NewRepository(pool), f, 64<<10, content.WithMirror(mirror, everyPage))
 	return svc, f, id
 }
 
@@ -458,7 +459,7 @@ func TestFetch_WithoutAMirrorTheFailureStands(t *testing.T) {
 func TestFetch_AMirrorAddressIsNotSentToTheMirrorAgain(t *testing.T) {
 	t.Parallel()
 	_, f, pool, _ := setup(t)
-	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10, content.WithMirror(mirror, everyPage))
+	svc := content.NewService(contentpg.NewRepository(pool), f, 64<<10, content.WithMirror(mirror, everyPage))
 	saved := mirror + articleURL
 	id := newArticle(t, pool, owner, saved)
 	f.errs[saved] = &content.FetchError{Problem: content.ProblemTimeout}
@@ -546,7 +547,7 @@ func TestFetch_SendsOnlyPagesTheMirrorServesToIt(t *testing.T) {
 		asked = append(asked, rawURL)
 		return false
 	}
-	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10, content.WithMirror(mirror, onlyMedium))
+	svc := content.NewService(contentpg.NewRepository(pool), f, 64<<10, content.WithMirror(mirror, onlyMedium))
 	f.errs[articleURL] = &content.FetchError{Problem: content.ProblemHTTPStatus, Status: 403}
 	f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(mirrorPage)}
 

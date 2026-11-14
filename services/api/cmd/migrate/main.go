@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"os"
 
-	"readvault/api/internal/adapter/postgres"
+	"readvault/api/internal/platform/postgres"
 )
 
 func main() {

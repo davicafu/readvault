@@ -91,7 +91,7 @@ The defaults are for local development. In production, pass the variables from y
 browser ──> apps/web (Next.js, :3000) ──/api/*──> services/api (Go, :8080) ──> Postgres (Docker)
 ```
 
-- `services/api`: the Go API. Code is grouped by domain (`internal/importing`, `internal/library`, `internal/content` for saved texts and downloads, `internal/urlnorm`, `internal/tag`), with adapters in `internal/adapter/http`, `internal/adapter/postgres` and `internal/adapter/fetch` (article downloads). Migrations are in `services/api/migrations` and are embedded in the binaries.
+- `services/api`: the Go API, a modular monolith with a hexagonal layout. Each module (`internal/importing`, `internal/library`, `internal/content` for saved texts and downloads, `internal/tag`) holds its domain and ports, and its own adapters below it: `http` (driving), `postgres` (driven) and, for content, `fetch` (article downloads). Domain packages import no adapter. What the adapters share lives in `internal/platform`: `httpapi` (router, health checks, middleware, JSON errors, uploads) and `postgres` (pool, migrations). `cmd/api` wires the modules together. The modules share one database schema. Migrations are in `services/api/migrations` and are embedded in the binaries.
 - `apps/web`: the web app. Server components read the API directly. The browser goes through the `/api/*` route handler, so there is a single origin. Brand settings are in `apps/web/src/config/brand.ts`.
 - `deploy/compose.yaml`: Postgres for local development.
 - `fixtures/bookmarks.html`: a sample export with nested folders, tags, tracking parameters, a duplicate, Unicode titles and entries that cannot be imported.

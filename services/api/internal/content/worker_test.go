@@ -10,8 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/content"
+	contentpg "readvault/api/internal/content/postgres"
 )
 
 func queue(t *testing.T, pool *pgxpool.Pool, articleIDs ...string) {
@@ -28,7 +28,7 @@ func queue(t *testing.T, pool *pgxpool.Pool, articleIDs ...string) {
 func runWorker(t *testing.T, svc *content.Service, pool *pgxpool.Pool) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
-	w := content.NewWorker(svc, postgres.NewDownloadQueue(pool, 0), content.WorkerConfig{Workers: 2, Pause: time.Millisecond, Idle: 10 * time.Millisecond})
+	w := content.NewWorker(svc, contentpg.NewDownloadQueue(pool, 0), content.WorkerConfig{Workers: 2, Pause: time.Millisecond, Idle: 10 * time.Millisecond})
 	stopped := make(chan struct{})
 	go func() {
 		w.Run(ctx)
@@ -124,7 +124,7 @@ func TestWorker_RecordsAFailedDownloadAndDoesNotRetryIt(t *testing.T) {
 func TestDownloadQueue_ClaimsEachArticleOnceUntilItsClaimRunsOut(t *testing.T) {
 	t.Parallel()
 	_, _, pool, id := setup(t)
-	q := postgres.NewDownloadQueue(pool, 0)
+	q := contentpg.NewDownloadQueue(pool, 0)
 	queue(t, pool, id)
 	ctx := t.Context()
 
@@ -159,7 +159,7 @@ func TestDownloadQueue_ClaimsEachArticleOnceUntilItsClaimRunsOut(t *testing.T) {
 func TestDownloadQueue_DoneRemovesTheArticle(t *testing.T) {
 	t.Parallel()
 	_, _, pool, id := setup(t)
-	q := postgres.NewDownloadQueue(pool, 0)
+	q := contentpg.NewDownloadQueue(pool, 0)
 	queue(t, pool, id)
 
 	job, _, err := q.Claim(t.Context(), time.Hour)
@@ -180,7 +180,7 @@ func TestDownloadQueue_DoneRemovesTheArticle(t *testing.T) {
 func TestDownloadQueue_WaitsBeforeHandingOutAFreshArticle(t *testing.T) {
 	t.Parallel()
 	_, _, pool, id := setup(t)
-	q := postgres.NewDownloadQueue(pool, time.Minute)
+	q := contentpg.NewDownloadQueue(pool, time.Minute)
 	queue(t, pool, id)
 
 	if _, ok, err := q.Claim(t.Context(), time.Hour); err != nil || ok {
@@ -204,7 +204,7 @@ func TestWorker_LeavesASingleLinkToItsImmediateDownload(t *testing.T) {
 	queue(t, pool, id)
 
 	ctx, cancel := context.WithCancel(t.Context())
-	w := content.NewWorker(svc, postgres.NewDownloadQueue(pool, time.Minute), content.WorkerConfig{Workers: 2, Pause: time.Millisecond, Idle: 10 * time.Millisecond})
+	w := content.NewWorker(svc, contentpg.NewDownloadQueue(pool, time.Minute), content.WorkerConfig{Workers: 2, Pause: time.Millisecond, Idle: 10 * time.Millisecond})
 	stopped := make(chan struct{})
 	go func() {
 		w.Run(ctx)
@@ -232,7 +232,7 @@ func TestWorker_ADownloadCutShortIsTriedAgain(t *testing.T) {
 	queue(t, pool, id)
 
 	ctx, cancel := context.WithCancel(t.Context())
-	w := content.NewWorker(svc, postgres.NewDownloadQueue(pool, 0), content.WorkerConfig{Workers: 1, Idle: 10 * time.Millisecond})
+	w := content.NewWorker(svc, contentpg.NewDownloadQueue(pool, 0), content.WorkerConfig{Workers: 1, Idle: 10 * time.Millisecond})
 	stopped := make(chan struct{})
 	go func() {
 		w.Run(ctx)

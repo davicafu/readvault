@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/content"
+	contentpg "readvault/api/internal/content/postgres"
 )
 
 const archive = "https://archive.example/web/2id_/"
@@ -22,7 +22,7 @@ func setupWithCopies(t *testing.T, mirrorServes bool) (*content.Service, *fakeFe
 	t.Helper()
 	_, f, pool, id := setup(t)
 	serves := func(_ context.Context, _ string) bool { return mirrorServes }
-	svc := content.NewService(postgres.NewContentRepository(pool), f, 64<<10,
+	svc := content.NewService(contentpg.NewRepository(pool), f, 64<<10,
 		content.WithMirror(mirror, serves), content.WithArchive(archive))
 	return svc, f, id
 }

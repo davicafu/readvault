@@ -27,6 +27,7 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 - **S19** (L8) "Cambié de idea y quiero que los errores tampoco salgan en el home, solo en la camapanita".
 - **S20** (L9, L10) the list of all articles lives at `/articles`, without `view=all` ("el endpoint de libary cuando muestra todos los articulos no deberia ser /articles sin view=all ni nada?"), with its filters in the query as in `GET /api/articles` (`/articles?collection=backend&q=kafka`, `/articles?text=failed`); `/` stays the front page; old `/?view=all`, `/?collection=…` addresses redirect to the new ones.
 - **S21** (L9) "seria facil de cambiar el makefile apra eso? la app quedaria igual?": `make dev DB=external` uses your own Postgres 15+ at `DATABASE_URL` from `.env` and skips Docker; the app is the same.
+- **S22** (L12, L13) "reorganiza por modulo": each API module (library, importing, content, tag) owns its adapters (`http`, `postgres`, `fetch`); what they share goes in `internal/platform`; domain packages import no adapter; endpoints and responses stay the same. Postgres stays (L13: "me parece perfecto lo de postgres entonces").
 
 ## Tasks
 
@@ -50,6 +51,7 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 | T16 | S19 | inline | done | Front-page notice and its summary request removed; the bell keeps waiting texts and failures. Real app: no notice on the front page, bell badge 38 with the failure line; tsc passes |
 | T17 | S20 | inline | done | List moved to `app/articles/page.tsx`; `/` keeps the front page and answers 308 for list queries (`/?view=all` → `/articles`, `/?collection=backend&q=kafka` → `/articles?q=kafka&collection=backend`, tags and sort kept); every list link, the header search and the bell point to `/articles`; tsc, lint and build pass; `/articles` renders 25 entries |
 | T18 | S21 | inline | done | `DB ?= docker`, `DB=external` swaps `db-up` for `db-external` in migrate, migrate-down and test-integration, unknown values stop make; `make -n dev DB=external` runs no Docker command; `make migrate DB=external` applied migrations against `DATABASE_URL` |
+| T19 | S22 | inline | done | `internal/adapter/*` moved to `<module>/http`, `<module>/postgres`, `content/fetch`, `tag/postgres` (shared `CreateTags`) and `platform/{httpapi,postgres}`; each module's `http.New(...).Register(mux)`; `importing/http` no longer imports `library`; 186 tests before and after; unit and integration (`-race -tags=integration`) pass; 10 live endpoints answer byte for byte the same before and after |
 
 ## Log
 
@@ -64,3 +66,5 @@ Delivery strategy: `ask-on-risk`. Test runner: `go test ./...`, `go test -race -
 - L9 (2026-11-14, user): "seria facil de cambiar el makefile apra eso? la app quedaria igual? / en el articulo delete article y save changes no tienen icono, y en add links save links tampoco y no cambia a save links cuando tienen varios / el endpoint de libary cuando muestra todos los articulos no deberia ser /articles sin view=all ni nada?"
 - L10 (2026-11-14, user): "cual seria lo mejor para una api bien dsieñada con lo de articles?" Then, after the proposal (`/articles`, filters in the query, redirects from the old addresses, `DB=external`, push to main): "si haz eso, que pensaba que ya estaba sieguiendo esas buenas practicas"
 - L11 (2026-11-14): `make build` first failed with "No space left on device"; removing this session's scratch Chrome profiles freed about 1.8 GB, then the build passed. The disk stays nearly full.
+- L12 (2026-11-14, user): "vale, una cosa la api y el backend esta diseñado como monolito modular en arquitectura hexagonal?" Answer: hexagonal yes; modular only in the core, adapters grouped by technology.
+- L13 (2026-11-14, user): "si tiene sentido si, otra cosa, postgres es necesario? para que se utiliza? seria mas util aprovechar ya el json de export/import y que se vaya escribiendo ahi? o no?" then "vale, reorganiza por modulo y me parece perfecto lo de postgres entonces"

@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"readvault/api/internal/adapter/postgres"
+	"readvault/api/internal/platform/postgres"
 )
 
 // New creates an empty database, applies every migration and returns a pool

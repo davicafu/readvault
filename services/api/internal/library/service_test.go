@@ -11,8 +11,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/library"
+	librarypg "readvault/api/internal/library/postgres"
+	"readvault/api/internal/platform/postgres"
 	"readvault/api/internal/tag"
 	"readvault/api/internal/testdb"
 )
@@ -65,7 +66,7 @@ func newUser(t *testing.T, pool *pgxpool.Pool) string {
 func newService(t *testing.T) (*library.Service, *pgxpool.Pool) {
 	t.Helper()
 	pool := testdb.New(t)
-	return library.NewService(postgres.NewLibraryRepository(pool)), pool
+	return library.NewService(librarypg.NewRepository(pool)), pool
 }
 
 func titles(items []library.Article) []string {

@@ -12,13 +12,19 @@ import (
 	"syscall"
 	"time"
 
-	"readvault/api/internal/adapter/fetch"
-	apihttp "readvault/api/internal/adapter/http"
-	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/config"
 	"readvault/api/internal/content"
+	"readvault/api/internal/content/fetch"
+	contenthttp "readvault/api/internal/content/http"
+	contentpg "readvault/api/internal/content/postgres"
 	"readvault/api/internal/importing"
+	importinghttp "readvault/api/internal/importing/http"
+	importingpg "readvault/api/internal/importing/postgres"
 	"readvault/api/internal/library"
+	libraryhttp "readvault/api/internal/library/http"
+	librarypg "readvault/api/internal/library/postgres"
+	"readvault/api/internal/platform/httpapi"
+	"readvault/api/internal/platform/postgres"
 )
 
 func main() {
@@ -45,19 +51,19 @@ func run() error {
 	}
 	defer pool.Close()
 
-	contents := content.NewService(postgres.NewContentRepository(pool), fetch.New(fetch.PublicAddr), cfg.MaxArticleBytes,
+	contents := content.NewService(contentpg.NewRepository(pool), fetch.New(fetch.PublicAddr), cfg.MaxArticleBytes,
 		content.WithMirror(cfg.ArticleMirrorURL, fetch.MirrorReads(fetch.NewMediumDetector(nil).Is)),
 		content.WithArchive(cfg.ArticleArchiveURL))
-	handler := apihttp.NewHandler(apihttp.Deps{
-		DB:               pool,
-		Logger:           logger,
-		Imports:          importing.NewService(postgres.NewImportRepository(pool), cfg.MaxImportRecords),
-		Library:          library.NewService(postgres.NewLibraryRepository(pool)),
-		OwnerID:          postgres.DevOwnerID,
-		MaxUploadBytes:   cfg.MaxUploadBytes,
-		MaxImportRecords: cfg.MaxImportRecords,
-		Content:          contents,
-		MaxArticleBytes:  cfg.MaxArticleBytes,
+	owner := postgres.DevOwnerID
+	handler := httpapi.NewHandler(httpapi.Deps{
+		DB:     pool,
+		Logger: logger,
+		Modules: []httpapi.Routes{
+			importinghttp.New(importing.NewService(importingpg.NewRepository(pool), cfg.MaxImportRecords),
+				owner, cfg.MaxUploadBytes, cfg.MaxImportRecords, logger),
+			libraryhttp.New(library.NewService(librarypg.NewRepository(pool)), owner, logger),
+			contenthttp.New(contents, owner, cfg.MaxArticleBytes, logger),
+		},
 	})
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -74,7 +80,7 @@ func run() error {
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	workerDone := make(chan struct{})
 	if cfg.DownloadWorkers > 0 {
-		worker := content.NewWorker(contents, postgres.NewDownloadQueue(pool, time.Minute), content.WorkerConfig{Workers: cfg.DownloadWorkers})
+		worker := content.NewWorker(contents, contentpg.NewDownloadQueue(pool, time.Minute), content.WorkerConfig{Workers: cfg.DownloadWorkers})
 		go func() {
 			defer close(workerDone)
 			worker.Run(workerCtx)

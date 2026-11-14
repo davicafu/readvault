@@ -12,8 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/importing"
+	importingpg "readvault/api/internal/importing/postgres"
 	"readvault/api/internal/library"
 )
 
@@ -157,7 +157,7 @@ func TestUpdate_OnlyFindsTheUsersOwnArticles(t *testing.T) {
 func TestUpdate_EditedTitleAndTagsSurviveAReimport(t *testing.T) {
 	t.Parallel()
 	svc, pool := newService(t)
-	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
+	imports := importing.NewService(importingpg.NewRepository(pool), 100)
 	file := `<DL><DT><A HREF="https://go.dev/blog/" TAGS="go">Imported title</A></DL>`
 	if _, err := imports.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(file)); err != nil {
 		t.Fatal(err)
@@ -194,7 +194,7 @@ func TestUpdate_EditedTitleAndTagsSurviveAReimport(t *testing.T) {
 func TestUpdate_ImportStillAddsTagsWhenOnlyTheTitleWasEdited(t *testing.T) {
 	t.Parallel()
 	svc, pool := newService(t)
-	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
+	imports := importing.NewService(importingpg.NewRepository(pool), 100)
 	ids := seed(t, pool, owner, seedArticle{url: "https://go.dev/blog/", title: "one", created: base, tags: []string{"news"}})
 	if _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Title: ptr("My title")}); err != nil {
 		t.Fatal(err)
@@ -271,7 +271,7 @@ func TestUpdate_ConcurrentEditsOfDifferentArticlesDoNotDeadlock(t *testing.T) {
 func TestUpdate_ConcurrentImportAndEditDoNotDeadlock(t *testing.T) {
 	t.Parallel()
 	svc, pool := newService(t)
-	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
+	imports := importing.NewService(importingpg.NewRepository(pool), 100)
 	ids := seed(t, pool, owner, seedArticle{url: "https://a.example/edited", title: "edited", created: base})
 
 	for round := range 20 {
@@ -300,7 +300,7 @@ func TestUpdate_ConcurrentImportAndEditDoNotDeadlock(t *testing.T) {
 func TestUpdate_ConcurrentImportAndTagEditOfTheSameArticle(t *testing.T) {
 	t.Parallel()
 	svc, pool := newService(t)
-	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
+	imports := importing.NewService(importingpg.NewRepository(pool), 100)
 
 	for round := range 20 {
 		url := fmt.Sprintf("https://a.example/same-%d", round)
@@ -356,7 +356,7 @@ func waitForLockWait(t *testing.T, pool *pgxpool.Pool) {
 func TestImport_WaitsForATagEditInProgressAndKeepsIt(t *testing.T) {
 	t.Parallel()
 	svc, pool := newService(t)
-	imports := importing.NewService(postgres.NewImportRepository(pool), 100)
+	imports := importing.NewService(importingpg.NewRepository(pool), 100)
 	ids := seed(t, pool, owner, seedArticle{url: "https://go.dev/blog/", title: "one", created: base})
 
 	// A tag edit that has locked the article, as Update does first, and has

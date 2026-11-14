@@ -10,8 +10,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"readvault/api/internal/adapter/postgres"
 	"readvault/api/internal/importing"
+	importingpg "readvault/api/internal/importing/postgres"
+	"readvault/api/internal/platform/postgres"
 	"readvault/api/internal/testdb"
 )
 
@@ -20,7 +21,7 @@ const owner = postgres.DevOwnerID
 func newService(t *testing.T) (*importing.Service, *pgxpool.Pool) {
 	t.Helper()
 	pool := testdb.New(t)
-	return importing.NewService(postgres.NewImportRepository(pool), 100), pool
+	return importing.NewService(importingpg.NewRepository(pool), 100), pool
 }
 
 func fixture(t *testing.T) string {
@@ -195,7 +196,7 @@ func TestImport_KeepsUserEditsAndCompletesMissingData(t *testing.T) {
 func TestImport_RejectsFilesOverTheRecordLimit(t *testing.T) {
 	t.Parallel()
 	pool := testdb.New(t)
-	svc := importing.NewService(postgres.NewImportRepository(pool), 2)
+	svc := importing.NewService(importingpg.NewRepository(pool), 2)
 
 	_, err := svc.Import(t.Context(), owner, importing.Choices{}, strings.NewReader(fixture(t)))
 	if err == nil || !strings.Contains(err.Error(), importing.ErrTooManyRecords.Error()) {
