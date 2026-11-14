@@ -22,7 +22,14 @@ It runs locally: a Go API, PostgreSQL in Docker and a Next.js web app. It needs 
 You need:
 
 - Go 1.27 or later
-- Docker with Compose (Docker Desktop on macOS; the `docker-compose` command)
+- A Docker engine with Compose, only for PostgreSQL. On macOS use [Colima](https://github.com/abiosoft/colima), a light engine without Docker Desktop:
+
+  ```bash
+  brew install colima docker docker-compose
+  colima start               # once after each restart of the computer
+  ```
+
+  Docker Desktop works too. `make` uses `docker compose`, or `docker-compose` when the plugin is missing.
 - Node.js 22 or later, with npm
 
 Compose runs PostgreSQL 17. To use your own server instead, it must be PostgreSQL 15 or later; set `DATABASE_URL` to point at it.
@@ -35,7 +42,7 @@ make dev                    # Postgres, migrations, API on :8080, web app on :30
 
 Open http://localhost:3000, choose **Add articles** and import a bookmarks file. To try it without your own export, import `fixtures/bookmarks.html`.
 
-The first `make` run creates `.env` with a random database password; edit it to change ports or limits (`.env.example` lists every variable). `make dev` checks that Node.js 22 or later comes first on `PATH`, installs the web app's dependencies the first time and again whenever `apps/web/package-lock.json` changes (for example after a pull that adds one), and stops everything with Ctrl+C. Go downloads the API's modules on its own the first time it runs. Postgres keeps running in Docker; stop it with `make db-down`. The data stays in the `db-data` volume.
+The first `make` run creates `.env` with a random database password; edit it to change ports or limits (`.env.example` lists every variable). `make dev` checks that Node.js 22 or later comes first on `PATH`, installs the web app's dependencies the first time and again whenever `apps/web/package-lock.json` changes (for example after a pull that adds one), and stops everything with Ctrl+C. Go downloads the API's modules on its own the first time it runs. If no Docker engine is running, `make` says so and stops. Postgres keeps running in Docker; stop it with `make db-down`. The data stays in the `db-data` volume, inside Colima's virtual machine: `colima stop` keeps it, `colima delete` deletes it.
 
 ## Commands
 
@@ -49,6 +56,7 @@ The first `make` run creates `.env` with a random database password; edit it to 
 | `make lint` | Checks Go formatting, runs `go vet` (and golangci-lint when installed), typechecks the web app |
 | `make build` | Builds `services/api/bin/api`, `services/api/bin/migrate` and the production web app |
 | `make db-up` / `make db-down` | Starts or stops Postgres |
+| `make docker-check` | Checks that a Docker engine (Colima or Docker Desktop) is running; `make db-up` runs it first |
 | `make web-install` | Reinstalls the web app's dependencies from the lockfile |
 
 ## Configuration
@@ -119,7 +127,7 @@ Each article can keep its text as Markdown, with the images of its body, for rea
 The database is the source of truth. Back it up with `pg_dump` from the Compose service:
 
 ```bash
-docker-compose -f deploy/compose.yaml --env-file .env exec -T db \
+docker compose -f deploy/compose.yaml --env-file .env exec -T db \
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' > readvault-$(date +%Y%m%d).dump
 ```
 
@@ -127,7 +135,7 @@ Restore it into an empty database. This replaces what is there, so take a backup
 
 ```bash
 make db-up
-docker-compose -f deploy/compose.yaml --env-file .env exec -T db \
+docker compose -f deploy/compose.yaml --env-file .env exec -T db \
   sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < readvault-20261108.dump
 make migrate   # applies any migration newer than the backup
 ```
@@ -142,12 +150,13 @@ The JSON export (**Export JSON** in the web app, or `GET /api/export`) is a read
 |---|---|
 | `set POSTGRES_PASSWORD in .env` | Add `POSTGRES_PASSWORD` to `.env`, or delete `.env` so `make` creates a new one. Compose refuses to start Postgres without a password |
 | `Node.js 22 or later is required` | An older `node` comes first on `PATH`. Put Node 22 first, for example `export PATH="$HOME/.local/node/bin:$PATH"` in your shell profile |
-| `make db-up` waits forever | Start Docker Desktop. Then check `docker-compose -f deploy/compose.yaml --env-file .env logs db` |
+| `No Docker engine is running` | Run `colima start` (or open Docker Desktop) |
+| `make db-up` waits forever | Check `docker compose -f deploy/compose.yaml --env-file .env logs db` |
 | `port is already allocated` on 5432 | Another Postgres is running. Set `POSTGRES_PORT=55432` in `.env` and use the same port in `DATABASE_URL` |
 | `address already in use` on 8080 | Set `HTTP_ADDR=:8081` and `API_ORIGIN=http://127.0.0.1:8081` in `.env` |
 | The library says the API is not reachable | The API is not running or `API_ORIGIN` points elsewhere. Check `curl http://localhost:8080/readyz` |
 | `/readyz` answers `unavailable` | The API cannot reach Postgres. Check `DATABASE_URL` and `make db-up` |
-| `password authentication failed` | The volume was created with another password. Use that password, or remove the volume with `docker-compose -f deploy/compose.yaml --env-file .env down -v`. This deletes all data |
+| `password authentication failed` | The volume was created with another password. Use that password, or remove the volume with `docker compose -f deploy/compose.yaml --env-file .env down -v`. This deletes all data |
 | `npm: command not found` | Install Node.js 22 or later and make sure it is on `PATH` |
 | The import says the file is too large | Raise `MAX_UPLOAD_BYTES`, or export a smaller bookmarks folder |
 | Integration tests fail with `TEST_DATABASE_URL (or DATABASE_URL) must be set` | Run them with `make test-integration`, which reads `.env`, or set `TEST_DATABASE_URL` to a database whose user may create databases |

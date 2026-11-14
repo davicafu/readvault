@@ -2,7 +2,12 @@
 
 SHELL := /bin/bash
 ENV_FILE ?= .env
-COMPOSE := docker-compose -f deploy/compose.yaml --env-file $(ENV_FILE)
+# Compose v2 (`docker compose`, what Colima and current Docker install) when
+# present, else the standalone v1 `docker-compose`.
+# Old Docker Desktop builds ship a preview `docker compose` without --env-file
+# that answers `version` with its help, so only a real version number counts.
+COMPOSE_CMD ?= $(shell docker compose version --short 2>/dev/null | grep -Eq '^v?([2-9]|[1-9][0-9])\.' && echo 'docker compose' || echo docker-compose)
+COMPOSE := $(COMPOSE_CMD) -f deploy/compose.yaml --env-file $(ENV_FILE)
 API_DIR := services/api
 WEB_DIR := apps/web
 
@@ -24,8 +29,16 @@ $(ENV_FILE):
 		'API_ORIGIN=http://127.0.0.1:8080' > $@
 	@echo "created $@ with a random database password"
 
+.PHONY: docker-check
+docker-check: ## Check that a Docker engine (Colima or Docker Desktop) is running
+	@docker info >/dev/null 2>&1 || { \
+		echo 'No Docker engine is running. Start Colima with: colima start'; \
+		echo '(or open Docker Desktop). Install Colima with: brew install colima docker docker-compose'; \
+		exit 1; \
+	}
+
 .PHONY: db-up
-db-up: $(ENV_FILE) ## Start Postgres and wait until it is healthy
+db-up: $(ENV_FILE) docker-check ## Start Postgres and wait until it is healthy
 	$(COMPOSE) up -d db
 	@until [ "$$(docker inspect -f '{{.State.Health.Status}}' $$($(COMPOSE) ps -q db))" = "healthy" ]; do sleep 1; done
 	@echo "postgres is ready"

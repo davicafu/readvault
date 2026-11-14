@@ -1,5 +1,6 @@
 # Local development stack. Run from the repository root:
-#   docker-compose -f deploy/compose.yaml --env-file .env up -d db
+#   docker compose -f deploy/compose.yaml --env-file .env up -d db
+# (or `make db-up`; the older `docker-compose` command works the same)
 services:
   db:
     image: postgres:17-alpine
