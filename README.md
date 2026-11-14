@@ -23,14 +23,12 @@ It runs locally: a Go API, PostgreSQL in Docker and a Next.js web app. It needs 
 You need:
 
 - Go 1.27 or later
-- A Docker engine with Compose, only for PostgreSQL. On macOS use [Colima](https://github.com/abiosoft/colima), a light engine without Docker Desktop:
+- [Colima](https://github.com/abiosoft/colima) with Docker Compose, only for PostgreSQL:
 
   ```bash
   brew install colima docker docker-compose
   colima start               # once after each restart of the computer
   ```
-
-  Docker Desktop works too. `make` uses `docker compose`, or `docker-compose` when the plugin is missing.
 - Node.js 22 or later, with npm
 
 Compose runs PostgreSQL 17. To use your own server instead (PostgreSQL 15 or later, no Docker needed), set `DATABASE_URL` in `.env` to point at it and add `DB=external` to the database commands: `make start DB=external`, `make dev DB=external`, `make migrate DB=external`, `make test-integration DB=external`. The web app and the API work the same either way.
@@ -62,7 +60,7 @@ The first `make` run creates `.env` with a random database password; edit it to 
 | `make lint` | Checks Go formatting, runs `go vet` (and golangci-lint when installed), typechecks the web app |
 | `make build` | Builds `services/api/bin/api`, `services/api/bin/migrate` and the production web app |
 | `make db-up` / `make db-down` | Starts or stops Postgres |
-| `make docker-check` | Checks that a Docker engine (Colima or Docker Desktop) is running; `make db-up` runs it first |
+| `make docker-check` | Checks that Colima is running; `make db-up` runs it first |
 | `make db-external` | With `DB=external`: checks that `DATABASE_URL` is set, in place of starting the compose Postgres |
 | `make web-install` | Reinstalls the web app's dependencies from the lockfile |
 
@@ -157,8 +155,7 @@ The JSON export (**Export JSON** in the web app, or `GET /api/export`) is a read
 |---|---|
 | `set POSTGRES_PASSWORD in .env` | Add `POSTGRES_PASSWORD` to `.env`, or delete `.env` so `make` creates a new one. Compose refuses to start Postgres without a password |
 | `Node.js 22 or later is required` | An older `node` comes first on `PATH`. Put Node 22 first, for example `export PATH="$HOME/.local/node/bin:$PATH"` in your shell profile |
-| `No Docker engine is running` | Run `colima start` (or open Docker Desktop) |
-| The library is empty after moving to Colima (or another Docker engine) | Each engine keeps its own `db-data` volume, and uninstalling Docker Desktop deletes its volumes. Before switching, back up with `pg_dump` (see Backup and restore) and restore into the new engine, or import your JSON export or bookmarks file again |
+| `No Docker engine is running` | Run `colima start` |
 | `make db-up` waits forever | Check `docker compose -f deploy/compose.yaml --env-file .env logs db` |
 | `port is already allocated` on 5432 | Another Postgres is running. Set `POSTGRES_PORT=55432` in `.env` and use the same port in `DATABASE_URL` |
 | `address already in use` on 8080 | Set `HTTP_ADDR=:8081` and `API_ORIGIN=http://127.0.0.1:8081` in `.env` |

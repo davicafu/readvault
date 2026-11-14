@@ -41,10 +41,10 @@ $(ENV_FILE):
 	@echo "created $@ with a random database password"
 
 .PHONY: docker-check
-docker-check: ## Check that a Docker engine (Colima or Docker Desktop) is running
+docker-check: ## Check that Colima is running
 	@docker info >/dev/null 2>&1 || { \
 		echo 'No Docker engine is running. Start Colima with: colima start'; \
-		echo '(or open Docker Desktop). Install Colima with: brew install colima docker docker-compose'; \
+		echo 'Install Colima with: brew install colima docker docker-compose'; \
 		exit 1; \
 	}
 

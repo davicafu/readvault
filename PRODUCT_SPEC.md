@@ -49,7 +49,7 @@ Implementado:
 - Colecciones (RF-08), con un artículo en una colección como máximo.
 - Exportación JSON y restauración importando ese mismo archivo.
 - Texto de los artículos (RF-12), sugerencias sin IA (RF-13) y notificaciones (RF-14).
-- Ejecución local con Docker Compose (Colima o Docker Desktop) o con un PostgreSQL propio.
+- Ejecución local con Colima y Docker Compose, o con un PostgreSQL propio.
 
 ### Fuera del alcance inicial
 
