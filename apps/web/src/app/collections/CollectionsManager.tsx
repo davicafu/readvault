@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 
 import { ApiError, readJSON, type Collection } from "@/lib/api";
 
+import { ActionIcon } from "../ActionIcon";
 import { CollectionIcon, hueStyle } from "../CollectionIcon";
 
 function message(err: unknown): string {
@@ -153,9 +154,10 @@ function SavedTexts() {
       <h2 id="saved-texts-title">Saved texts</h2>
       <p>
         Each article can keep its text and images for reading later. Delete them to free space; the articles stay in
-        your library. To clear one collection, use <strong>Delete texts</strong> on its row.
+        your library. To clear one collection, use <strong>Delete texts</strong> (the page with a cross) on its row.
       </p>
-      <button className="button button-danger" type="button" onClick={removeAll} disabled={busy}>
+      <button className="button button-danger button-with-icon" type="button" onClick={removeAll} disabled={busy}>
+        <ActionIcon name="clearText" />
         {busy ? "Deleting…" : "Delete all saved texts"}
       </button>
       {outcome ? (
@@ -272,15 +274,19 @@ function CollectionRow({
               {c.articles} {c.articles === 1 ? "article" : "articles"}
             </span>
           </span>
+          {/* Icons only; each name shows on hover or keyboard focus. */}
           <span className="collection-actions">
-            <button className="button button-quiet" type="button" onClick={() => setEditing(true)} disabled={busy}>
-              Rename
+            <button className="icon-button" type="button" onClick={() => setEditing(true)} disabled={busy} aria-label={`Rename ${c.name}`}>
+              <ActionIcon name="rename" />
+              <span className="icon-button-tip" aria-hidden="true">Rename</span>
             </button>
-            <button className="button button-quiet" type="button" onClick={clearTexts} disabled={busy}>
-              Delete texts
+            <button className="icon-button" type="button" onClick={clearTexts} disabled={busy} aria-label={`Delete the texts of ${c.name}`}>
+              <ActionIcon name="clearText" />
+              <span className="icon-button-tip" aria-hidden="true">Delete texts</span>
             </button>
-            <button className="button button-quiet" type="button" onClick={remove} disabled={busy}>
-              Delete
+            <button className="icon-button icon-button-danger" type="button" onClick={remove} disabled={busy} aria-label={`Delete ${c.name}`}>
+              <ActionIcon name="delete" />
+              <span className="icon-button-tip" aria-hidden="true">Delete</span>
             </button>
           </span>
         </>

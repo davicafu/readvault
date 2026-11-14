@@ -7,6 +7,8 @@ import { ApiError, downloadProblems, readJSON, type ArticleContent } from "@/lib
 import { formatDate } from "@/lib/format";
 import { Markdown } from "@/lib/markdown";
 
+import { ActionIcon } from "../../ActionIcon";
+
 type Props = { articleId: string; articleUrl: string; content: ArticleContent | null };
 
 const accepted = ".html,.htm,.xhtml,.md,.markdown,.txt,text/html,text/markdown,text/plain";
@@ -94,14 +96,17 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
 
   const actions = (
     <div className="actions">
-      <button className="button" type="button" disabled={busy !== null} onClick={() => fileInput.current?.click()}>
+      <button className="button button-with-icon" type="button" disabled={busy !== null} onClick={() => fileInput.current?.click()}>
+        <ActionIcon name="upload" />
         {busy === "upload" ? "Uploading…" : "Upload page"}
       </button>
-      <button className="button button-quiet" type="button" disabled={busy !== null} onClick={download}>
+      <button className="button button-quiet button-with-icon" type="button" disabled={busy !== null} onClick={download}>
+        <ActionIcon name="download" />
         {busy === "download" ? "Downloading…" : content?.status === "complete" ? "Download again" : "Download text"}
       </button>
       {content ? (
-        <button className="button button-danger actions-end" type="button" disabled={busy !== null} onClick={removeText}>
+        <button className="button button-danger button-with-icon actions-end" type="button" disabled={busy !== null} onClick={removeText}>
+          <ActionIcon name="clearText" />
           {busy === "remove" ? "Deleting…" : "Delete text"}
         </button>
       ) : null}

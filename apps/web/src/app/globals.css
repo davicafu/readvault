@@ -2398,17 +2398,93 @@ body:has(.article-with-toc) .masthead-inner {
 
 .collection-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
+/* A square button with only its icon; its name appears above it on hover
+   or keyboard focus (and on a tap, where nothing hovers). */
+.icon-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.icon-button .action-icon {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.icon-button:hover:not([disabled]),
+.icon-button:focus-visible {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.icon-button-danger:hover:not([disabled]),
+.icon-button-danger:focus-visible {
+  border-color: color-mix(in srgb, var(--bad) 55%, transparent);
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+  color: var(--bad);
+}
+
+.icon-button[disabled] {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.icon-button-tip {
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  left: 50%;
+  z-index: 5;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 0.2rem);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.icon-button:hover .icon-button-tip,
+.icon-button:focus-visible .icon-button-tip,
+.icon-button:active .icon-button-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* A button with an icon before its label. */
+.button-with-icon {
+  gap: 0.45rem;
+}
+
+.button-with-icon .action-icon {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* The icons are small enough to stay beside the name on a phone. */
 @media (max-width: 640px) {
   .collection-row {
-    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.4rem 0.75rem;
   }
 
   .collection-actions {
-    grid-column: 1 / -1;
-    flex-wrap: wrap;
+    gap: 0.3rem;
   }
 }
 
