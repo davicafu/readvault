@@ -32,7 +32,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 // selectArticle reads an article with its tags, sorted by slug, and the
 // title key the title sorts use.
 const selectArticle = `SELECT a.id, a.original_url, a.canonical_url, a.title, a.title_edited_at, a.tags_edited_at,
-	a.original_folder, a.bookmarked_at, a.created_at, a.updated_at,
+	a.original_folder, a.bookmarked_at, a.read_at, a.created_at, a.updated_at,
 	(SELECT c.status FROM article_contents c WHERE c.article_id = a.id),
 	ARRAY(SELECT t.name FROM article_tags at JOIN tags t ON t.id = at.tag_id WHERE at.article_id = a.id ORDER BY t.slug),
 	ARRAY(SELECT t.slug FROM article_tags at JOIN tags t ON t.id = at.tag_id WHERE at.article_id = a.id ORDER BY t.slug),
@@ -66,6 +66,13 @@ func (r *Repository) List(ctx context.Context, userID string, q library.Query) (
 		where = append(where, "NOT EXISTS (SELECT 1 FROM article_contents c WHERE c.article_id = a.id)")
 	default:
 		where = append(where, fmt.Sprintf("EXISTS (SELECT 1 FROM article_contents c WHERE c.article_id = a.id AND c.status = %s)", arg(string(q.Text))))
+	}
+	if q.Read != nil {
+		if *q.Read {
+			where = append(where, "a.read_at IS NOT NULL")
+		} else {
+			where = append(where, "a.read_at IS NULL")
+		}
 	}
 	if len(q.TagSlugs) > 0 {
 		slugs := arg(q.TagSlugs)
@@ -166,7 +173,7 @@ func scanListed(row pgx.CollectableRow) (library.Listed, error) {
 	var names, slugs []string
 	var colID, colName, colSlug *string
 	err := row.Scan(&l.ID, &l.OriginalURL, &l.CanonicalURL, &l.Title, &l.TitleEditedAt, &l.TagsEditedAt,
-		&l.Folder, &l.BookmarkedAt, &l.CreatedAt, &l.UpdatedAt, &l.ContentStatus, &names, &slugs, &l.TitleKey,
+		&l.Folder, &l.BookmarkedAt, &l.ReadAt, &l.CreatedAt, &l.UpdatedAt, &l.ContentStatus, &names, &slugs, &l.TitleKey,
 		&colID, &colName, &colSlug)
 	if colID != nil && colName != nil && colSlug != nil {
 		l.Collection = &library.CollectionRef{ID: *colID, Name: *colName, Slug: *colSlug}
@@ -232,6 +239,17 @@ func (r *Repository) Update(ctx context.Context, userID, articleID string, c lib
 				return fmt.Errorf("moving article to collection: %w", err)
 			}
 			changed = true
+		}
+		// Reading is not an edit: it leaves updated_at as it is, and marking
+		// a read article read again keeps when it was first read.
+		if c.Read != nil {
+			sql := `UPDATE articles SET read_at = NULL WHERE id = $1`
+			if *c.Read {
+				sql = `UPDATE articles SET read_at = coalesce(read_at, now()) WHERE id = $1`
+			}
+			if _, err := tx.Exec(ctx, sql, articleID); err != nil {
+				return fmt.Errorf("marking article read: %w", err)
+			}
 		}
 		if changed {
 			if _, err := tx.Exec(ctx, `UPDATE articles SET updated_at = now() WHERE id = $1`, articleID); err != nil {

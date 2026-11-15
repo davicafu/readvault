@@ -60,3 +60,50 @@ func TestImport_FromAnExportRestoresALostCollectionAndArticle(t *testing.T) {
 		t.Errorf("articles = %d, %v; want 2, nothing duplicated", articles, err)
 	}
 }
+
+// An export keeps when each article was read. Importing it marks the
+// articles it adds again as read; articles already in the library keep
+// their own state, since the reader may have marked them unread since.
+func TestImport_FromAnExportRestoresTheReadStateOfAddedArticles(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	ctx := t.Context()
+
+	const export = `{"schemaVersion": 1, "articles": [
+		{"originalUrl": "https://example.com/lost", "title": "Lost", "folder": [], "tags": [], "readAt": "2026-10-01T08:00:00Z"},
+		{"originalUrl": "https://example.com/kept", "title": "Kept", "folder": [], "tags": [], "readAt": "2026-10-02T08:00:00Z"},
+		{"originalUrl": "https://example.com/never", "title": "Never", "folder": [], "tags": [], "readAt": null}
+	]}`
+	if _, err := pool.Exec(ctx, `INSERT INTO articles (user_id, original_url, canonical_url, title)
+		VALUES ($1, 'https://example.com/kept', 'https://example.com/kept', 'Kept')`, owner); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.Import(ctx, owner, importing.Choices{}, strings.NewReader(export)); err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]string{}
+	rows, err := pool.Query(ctx, `SELECT canonical_url, coalesce(to_char(read_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')
+		FROM articles WHERE user_id = $1`, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var url, readAt string
+		if err := rows.Scan(&url, &readAt); err != nil {
+			t.Fatal(err)
+		}
+		got[url] = readAt
+	}
+	expected := map[string]string{
+		"https://example.com/lost":  "2026-10-01T08:00:00Z",
+		"https://example.com/kept":  "",
+		"https://example.com/never": "",
+	}
+	for url, readAt := range expected {
+		if got[url] != readAt {
+			t.Errorf("%s: read_at %q, want %q", url, got[url], readAt)
+		}
+	}
+}

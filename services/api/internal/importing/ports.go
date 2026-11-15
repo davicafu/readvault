@@ -33,7 +33,10 @@ type NewArticle struct {
 	Title        string
 	Folder       []string
 	BookmarkedAt *time.Time
-	Tags         []tag.Tag
+	// ReadAt is set only on articles the import adds; an article already in
+	// the library keeps its own read state.
+	ReadAt *time.Time
+	Tags   []tag.Tag
 	// Collection is the collection the article goes in, or nil for none.
 	Collection *tag.Tag
 	// CollectionID is the id of Collection, set by the repository once the

@@ -83,6 +83,9 @@ type Change struct {
 	// ErrCollectionNotFound when the user has no such collection.
 	SetCollection bool
 	CollectionID  *string
+	// Read marks the article read (true) or unread (false); nil leaves it.
+	// Marking a read article read again keeps when it was first read.
+	Read *bool
 }
 
 // Article is a saved bookmark with its tags and provenance.
@@ -103,8 +106,10 @@ type Article struct {
 	Tags          []tag.Tag  `json:"tags"`
 	// Collection is nil when the article is in none.
 	Collection *CollectionRef `json:"collection"`
-	CreatedAt  time.Time      `json:"createdAt"`
-	UpdatedAt  time.Time      `json:"updatedAt"`
+	// ReadAt is when the article was read; nil while it is unread.
+	ReadAt    *time.Time `json:"readAt"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
 }
 
 // Listed is an article of a list page with the key it was sorted by when
@@ -123,7 +128,9 @@ type Query struct {
 	CollectionSlug string
 	// Text keeps the articles whose saved text is in this state; empty
 	// keeps all.
-	Text  TextState
+	Text TextState
+	// Read keeps only read (true) or unread (false) articles; nil keeps all.
+	Read  *bool
 	Sort  Sort
 	Limit int
 	After *Position

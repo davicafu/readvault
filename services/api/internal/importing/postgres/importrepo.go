@@ -174,11 +174,11 @@ func ensureCollections(ctx context.Context, tx pgx.Tx, userID string, articles [
 func insertArticles(ctx context.Context, tx pgx.Tx, userID string, articles []importing.NewArticle, outcomes []importing.Outcome) ([]string, error) {
 	batch := &pgx.Batch{}
 	for _, a := range articles {
-		batch.Queue(`INSERT INTO articles (user_id, original_url, canonical_url, title, original_folder, bookmarked_at, collection_id)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		batch.Queue(`INSERT INTO articles (user_id, original_url, canonical_url, title, original_folder, bookmarked_at, collection_id, read_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			ON CONFLICT (user_id, canonical_url) DO NOTHING
 			RETURNING id`,
-			userID, a.OriginalURL, a.CanonicalURL, a.Title, a.Folder, a.BookmarkedAt, a.CollectionID)
+			userID, a.OriginalURL, a.CanonicalURL, a.Title, a.Folder, a.BookmarkedAt, a.CollectionID, a.ReadAt)
 	}
 
 	ids := make([]string, len(articles))

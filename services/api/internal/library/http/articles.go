@@ -61,7 +61,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/collections/{id}", h.deleteCollection)
 }
 
-// list serves GET /api/articles?q=&tag=&tag=&sort=&limit=&cursor=
+// list serves GET /api/articles?q=&tag=&tag=&collection=&text=&read=&sort=&limit=&cursor=
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	// url.ParseQuery reports what r.URL.Query() silently drops, such as a
 	// pair separated by ";" instead of "&".
@@ -71,7 +71,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 			[]library.FieldProblem{{Field: "query", Code: "invalid", Message: `the query string is malformed; separate parameters with "&"`}})
 		return
 	}
-	p := library.ListParams{Search: v.Get("q"), Tags: v["tag"], Collection: v.Get("collection"), Text: v.Get("text"), Sort: v.Get("sort"), Cursor: v.Get("cursor")}
+	p := library.ListParams{Search: v.Get("q"), Tags: v["tag"], Collection: v.Get("collection"), Text: v.Get("text"), Read: v.Get("read"), Sort: v.Get("sort"), Cursor: v.Get("cursor")}
 	if raw := v.Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil {
@@ -121,7 +121,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 }
 
 // update serves PATCH /api/articles/{id} with a body such as
-// {"title": "New title", "tags": ["go", "news"]}. Unknown fields are
+// {"title": "New title", "tags": ["go", "news"]} or {"read": true}. Unknown fields are
 // rejected, so the URLs cannot be changed through this endpoint.
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	var p library.Patch

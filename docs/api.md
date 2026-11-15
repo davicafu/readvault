@@ -47,7 +47,7 @@ A field problem is `{ "field": "limit", "code": "out_of_range", "message": "limi
 
 ## Imports
 
-Imports take a browser bookmarks export in the Netscape HTML format (Chrome, Firefox, Safari, Edge), or a ReadVault export (`GET /api/export`) to restore a library. A file whose first non-blank character is `{` is read as an export: each article becomes a bookmark with its original URL, title, folder, bookmark date, tags and its collection as the suggested collection, so the rules below apply as for any import (a missing article is added, a missing collection is created, an article without a collection goes back to it). A JSON file that is not an export of `schemaVersion` 1 is rejected with `422 invalid_file`. Send it as `multipart/form-data` with the file in the `file` field. The file is streamed and never stored: the preview and the import each upload it.
+Imports take a browser bookmarks export in the Netscape HTML format (Chrome, Firefox, Safari, Edge), or a ReadVault export (`GET /api/export`) to restore a library. A file whose first non-blank character is `{` is read as an export: each article becomes a bookmark with its original URL, title, folder, bookmark date, tags, read time and its collection as the suggested collection, so the rules below apply as for any import (a missing article is added, a missing collection is created, an article without a collection goes back to it). The read time (`readAt`) is restored only on the articles the import adds; an article already in the library keeps its own read state. A JSON file that is not an export of `schemaVersion` 1 is rejected with `422 invalid_file`. Send it as `multipart/form-data` with the file in the `file` field. The file is streamed and never stored: the preview and the import each upload it.
 
 Limits: `MAX_UPLOAD_BYTES` (default 10 MiB) and `MAX_IMPORT_RECORDS` (default 20,000 bookmarks).
 
@@ -162,12 +162,13 @@ An article:
   "bookmarkedAt": "2023-11-14T22:15:00Z",
   "tags": [{ "name": "go", "slug": "go" }],
   "collection": { "id": "0b6f4c1e-5b3a-4a52-9a49-3f1d2b7c8e10", "name": "Reading", "slug": "reading" },
+  "readAt": null,
   "createdAt": "2026-11-07T23:27:07.5Z",
   "updatedAt": "2026-11-07T23:27:07.5Z"
 }
 ```
 
-Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lowercased, the fragment and known tracking parameters (`utm_*`, `fbclid`, `gclid` and similar) are removed, and everything else is kept. Tags are sorted by slug; a tag's slug is its lowercase name with spaces turned into hyphens, and it is unique per user. `collection` is the one collection the article is in, or `null`.
+Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lowercased, the fragment and known tracking parameters (`utm_*`, `fbclid`, `gclid` and similar) are removed, and everything else is kept. Tags are sorted by slug; a tag's slug is its lowercase name with spaces turned into hyphens, and it is unique per user. `collection` is the one collection the article is in, or `null`. `readAt` is when the article was read, or `null` while it is unread.
 
 ### `GET /api/articles`
 
@@ -177,6 +178,7 @@ Times are RFC 3339 in UTC. `canonicalUrl` identifies the article: the host is lo
 | `tag` | Keeps articles that have this tag (name or slug). Repeat it to require several tags, up to 10 |
 | `collection` | Keeps the articles of this collection (name or slug); an unknown collection gives an empty list, and a blank value is ignored |
 | `text` | Keeps the articles whose saved text is `complete`, `incomplete` (a paid preview), `failed` (the download failed and nothing was saved) or `missing` (never downloaded); any other value is `text/invalid` |
+| `read` | `true` keeps the read articles, `false` the unread ones; any other value is `read/invalid` |
 | `sort` | `created_desc` (default), `created_asc`, `title_asc`, `title_desc` |
 | `limit` | 1 to 100; 25 when absent |
 | `cursor` | The `nextCursor` of the previous page |
@@ -203,8 +205,9 @@ Send it as `application/json`. Every field is optional, but at least one is requ
 - `tags` replaces the whole tag set: send `[]` to remove every tag. When the set changes, the tags are marked as edited (`tagsEditedAt`), and imports add no tags to the article from then on; sending the same set marks nothing. Up to 50 tags of up to 64 characters each. Tags that share a slug are merged, and an existing tag keeps its stored spelling.
 
 - `collectionId` moves the article to that collection; an article is in at most one, so this replaces its current one. Send `null` to take it out of its collection. Tags are not affected.
+- `read`: `true` marks the article read and sets `readAt`; marking a read article read again keeps the first `readAt`. `false` marks it unread (`readAt` becomes `null`). Reading is not an edit: `updatedAt` does not change. Any other value is `400 invalid_json`.
 
-Returns the updated article. Field problem codes: `body/empty`, `collectionId/not_found` (no collection with that id for this user), `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
+Returns the updated article. Field problem codes: `body/empty` (no field sent), `collectionId/not_found` (no collection with that id for this user), `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
 
 ### `DELETE /api/articles/{id}`
 

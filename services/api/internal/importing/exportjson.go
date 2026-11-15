@@ -45,6 +45,7 @@ type exportArticle struct {
 	Title        string     `json:"title"`
 	Folder       []string   `json:"folder"`
 	BookmarkedAt *time.Time `json:"bookmarkedAt"`
+	ReadAt       *time.Time `json:"readAt"`
 	Tags         []struct {
 		Name string `json:"name"`
 	} `json:"tags"`
@@ -116,6 +117,10 @@ func decodeArticles(dec *json.Decoder, maxRecords int) ([]Record, error) {
 		if a.BookmarkedAt != nil {
 			t := a.BookmarkedAt.UTC()
 			rec.AddedAt = &t
+		}
+		if a.ReadAt != nil {
+			t := a.ReadAt.UTC()
+			rec.ReadAt = &t
 		}
 		for _, t := range a.Tags {
 			rec.Tags = append(rec.Tags, t.Name)

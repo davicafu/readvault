@@ -49,6 +49,9 @@ type ListParams struct {
 	// Text is complete, incomplete, failed or missing (no text saved and
 	// no download recorded); empty keeps all.
 	Text string
+	// Read is "true" for read articles, "false" for unread ones; empty
+	// keeps all.
+	Read string
 	Sort string
 	// Limit is nil when the client sent none.
 	Limit  *int
@@ -126,6 +129,8 @@ type Patch struct {
 	// CollectionID moves the article to a collection; null removes it from
 	// its collection.
 	CollectionID Nullable[string] `json:"collectionId"`
+	// Read marks the article read (true) or unread (false).
+	Read *bool `json:"read"`
 }
 
 // Update edits the title and tags of one of the user's articles. The title
@@ -150,11 +155,11 @@ func (s *Service) Update(ctx context.Context, userID, articleID string, p Patch)
 }
 
 func parsePatch(p Patch) (Change, error) {
-	if p.Title == nil && p.Tags == nil && !p.CollectionID.Set {
-		return Change{}, &ValidationError{Problems: []FieldProblem{{"body", "empty", "send a title, tags, collectionId or several"}}}
+	if p.Title == nil && p.Tags == nil && !p.CollectionID.Set && p.Read == nil {
+		return Change{}, &ValidationError{Problems: []FieldProblem{{"body", "empty", "send a title, tags, collectionId, read or several"}}}
 	}
 	var problems []FieldProblem
-	var c Change
+	c := Change{Read: p.Read}
 
 	if p.Title != nil {
 		title := strings.Join(strings.Fields(*p.Title), " ")
@@ -342,6 +347,15 @@ func parseQuery(p ListParams) (Query, error) {
 		q.Text = TextState(p.Text)
 	default:
 		problems = append(problems, FieldProblem{"text", "invalid", "text must be complete, incomplete, failed or missing"})
+	}
+
+	switch p.Read {
+	case "":
+	case "true", "false":
+		read := p.Read == "true"
+		q.Read = &read
+	default:
+		problems = append(problems, FieldProblem{"read", "invalid", "read must be true or false"})
 	}
 
 	switch q.Sort {

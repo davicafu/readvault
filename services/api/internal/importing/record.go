@@ -21,5 +21,8 @@ type Record struct {
 	// browser's root folders, or "" when there is none.
 	Collection string
 	AddedAt    *time.Time
-	Tags       []string
+	// ReadAt is when the article was read, from a ReadVault export; nil
+	// for bookmark files and unread articles.
+	ReadAt *time.Time
+	Tags   []string
 }

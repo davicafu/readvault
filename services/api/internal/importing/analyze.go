@@ -89,6 +89,7 @@ func analyze(records []Record) []analyzed {
 		a.article.Title = a.Title
 		a.article.Folder = rec.Folder
 		a.article.BookmarkedAt = rec.AddedAt
+		a.article.ReadAt = rec.ReadAt
 		a.article.Tags = tags
 		out = append(out, a)
 	}
