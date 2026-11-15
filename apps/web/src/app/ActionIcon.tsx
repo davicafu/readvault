@@ -20,6 +20,10 @@ const paths = {
   save: ["M5 12.5l4.5 4.5L19 7.5"],
   // A plus in a circle: adding links.
   add: ["M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 1 0 0-17z", "M12 8.5v7", "M8.5 12h7"],
+  // An open book: marking an article read.
+  read: ["M12 6.5c-2-1.5-4.5-2-7.5-2v13c3 0 5.5.5 7.5 2c2-1.5 4.5-2 7.5-2v-13c-3 0-5.5.5-7.5 2z", "M12 6.5v13"],
+  // A closed book: marking an article unread again.
+  unread: ["M6.5 4.5h11v15h-11a1.5 1.5 0 0 1-1.5-1.5V6a1.5 1.5 0 0 1 1.5-1.5z", "M5 16.5a1.5 1.5 0 0 1 1.5-1.5h11"],
   // A circling arrow: trying again.
   retry: ["M19.5 12a7.5 7.5 0 1 1-2.2-5.3", "M19.5 4.5v4h-4"],
   // A bell: notifications.

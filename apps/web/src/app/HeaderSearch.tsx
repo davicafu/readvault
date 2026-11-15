@@ -149,7 +149,7 @@ export function HeaderSearch() {
     if (q.trim()) next.set("q", q.trim());
     if (collection) next.set("collection", collection);
     if (onLibrary) {
-      for (const key of ["text", "sort"]) {
+      for (const key of ["text", "read", "sort"]) {
         const v = params.get(key);
         if (v) next.set(key, v);
       }

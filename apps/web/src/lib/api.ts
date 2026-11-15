@@ -30,6 +30,8 @@ export type Article = {
   bookmarkedAt: string | null;
   tags: Tag[];
   collection: CollectionRef | null;
+  /** When the article was read; null while unread. */
+  readAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

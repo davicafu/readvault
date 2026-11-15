@@ -13,6 +13,7 @@ import { ArticleEditor } from "./ArticleEditor";
 import { ArticleText } from "./ArticleText";
 import { ArticleToc } from "./ArticleToc";
 import { ReadingProgress } from "./ReadingProgress";
+import { ReadState } from "./ReadState";
 
 type Params = Promise<{ id: string }>;
 
@@ -90,11 +91,14 @@ export default async function ArticlePage({ params }: { params: Params }) {
           <Link href="/">Library</Link>
         </p>
         <h1 className="article-title">{a.title || "Untitled bookmark"}</h1>
-        {isWebUrl(a.originalUrl) ? (
-          <a className="article-link" href={a.originalUrl} target="_blank" rel="noopener noreferrer">
-            Open the original article
-          </a>
-        ) : null}
+        <div className="article-actions">
+          {isWebUrl(a.originalUrl) ? (
+            <a className="article-link" href={a.originalUrl} target="_blank" rel="noopener noreferrer">
+              Open the original article
+            </a>
+          ) : null}
+          <ReadState id={a.id} readAt={a.readAt} targetId="article-text" />
+        </div>
         <ArticleEditor
           id={a.id}
           title={a.title}

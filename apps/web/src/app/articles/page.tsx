@@ -12,6 +12,7 @@ import {
 import { formatDate } from "@/lib/format";
 import { apiGet } from "@/lib/server-api";
 
+import { ActionIcon } from "../ActionIcon";
 import { CollectionIcon, hueStyle } from "../CollectionIcon";
 import { EmptyLibrary, LibraryError } from "../LibraryNotices";
 import { TagLogo } from "../TagLogo";
@@ -27,6 +28,15 @@ const sortLabels: Record<Sort, string> = {
 
 type TextFilter = "" | "complete" | "incomplete" | "failed" | "missing";
 
+// read is "true" for read articles, "false" for unread ones, as in the API.
+type ReadFilter = "" | "true" | "false";
+
+const readLabels: Record<ReadFilter, string> = {
+  "": "All",
+  "false": "Unread",
+  "true": "Read",
+};
+
 const textLabels: Record<Exclude<TextFilter, "">, string> = {
   complete: "with their text",
   incomplete: "with only part of their text",
@@ -39,6 +49,7 @@ type Filters = {
   tags: string[];
   collection: string;
   text: TextFilter;
+  read: ReadFilter;
   sort: Sort;
   cursor: string;
 };
@@ -53,6 +64,7 @@ function readFilters(params: Record<string, string | string[] | undefined>): Fil
     tags: [params.tag ?? []].flat().filter(Boolean),
     collection: one(params.collection).trim(),
     text: one(params.text) in textLabels ? (one(params.text) as TextFilter) : "",
+    read: one(params.read) === "true" || one(params.read) === "false" ? (one(params.read) as ReadFilter) : "",
     sort: sort in sortLabels ? (sort as Sort) : "created_desc",
     cursor: one(params.cursor),
   };
@@ -66,6 +78,7 @@ function libraryHref(f: Filters, overrides: Partial<Filters> = {}): string {
   if (next.collection) qs.set("collection", next.collection);
   for (const t of next.tags) qs.append("tag", t);
   if (next.text) qs.set("text", next.text);
+  if (next.read) qs.set("read", next.read);
   if (next.sort !== "created_desc") qs.set("sort", next.sort);
   if (next.cursor) qs.set("cursor", next.cursor);
   const s = qs.toString();
@@ -77,14 +90,16 @@ function libraryHref(f: Filters, overrides: Partial<Filters> = {}): string {
 // text, sort and cursor. Without filters it lists every article.
 export default async function ArticlesPage({ searchParams }: { searchParams: SearchParams }) {
   const filters = readFilters(await searchParams);
-  const filtered = filters.q !== "" || filters.tags.length > 0 || filters.collection !== "" || filters.text !== "";
-  const cleared: Filters = { ...filters, q: "", tags: [], collection: "", text: "" };
+  const filtered =
+    filters.q !== "" || filters.tags.length > 0 || filters.collection !== "" || filters.text !== "" || filters.read !== "";
+  const cleared: Filters = { ...filters, q: "", tags: [], collection: "", text: "", read: "" };
 
   const qs = new URLSearchParams({ limit: String(PAGE_SIZE), sort: filters.sort });
   if (filters.q) qs.set("q", filters.q);
   if (filters.collection) qs.set("collection", filters.collection);
   for (const t of filters.tags) qs.append("tag", t);
   if (filters.text) qs.set("text", filters.text);
+  if (filters.read) qs.set("read", filters.read);
   if (filters.cursor) qs.set("cursor", filters.cursor);
 
   // The side panels are optional: the list still shows when they fail to load.
@@ -116,7 +131,10 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Sea
       ) : (
         <h1 className="visually-hidden">Library</h1>
       )}
-      <SortLinks filters={filters} />
+      <div className="list-controls">
+        <ReadLinks filters={filters} />
+        <SortLinks filters={filters} />
+      </div>
 
       {filters.q || filters.tags.length > 0 || filters.text ? (
         <div className="active-filters">
@@ -188,6 +206,23 @@ function SortLinks({ filters }: { filters: Filters }) {
           aria-current={filters.sort === value ? "true" : undefined}
         >
           {label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+// ReadLinks shows every article, only the unread ones or only the read ones.
+function ReadLinks({ filters }: { filters: Filters }) {
+  return (
+    <nav className="sort-links" aria-label="Read or unread">
+      {(["", "false", "true"] as ReadFilter[]).map((value) => (
+        <Link
+          key={value || "all"}
+          href={libraryHref(filters, { read: value })}
+          aria-current={filters.read === value ? "true" : undefined}
+        >
+          {readLabels[value]}
         </Link>
       ))}
     </nav>
@@ -341,6 +376,12 @@ function Entry({ article: a, filters }: { article: Article; filters: Filters }) 
         <span>
           Saved <time dateTime={saved}>{formatDate(saved)}</time>
         </span>
+        {a.readAt ? (
+          <span className="entry-read">
+            <ActionIcon name="read" />
+            Read
+          </span>
+        ) : null}
         {a.contentStatus === "incomplete" ? (
           <span className="badge badge-warn">Text incomplete</span>
         ) : a.contentStatus === "failed" ? (

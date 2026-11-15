@@ -48,7 +48,7 @@ Implementado:
 - Biblioteca paginada con búsqueda de texto completo, filtros, ordenación y edición de títulos, etiquetas y colección.
 - Colecciones (RF-08), con un artículo en una colección como máximo.
 - Exportación JSON y restauración importando ese mismo archivo.
-- Texto de los artículos (RF-12), sugerencias sin IA (RF-13) y notificaciones (RF-14).
+- Texto de los artículos (RF-12), sugerencias sin IA (RF-13), notificaciones (RF-14) y artículos leídos (RF-15).
 - Ejecución local con Colima y Docker Compose, o con un PostgreSQL propio.
 
 ### Fuera del alcance inicial
@@ -199,6 +199,14 @@ El descubrimiento de artículos relacionados y la generación de documentos a pa
 
 - Una campana en la cabecera muestra los textos que se están descargando, los artículos sin texto (con «Download all») y las descargas fallidas, con un enlace a la lista filtrada. Los avisos solo aparecen ahí.
 
+### RF-15: Artículos leídos
+
+- Un artículo se marca como leído al llegar al final de su texto, una vez por visita, y con los botones «Mark as read» y «Mark as unread».
+- Si el lector lo desmarca, no se vuelve a marcar solo en esa visita. Un texto que cabe en la pantalla solo se marca con el botón.
+- Marcar como leído no cuenta como edición: no cambia la fecha de actualización.
+- Las listas señalan los leídos y se pueden filtrar por leídos o no leídos (`/articles?read=false`).
+- La exportación JSON guarda cuándo se leyó cada artículo; al restaurarla, solo los artículos que se vuelven a crear recuperan ese estado.
+
 ## 5. Requisitos no funcionales
 
 ### RNF-01: Fiabilidad
@@ -306,6 +314,7 @@ No introducir Redis, Kafka, Kubernetes, pgvector ni una base de datos vectorial 
 - original_folder
 - bookmarked_at
 - collection_id, nullable
+- read_at, nullable: cuándo se leyó
 - search, columna de búsqueda de texto completo
 - created_at
 - updated_at
