@@ -207,7 +207,7 @@ Send it as `application/json`. Every field is optional, but at least one is requ
 - `collectionId` moves the article to that collection; an article is in at most one, so this replaces its current one. Send `null` to take it out of its collection. Tags are not affected.
 - `read`: `true` marks the article read and sets `readAt`; marking a read article read again keeps the first `readAt`. `false` marks it unread (`readAt` becomes `null`). Reading is not an edit: `updatedAt` does not change. `null` is `422 validation_failed` with `read/invalid`, and any other value is `400 invalid_json`.
 
-Returns the updated article. Field problem codes: `body/empty` (no field sent), `collectionId/not_found` (no collection with that id for this user), `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid`, `read/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
+Returns the updated article. Field problem codes: `body/empty` (no field sent), `collectionId/not_found` (no collection with that id for this user), `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (for `title` and `tags`, `invalid` means the text is not valid UTF-8 or holds a NUL byte), `read/invalid` (`read` is `null`).
 
 ### `DELETE /api/articles/{id}`
 
