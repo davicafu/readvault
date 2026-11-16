@@ -16,6 +16,7 @@ It runs locally: a Go API, PostgreSQL in Docker and a Next.js web app. It needs 
 - **Front page**: your collections as folders with their latest articles, the articles added last and your tags.
 - **Clean up**: delete one article for good, or free space by deleting the saved text of one article, of one collection or of every article (the articles stay).
 - **Notifications**: a bell in the header shows the texts still downloading, the articles without a text yet (with **Download all**) and the downloads that failed.
+- **Install as an app** on a computer or a phone from the browser, with its own window and icon (see [Install as an app](#install-as-an-app)).
 - **Backup and restore**: export everything as JSON and import that file to bring back lost articles and collections; back up the whole database, saved texts included, with `pg_dump`.
 
 ## Quick start
@@ -46,6 +47,16 @@ Open http://localhost:3000, choose **Add articles** and import a bookmarks file.
 To work on the code, run `make dev` instead: the API runs from source and the web app reloads on every change, with Next.js's development tools.
 
 The first `make` run creates `.env` with a random database password; edit it to change ports or limits (`.env.example` lists every variable). `make dev` checks that Node.js 22 or later comes first on `PATH`, installs the web app's dependencies the first time and again whenever `apps/web/package-lock.json` changes (for example after a pull that adds one), and stops everything with Ctrl+C. `make start` does the same. Go downloads the API's modules on its own the first time it runs. If no Docker engine is running, `make` says so and stops. Postgres keeps running in Docker; stop it with `make db-down`. The data stays in the `db-data` volume, inside Colima's virtual machine: `colima stop` keeps it, `colima delete` deletes it.
+
+### Install as an app
+
+ReadVault can be installed from the browser and then opens in its own window, with its icon in the dock, start menu or home screen. Browsers offer this only on `http://localhost` or over HTTPS, so on another device open it through an HTTPS address (for example one from `tailscale serve`), not `http://<ip>:3000`.
+
+- **Chrome, Edge or Brave on a computer**: the install icon at the right of the address bar, or the menu's **Install ReadVault**.
+- **Android (Chrome)**: menu ⋮ → **Add to Home screen** → **Install**.
+- **iPhone or iPad (Safari)**: Share → **Add to Home Screen**.
+
+The installed app is the same site: it needs `make start` running and shows the same library.
 
 ## Commands
 

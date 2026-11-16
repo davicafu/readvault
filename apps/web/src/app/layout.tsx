@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Literata, Schibsted_Grotesk } from "next/font/google";
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
@@ -15,6 +15,16 @@ const schibsted = Schibsted_Grotesk({ subsets: ["latin", "latin-ext"], variable:
 export const metadata: Metadata = {
   title: { default: brand.name, template: `%s | ${brand.name}` },
   description: brand.description,
+  // Installed on an iPhone or iPad, the app opens full screen under its name.
+  appleWebApp: { capable: true, title: brand.name, statusBarStyle: "default" },
+};
+
+// The browser bar and the installed app's title bar take the page's --paper.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#eef1f4" },
+    { media: "(prefers-color-scheme: dark)", color: "#151b23" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
