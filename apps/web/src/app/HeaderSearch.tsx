@@ -21,6 +21,19 @@ const fold = (s: string) =>
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "");
 
+// ":read" and ":unread" filter by read state instead of naming a collection.
+const readWords: Record<string, "true" | "false"> = { read: "true", unread: "false" };
+
+// readToken takes ":read" or ":unread" out of a search; the last one wins.
+function readToken(q: string): { q: string; read: "true" | "false" | "" } {
+  let read: "true" | "false" | "" = "";
+  const rest = q.replace(/(^|\s):(read|unread)(?=\s|$)/gi, (_, space: string, word: string) => {
+    read = readWords[word.toLowerCase()];
+    return space;
+  });
+  return { q: read ? rest.replace(/\s{2,}/g, " ") : q, read };
+}
+
 function matching(collections: Collection[], word: string): Collection[] {
   const w = fold(word);
   if (!w) return collections;
@@ -30,8 +43,8 @@ function matching(collections: Collection[], word: string): Collection[] {
 }
 
 // HeaderSearch is the library's search box, in the page header on every
-// page. Type ":" and a collection's name to search in that collection;
-// "-word" leaves out articles with a word and "exact words" in quotes match
+// page. Type ":" and a collection's name to search in that collection,
+// ":read" or ":unread" for only read or unread articles; "-word" leaves out articles with a word and "exact words" in quotes match
 // a phrase (the API's search does both). On the library it keeps the
 // filters in use. Press "/" anywhere outside a field to jump to it.
 export function HeaderSearch() {
@@ -89,7 +102,9 @@ export function HeaderSearch() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const options = token && collections ? matching(collections, token.word).slice(0, 8) : [];
+  // A finished ":read" or ":unread" is not a collection to pick.
+  const options =
+    token && collections && !(token.word.toLowerCase() in readWords) ? matching(collections, token.word).slice(0, 8) : [];
   const open = token !== null && options.length > 0;
 
   const update = (value: string, caret: number) => {
@@ -131,11 +146,13 @@ export function HeaderSearch() {
     }
   };
 
-  // Searching keeps the library's other filters. A ":word" left in the box
-  // picks the collection that matches it best.
+  // Searching keeps the library's other filters. ":read" or ":unread" sets
+  // the read filter, and a ":word" left in the box picks the collection that
+  // matches it best.
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    let q = text;
+    const typed = readToken(text);
+    let q = typed.q;
     let collection = picked?.slug ?? "";
     const leftover = /(^|\s):([^\s:]+)/.exec(q);
     if (leftover && collections) {
@@ -155,6 +172,7 @@ export function HeaderSearch() {
       }
       for (const t of params.getAll("tag")) next.append("tag", t);
     }
+    if (typed.read) next.set("read", typed.read);
     setToken(null);
     input.current?.blur();
     router.push(next.size > 0 ? `/articles?${next}` : "/articles");
@@ -235,6 +253,9 @@ export function HeaderSearch() {
         <div className="header-search-help" aria-hidden="true">
           <p>
             <kbd>:name</kbd> search in a collection
+          </p>
+          <p>
+            <kbd>:read</kbd> <kbd>:unread</kbd> only read or unread articles
           </p>
           <p>
             <kbd>-word</kbd> leave out articles with a word
