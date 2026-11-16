@@ -78,16 +78,23 @@ export function HeaderSearch() {
     setPicked({ slug: urlCollection, name: collections?.find((c) => c.slug === urlCollection)?.name ?? urlCollection });
   }, [urlCollection, collections]);
 
-  const loadCollections = () => {
-    if (collections) return;
-    fetch("/api/collections")
+  // The collections are fetched once, when first needed; a failed fetch
+  // leaves the list empty.
+  const loading = useRef<Promise<Collection[]> | null>(null);
+  const loadCollections = (): Promise<Collection[]> => {
+    loading.current ??= fetch("/api/collections")
       .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((body: { collections: Collection[] }) => setCollections(body.collections))
-      .catch(() => setCollections([]));
+      .then((body: { collections: Collection[] }) => body.collections)
+      .catch(() => [])
+      .then((list) => {
+        setCollections(list);
+        return list;
+      });
+    return loading.current;
   };
 
   useEffect(() => {
-    if (urlCollection) loadCollections();
+    if (urlCollection) void loadCollections();
   }, [urlCollection]);
 
   useEffect(() => {
@@ -112,7 +119,7 @@ export function HeaderSearch() {
     const t = collectionToken(value, caret);
     setToken(t);
     setActive(0);
-    if (t) loadCollections();
+    if (t) void loadCollections();
   };
 
   const pick = (c: Collection) => {
@@ -148,15 +155,16 @@ export function HeaderSearch() {
 
   // Searching keeps the library's other filters. ":read" or ":unread" sets
   // the read filter, and a ":word" left in the box picks the collection that
-  // matches it best.
-  const onSubmit = (e: FormEvent) => {
+  // matches it best, once the collections are known (they may not be yet when
+  // the text was pasted rather than typed).
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const typed = readToken(text);
     let q = typed.q;
     let collection = picked?.slug ?? "";
     const leftover = /(^|\s):([^\s:]+)/.exec(q);
-    if (leftover && collections) {
-      const best = matching(collections, leftover[2])[0];
+    if (leftover) {
+      const best = matching(collections ?? (await loadCollections()), leftover[2])[0];
       if (best) {
         collection = best.slug;
         q = q.replace(leftover[0], leftover[1]);
