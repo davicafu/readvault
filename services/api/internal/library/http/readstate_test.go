@@ -30,13 +30,20 @@ func TestPatchArticle_PassesTheReadState(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%s: status = %d; body %s", tc.body, rec.Code, rec.Body.String())
 		}
-		if svc.gotPatch.Read == nil || *svc.gotPatch.Read != tc.want || svc.gotPatch.Title != nil || svc.gotPatch.Tags != nil {
+		r := svc.gotPatch.Read
+		if !r.Set || r.Value == nil || *r.Value != tc.want || svc.gotPatch.Title != nil || svc.gotPatch.Tags != nil {
 			t.Errorf("%s: patch = %+v", tc.body, svc.gotPatch)
 		}
 	}
 
-	// A read state that is not true or false is refused before the service.
+	// null reaches the service as a sent field without a value, for it to refuse.
 	svc := &stubLibrary{}
+	if rec := patch(t, svc, "/api/articles/a1", `{"read":null}`); rec.Code != http.StatusOK || !svc.gotPatch.Read.Set || svc.gotPatch.Read.Value != nil {
+		t.Errorf(`{"read":null}: status %d, patch %+v`, rec.Code, svc.gotPatch)
+	}
+
+	// A read state that is not true, false or null is refused before the service.
+	svc = &stubLibrary{}
 	if rec := patch(t, svc, "/api/articles/a1", `{"read":"yes"}`); rec.Code != http.StatusBadRequest || svc.gotID != "" {
 		t.Errorf(`{"read":"yes"}: status %d, service called with %q`, rec.Code, svc.gotID)
 	}

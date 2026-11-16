@@ -129,8 +129,8 @@ type Patch struct {
 	// CollectionID moves the article to a collection; null removes it from
 	// its collection.
 	CollectionID Nullable[string] `json:"collectionId"`
-	// Read marks the article read (true) or unread (false).
-	Read *bool `json:"read"`
+	// Read marks the article read (true) or unread (false); null is refused.
+	Read Nullable[bool] `json:"read"`
 }
 
 // Update edits the title and tags of one of the user's articles. The title
@@ -155,11 +155,11 @@ func (s *Service) Update(ctx context.Context, userID, articleID string, p Patch)
 }
 
 func parsePatch(p Patch) (Change, error) {
-	if p.Title == nil && p.Tags == nil && !p.CollectionID.Set && p.Read == nil {
+	if p.Title == nil && p.Tags == nil && !p.CollectionID.Set && !p.Read.Set {
 		return Change{}, &ValidationError{Problems: []FieldProblem{{"body", "empty", "send a title, tags, collectionId, read or several"}}}
 	}
 	var problems []FieldProblem
-	c := Change{Read: p.Read}
+	var c Change
 
 	if p.Title != nil {
 		title := strings.Join(strings.Fields(*p.Title), " ")
@@ -191,6 +191,13 @@ func parsePatch(p Patch) (Change, error) {
 			}
 			c.CollectionID = id
 		}
+	}
+
+	if p.Read.Set {
+		if p.Read.Value == nil {
+			problems = append(problems, FieldProblem{"read", "invalid", "read must be true or false"})
+		}
+		c.Read = p.Read.Value
 	}
 
 	if problems != nil {

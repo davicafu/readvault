@@ -205,9 +205,9 @@ Send it as `application/json`. Every field is optional, but at least one is requ
 - `tags` replaces the whole tag set: send `[]` to remove every tag. When the set changes, the tags are marked as edited (`tagsEditedAt`), and imports add no tags to the article from then on; sending the same set marks nothing. Up to 50 tags of up to 64 characters each. Tags that share a slug are merged, and an existing tag keeps its stored spelling.
 
 - `collectionId` moves the article to that collection; an article is in at most one, so this replaces its current one. Send `null` to take it out of its collection. Tags are not affected.
-- `read`: `true` marks the article read and sets `readAt`; marking a read article read again keeps the first `readAt`. `false` marks it unread (`readAt` becomes `null`). Reading is not an edit: `updatedAt` does not change. Any other value is `400 invalid_json`.
+- `read`: `true` marks the article read and sets `readAt`; marking a read article read again keeps the first `readAt`. `false` marks it unread (`readAt` becomes `null`). Reading is not an edit: `updatedAt` does not change. `null` is `422 validation_failed` with `read/invalid`, and any other value is `400 invalid_json`.
 
-Returns the updated article. Field problem codes: `body/empty` (no field sent), `collectionId/not_found` (no collection with that id for this user), `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
+Returns the updated article. Field problem codes: `body/empty` (no field sent), `collectionId/not_found` (no collection with that id for this user), `title/required`, `title/too_long`, `title/invalid`, `tags/empty`, `tags/too_long`, `tags/too_many`, `tags/invalid`, `read/invalid` (`invalid` means the text is not valid UTF-8 or holds a NUL byte).
 
 ### `DELETE /api/articles/{id}`
 

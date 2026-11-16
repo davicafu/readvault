@@ -11,12 +11,36 @@ import (
 	"readvault/api/internal/library"
 )
 
+func read(v bool) library.Nullable[bool] { return library.Nullable[bool]{Set: true, Value: &v} }
+
+func TestUpdate_ReadMustBeTrueOrFalse(t *testing.T) {
+	t.Parallel()
+	svc, pool := newService(t)
+	ids := seed(t, pool, owner, seedArticle{url: "https://a.example/one", title: "One", created: base})
+	before := snapshot(t, pool)
+
+	// {"read": null}, alone or with another field, is refused and changes nothing.
+	for _, p := range []library.Patch{
+		{Read: library.Nullable[bool]{Set: true}},
+		{Title: ptr("New"), Read: library.Nullable[bool]{Set: true}},
+	} {
+		_, err := svc.Update(t.Context(), owner, ids[0], p)
+		var ve *library.ValidationError
+		if !errors.As(err, &ve) || len(ve.Problems) != 1 || ve.Problems[0].Field != "read" || ve.Problems[0].Code != "invalid" {
+			t.Errorf("%+v: %v, want a read/invalid problem", p, err)
+		}
+	}
+	if after := snapshot(t, pool); after != before {
+		t.Error("a refused read state changed the library")
+	}
+}
+
 func TestUpdate_MarksAnArticleReadAndUnread(t *testing.T) {
 	t.Parallel()
 	svc, pool := newService(t)
 	ids := seed(t, pool, owner, seedArticle{url: "https://a.example/one", title: "One", created: base})
 
-	got, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: ptr(true)})
+	got, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: read(true)})
 	if err != nil {
 		t.Fatalf("mark read: %v", err)
 	}
@@ -31,12 +55,12 @@ func TestUpdate_MarksAnArticleReadAndUnread(t *testing.T) {
 
 	// Marking it read again keeps the first time it was read.
 	first := *got.ReadAt
-	again, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: ptr(true)})
+	again, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: read(true)})
 	if err != nil || again.ReadAt == nil || !again.ReadAt.Equal(first) {
 		t.Errorf("marking read twice: readAt %v (err %v), want %v", again.ReadAt, err, first)
 	}
 
-	unread, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: ptr(false)})
+	unread, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: read(false)})
 	if err != nil || unread.ReadAt != nil {
 		t.Errorf("mark unread: readAt %v (err %v), want nil", unread.ReadAt, err)
 	}
@@ -52,7 +76,7 @@ func TestUpdate_ReadOnAnotherUsersArticleIsNotFound(t *testing.T) {
 	other := newUser(t, pool)
 	ids := seed(t, pool, other, seedArticle{url: "https://a.example/theirs", title: "Theirs", created: base})
 
-	if _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: ptr(true)}); !errors.Is(err, library.ErrNotFound) {
+	if _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: read(true)}); !errors.Is(err, library.ErrNotFound) {
 		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 	var readAt *time.Time
@@ -68,7 +92,7 @@ func TestList_FiltersReadAndUnreadArticles(t *testing.T) {
 		seedArticle{url: "https://a.example/read", title: "read", created: base},
 		seedArticle{url: "https://a.example/unread", title: "unread", created: base.Add(time.Hour)},
 	)
-	if _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: ptr(true)}); err != nil {
+	if _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: read(true)}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -104,7 +128,7 @@ func TestExport_IncludesWhenEachArticleWasRead(t *testing.T) {
 		seedArticle{url: "https://a.example/read", title: "read", created: base},
 		seedArticle{url: "https://a.example/unread", title: "unread", created: base.Add(time.Hour)},
 	)
-	if _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: ptr(true)}); err != nil {
+	if _, err := svc.Update(t.Context(), owner, ids[0], library.Patch{Read: read(true)}); err != nil {
 		t.Fatal(err)
 	}
 
