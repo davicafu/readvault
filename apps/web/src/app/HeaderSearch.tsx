@@ -104,7 +104,7 @@ export function HeaderSearch() {
 
   // A finished ":read" or ":unread" is not a collection to pick.
   const options =
-    token && collections && !(token.word.toLowerCase() in readWords) ? matching(collections, token.word).slice(0, 8) : [];
+    token && collections && !Object.hasOwn(readWords, token.word.toLowerCase()) ? matching(collections, token.word).slice(0, 8) : [];
   const open = token !== null && options.length > 0;
 
   const update = (value: string, caret: number) => {
