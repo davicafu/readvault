@@ -3,10 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 
-import { readJSON } from "@/lib/api";
+import { readJSON, type Article } from "@/lib/api";
 import { ActionIcon } from "../ActionIcon";
 
-// The width of the Delete button once the entry is swiped open.
+// The width of an action button once the entry is swiped open.
 const ACTION = 96;
 // How far a finger moves before the gesture counts as a swipe or a scroll.
 const SLOP = 8;
@@ -17,15 +17,26 @@ const OPENED = "readvault:swipe-open";
 // when the finger lifts after a quick swipe.
 type Drag = { x: number; y: number; from: number; to: number; axis: "x" | "y" | null };
 
-// SwipeDelete is a list entry (an <li>) that a touch screen can swipe to the
-// left to show a Delete button; tapping it deletes the article for good. A mouse or a
-// keyboard does not swipe: the article page has Delete for them. A tap on an
-// open entry closes it instead of opening the article.
-export function SwipeDelete({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+// SwipeActions is a list entry (an <li>) that a touch screen can swipe open:
+// to the left it shows Delete, which deletes the article for good; to the
+// right it shows Mark read, or Mark unread for a read article. A mouse or a
+// keyboard does not swipe: the article page has both actions for them. A
+// tap on an open entry closes it instead of opening the article.
+export function SwipeActions({
+  id,
+  title,
+  readAt,
+  children,
+}: {
+  id: string;
+  title: string;
+  readAt: string | null;
+  children: ReactNode;
+}) {
   const router = useRouter();
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [busy, setBusy] = useState<"delete" | "read" | null>(null);
   const [gone, setGone] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
@@ -37,6 +48,7 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
     swallowUntil.current = Date.now() + 500;
   };
   const open = offset !== 0;
+  const name = title || "Untitled bookmark";
 
   useEffect(() => {
     const onOpened = (e: Event) => {
@@ -52,7 +64,7 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
   };
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== "touch" || deleting) return;
+    if (e.pointerType !== "touch" || busy) return;
     drag.current = { x: e.clientX, y: e.clientY, from: offset, to: offset, axis: null };
   };
 
@@ -75,7 +87,7 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
       }
       setDragging(true);
     }
-    d.to = Math.min(0, Math.max(-ACTION * 1.4, d.from + dx));
+    d.to = Math.min(ACTION * 1.4, Math.max(-ACTION * 1.4, d.from + dx));
     setOffset(d.to);
   };
 
@@ -86,7 +98,7 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
     if (d.axis === "x") {
       setDragging(false);
       swallowNextClick();
-      settle(d.to < -ACTION / 2 ? -ACTION : 0);
+      settle(d.to < -ACTION / 2 ? -ACTION : d.to > ACTION / 2 ? ACTION : 0);
     } else if (open) {
       // A tap on an open entry closes it.
       swallowNextClick();
@@ -97,11 +109,11 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
   const onPointerCancel = () => {
     drag.current = null;
     setDragging(false);
-    setOffset((o) => (o < -ACTION / 2 ? -ACTION : 0));
+    setOffset((o) => (o < -ACTION / 2 ? -ACTION : o > ACTION / 2 ? ACTION : 0));
   };
 
   const remove = async () => {
-    setDeleting(true);
+    setBusy("delete");
     setFailure(null);
     try {
       const res = await fetch(`/api/articles/${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -110,7 +122,29 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
       router.refresh();
     } catch {
       setFailure("The article could not be deleted. Try again in a moment.");
-      setDeleting(false);
+      setBusy(null);
+      setOffset(0);
+    }
+  };
+
+  // The list shows the new state once the page reloads its data; a list
+  // filtered to unread or read articles then leaves this one out.
+  const toggleRead = async () => {
+    setBusy("read");
+    setFailure(null);
+    try {
+      await readJSON<Article>(
+        await fetch(`/api/articles/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ read: readAt === null }),
+        }),
+      );
+      router.refresh();
+    } catch {
+      setFailure("The read state could not be saved. Try again in a moment.");
+    } finally {
+      setBusy(null);
       setOffset(0);
     }
   };
@@ -121,16 +155,29 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
     <li className="entry" data-dragging={dragging ? "" : undefined}>
       <button
         type="button"
-        className="swipe-delete"
-        style={{ width: -offset }}
-        hidden={!open}
-        tabIndex={open && !dragging ? 0 : -1}
-        disabled={deleting}
+        className="swipe-action swipe-read"
+        style={{ width: Math.max(0, offset) }}
+        hidden={offset <= 0}
+        tabIndex={offset > 0 && !dragging ? 0 : -1}
+        disabled={busy !== null}
+        onClick={toggleRead}
+        aria-label={`${readAt ? "Mark as unread" : "Mark as read"}: “${name}”`}
+      >
+        <ActionIcon name={readAt ? "unread" : "read"} />
+        {busy === "read" ? "Saving…" : readAt ? "Mark unread" : "Mark read"}
+      </button>
+      <button
+        type="button"
+        className="swipe-action swipe-delete"
+        style={{ width: Math.max(0, -offset) }}
+        hidden={offset >= 0}
+        tabIndex={offset < 0 && !dragging ? 0 : -1}
+        disabled={busy !== null}
         onClick={remove}
-        aria-label={`Delete “${title || "Untitled bookmark"}”`}
+        aria-label={`Delete “${name}”`}
       >
         <ActionIcon name="delete" />
-        {deleting ? "Deleting…" : "Delete"}
+        {busy === "delete" ? "Deleting…" : "Delete"}
       </button>
       <div
         className="entry-body"

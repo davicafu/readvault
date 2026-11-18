@@ -14,7 +14,7 @@ It runs locally: a Go API, PostgreSQL in Docker and a Next.js web app. It needs 
 - **Suggestions**: an article page suggests a collection and tags from its content, among your own.
 - **Search** from the header on every page (press `/`): by title, address or tag, `:name` to search one collection, `:read` or `:unread` for only read or unread articles, `-word` to leave a word out, `"exact words"` for a phrase. Results can be filtered by collection, tag and saved text, and ordered.
 - **Front page**: your collections as folders with their latest articles, the articles added last and your tags.
-- **Clean up**: delete one article for good (on a phone, swipe it to the left in a list and tap **Delete**), or free space by deleting the saved text of one article, of one collection or of every article (the articles stay).
+- **Clean up**: delete one article for good (on a phone, swipe it to the left in a list and tap **Delete**; swipe it to the right to mark it read or unread), or free space by deleting the saved text of one article, of one collection or of every article (the articles stay).
 - **Notifications**: a bell in the header shows the texts still downloading, the articles without a text yet (with **Download all**) and the downloads that failed.
 - **Install as an app** on a computer or a phone from the browser, with its own window and icon (see [Install as an app](#install-as-an-app)).
 - **Backup and restore**: export everything as JSON and import that file to bring back lost articles and collections; back up the whole database, saved texts included, with `pg_dump`.

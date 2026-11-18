@@ -990,7 +990,8 @@ body::before {
 
 /* Each entry: the title carries the weight, one line of facts under it,
    then the tags. On a touch screen the body slides left over a Delete
-   button (SwipeDelete); vertical moves stay the page's scroll. */
+   button, or right over a Mark read one (SwipeActions); vertical moves stay
+   the page's scroll. */
 .entry {
   position: relative;
   overflow: hidden;
@@ -1005,10 +1006,9 @@ body::before {
   transition: translate 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.swipe-delete {
+.swipe-action {
   position: absolute;
   inset-block: 0;
-  right: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1016,7 +1016,6 @@ body::before {
   gap: 0.3rem;
   overflow: hidden;
   border: 0;
-  background: var(--bad);
   color: var(--paper);
   font: inherit;
   font-size: 0.85rem;
@@ -1025,18 +1024,28 @@ body::before {
   transition: width 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.swipe-delete svg {
+.swipe-delete {
+  right: 0;
+  background: var(--bad);
+}
+
+.swipe-read {
+  left: 0;
+  background: var(--ok);
+}
+
+.swipe-action svg {
   flex: none;
   width: 1.35rem;
   height: 1.35rem;
 }
 
-.swipe-delete[hidden] {
+.swipe-action[hidden] {
   display: none;
 }
 
 .entry[data-dragging] .entry-body,
-.entry[data-dragging] .swipe-delete {
+.entry[data-dragging] .swipe-action {
   transition: none;
 }
 
@@ -1555,15 +1564,6 @@ a.tag:hover .tag-icon {
   margin-left: auto;
 }
 
-.fine-print {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: var(--step--1);
-}
-
-/* Article */
-
-.article {
 /* On a narrow screen the row wraps: the last button starts its own line on
    the left instead of hanging in the right corner. */
 @media (max-width: 760px) {
@@ -1576,6 +1576,15 @@ a.tag:hover .tag-icon {
   margin: 0;
 }
 
+.fine-print {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+/* Article */
+
+.article {
   display: grid;
   grid-template-columns: minmax(0, var(--measure)) minmax(14rem, 1fr);
   gap: 2rem 3rem;

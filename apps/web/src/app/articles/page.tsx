@@ -16,7 +16,7 @@ import { ActionIcon } from "../ActionIcon";
 import { CollectionIcon, hueStyle } from "../CollectionIcon";
 import { EmptyLibrary, LibraryError } from "../LibraryNotices";
 import { TagLogo } from "../TagLogo";
-import { SwipeDelete } from "./SwipeDelete";
+import { SwipeActions } from "./SwipeActions";
 
 const PAGE_SIZE = 25;
 
@@ -355,11 +355,11 @@ function TagPanel({ tags, filters }: { tags: TagCount[]; filters: Filters }) {
 // Entry is one article of a list: its title, a line of facts (collection,
 // site, date saved, text problems) and its tags. The browser folder it came
 // from is on the article's page. On a touch screen, swiping it to the left
-// offers to delete it.
+// offers to delete it, and to the right to mark it read or unread.
 function Entry({ article: a, filters }: { article: Article; filters: Filters }) {
   const saved = a.bookmarkedAt ?? a.createdAt;
   return (
-    <SwipeDelete id={a.id} title={a.title}>
+    <SwipeActions id={a.id} title={a.title} readAt={a.readAt}>
       <Link href={`/articles/${a.id}`} className="entry-title">
         {a.title ? a.title : <span className="entry-untitled">Untitled bookmark</span>}
       </Link>
@@ -407,6 +407,6 @@ function Entry({ article: a, filters }: { article: Article; filters: Filters }) 
           ))}
         </ul>
       ) : null}
-    </SwipeDelete>
+    </SwipeActions>
   );
 }
