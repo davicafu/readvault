@@ -1564,6 +1564,18 @@ a.tag:hover .tag-icon {
 /* Article */
 
 .article {
+/* On a narrow screen the row wraps: the last button starts its own line on
+   the left instead of hanging in the right corner. */
+@media (max-width: 760px) {
+  .actions-end {
+    margin-left: 0;
+  }
+}
+
+.actions-status {
+  margin: 0;
+}
+
   display: grid;
   grid-template-columns: minmax(0, var(--measure)) minmax(14rem, 1fr);
   gap: 2rem 3rem;

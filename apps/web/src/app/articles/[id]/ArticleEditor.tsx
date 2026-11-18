@@ -255,14 +255,15 @@ export function ArticleEditor({
             <ActionIcon name="save" />
             {saving ? "Saving…" : "Save changes"}
           </button>
-          <span role="status" aria-live="polite">
-            {saved ? <span className="saved">Changes saved</span> : null}
-          </span>
           <button className="button button-danger button-with-icon actions-end" type="button" onClick={remove} disabled={deleting || saving}>
             <ActionIcon name="delete" />
             {deleting ? "Deleting…" : "Delete article"}
           </button>
         </div>
+        {/* Under the buttons, so it never pushes them aside. */}
+        <p className="actions-status" role="status" aria-live="polite">
+          {saved ? <span className="saved">Changes saved</span> : null}
+        </p>
         {failure ? (
           <p className="field-error" role="alert">
             {failure}
