@@ -94,3 +94,26 @@ func TestPDF_WithoutASavedPDFIsNoContent(t *testing.T) {
 		t.Errorf("unknown article: PDF() error = %v, want ErrNotFound", err)
 	}
 }
+
+func TestFetch_AFileSentAsAPDFThatIsNotOneIsNotHTML(t *testing.T) {
+	t.Parallel()
+	for _, contentType := range []string{"application/pdf", "application/octet-stream"} {
+		t.Run(contentType, func(t *testing.T) {
+			t.Parallel()
+			svc, f, _, id := setup(t)
+			f.responses[articleURL] = content.Fetched{ContentType: contentType, Body: []byte(articlePage)}
+
+			_, err := svc.Fetch(t.Context(), owner, id)
+			var fe *content.FetchError
+			if !errors.As(err, &fe) || fe.Problem != content.ProblemNotHTML {
+				t.Fatalf("Fetch() error = %v, want %s", err, content.ProblemNotHTML)
+			}
+			if _, err := svc.Get(t.Context(), owner, id); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := svc.PDF(t.Context(), owner, id); !errors.Is(err, content.ErrNoContent) {
+				t.Errorf("PDF() error = %v, want nothing saved", err)
+			}
+		})
+	}
+}

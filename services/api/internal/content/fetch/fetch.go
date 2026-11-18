@@ -10,11 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"mime"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -116,9 +118,10 @@ func PublicAddr(ap netip.AddrPort) bool {
 }
 
 // Fetch implements content.Fetcher. It accepts a 2xx response whose media
-// type is in accept ("image/*" allows a family) and whose body fits in
-// maxBytes. Failures are *content.FetchError with a stable problem code.
-func (c *Client) Fetch(ctx context.Context, rawURL string, maxBytes int64, accept []string) (content.Fetched, error) {
+// type is in accept and whose body fits in that type's limit, so a large
+// limit for one type never lets another read more. Failures are
+// *content.FetchError with a stable problem code.
+func (c *Client) Fetch(ctx context.Context, rawURL string, accept content.Accept) (content.Fetched, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemBlockedAddress, Err: errBlocked}
@@ -128,7 +131,8 @@ func (c *Client) Fetch(ctx context.Context, rawURL string, maxBytes int64, accep
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemBlockedAddress, Err: err}
 	}
 	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("Accept", strings.Join(accept, ", "))
+	types := slices.Sorted(maps.Keys(accept))
+	req.Header.Set("Accept", strings.Join(types, ", "))
 
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -140,7 +144,8 @@ func (c *Client) Fetch(ctx context.Context, rawURL string, maxBytes int64, accep
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemHTTPStatus, Status: resp.StatusCode}
 	}
 	mediaType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	if !accepted(mediaType, accept) {
+	maxBytes, ok := limit(mediaType, accept)
+	if !ok {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemNotHTML, Err: fmt.Errorf("media type %q", mediaType)}
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
@@ -153,13 +158,18 @@ func (c *Client) Fetch(ctx context.Context, rawURL string, maxBytes int64, accep
 	return content.Fetched{URL: resp.Request.URL.String(), ContentType: mediaType, Body: body}, nil
 }
 
-func accepted(mediaType string, accept []string) bool {
-	for _, a := range accept {
-		if a == mediaType || (strings.HasSuffix(a, "/*") && strings.HasPrefix(mediaType, strings.TrimSuffix(a, "*"))) {
-			return true
-		}
+// limit is the most bytes accept allows for mediaType: its own entry, else
+// its family's ("image/*").
+func limit(mediaType string, accept content.Accept) (int64, bool) {
+	if n, ok := accept[mediaType]; ok {
+		return n, true
 	}
-	return false
+	family, _, found := strings.Cut(mediaType, "/")
+	if !found || family == "" {
+		return 0, false
+	}
+	n, ok := accept[family+"/*"]
+	return n, ok
 }
 
 func classify(ctx context.Context, err error) *content.FetchError {

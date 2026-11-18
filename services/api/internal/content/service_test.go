@@ -33,7 +33,9 @@ type fakeFetcher struct {
 	delay time.Duration
 }
 
-func (f *fakeFetcher) Fetch(ctx context.Context, rawURL string, maxBytes int64, _ []string) (content.Fetched, error) {
+// Fetch applies accept's limit for the response's type, as the real
+// fetcher does; a type accept does not allow is not_html.
+func (f *fakeFetcher) Fetch(ctx context.Context, rawURL string, accept content.Accept) (content.Fetched, error) {
 	f.mu.Lock()
 	f.requested = append(f.requested, rawURL)
 	delay := f.delay
@@ -53,6 +55,13 @@ func (f *fakeFetcher) Fetch(ctx context.Context, rawURL string, maxBytes int64, 
 	got, ok := f.responses[rawURL]
 	if !ok {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemHTTPStatus, Status: 404}
+	}
+	maxBytes, allowed := accept[got.ContentType]
+	if family, _, _ := strings.Cut(got.ContentType, "/"); !allowed {
+		maxBytes, allowed = accept[family+"/*"]
+	}
+	if !allowed {
+		return content.Fetched{}, &content.FetchError{Problem: content.ProblemNotHTML}
 	}
 	if int64(len(got.Body)) > maxBytes {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemTooLarge}

@@ -16,7 +16,7 @@ import (
 	"readvault/api/internal/content/fetch"
 )
 
-var html = []string{"text/html"}
+var html = content.Accept{"text/html": 1024}
 
 // allowLoopback lets tests reach httptest servers; production uses PublicAddr.
 func allowLoopback(netip.AddrPort) bool { return true }
@@ -45,7 +45,7 @@ func TestFetch_ReturnsThePageAfterRedirects(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := fetch.New(allowLoopback).Fetch(t.Context(), srv.URL+"/old", 1024, html)
+	got, err := fetch.New(allowLoopback).Fetch(t.Context(), srv.URL+"/old", html)
 	if err != nil {
 		t.Fatalf("Fetch() error: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestFetch_ReportsEachFailureWithAProblemCode(t *testing.T) {
 			ctx, cancel = contextWithTimeout(t, tt.deadline)
 			defer cancel()
 		}
-		_, err := fetch.New(allowLoopback).Fetch(ctx, srv.URL+tt.path, 1024, html)
+		_, err := fetch.New(allowLoopback).Fetch(ctx, srv.URL+tt.path, html)
 		fe := problemOf(t, err)
 		if fe.Problem != tt.problem || fe.Status != tt.status {
 			t.Errorf("%s: problem %q status %d, want %q %d", tt.path, fe.Problem, fe.Status, tt.problem, tt.status)
@@ -113,7 +113,7 @@ func TestFetch_ReportsEachFailureWithAProblemCode(t *testing.T) {
 func TestFetch_RejectsAddressesThatAreNotWebURLs(t *testing.T) {
 	t.Parallel()
 	for _, raw := range []string{"file:///etc/passwd", "javascript:alert(1)", "gopher://x.example/", "not a url"} {
-		_, err := fetch.New(allowLoopback).Fetch(t.Context(), raw, 1024, html)
+		_, err := fetch.New(allowLoopback).Fetch(t.Context(), raw, html)
 		if fe := problemOf(t, err); fe.Problem != content.ProblemBlockedAddress {
 			t.Errorf("%q: problem %q, want blocked_address", raw, fe.Problem)
 		}
@@ -126,7 +126,7 @@ func TestFetch_DefaultGuardBlocksLoopback(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hit = true }))
 	defer srv.Close()
 
-	_, err := fetch.New(fetch.PublicAddr).Fetch(t.Context(), srv.URL, 1024, html)
+	_, err := fetch.New(fetch.PublicAddr).Fetch(t.Context(), srv.URL, html)
 
 	if fe := problemOf(t, err); fe.Problem != content.ProblemBlockedAddress {
 		t.Errorf("problem %q, want blocked_address", fe.Problem)
@@ -149,7 +149,7 @@ func TestFetch_GuardAppliesToEveryRedirect(t *testing.T) {
 
 	// Only the first server counts as public here.
 	onlyOuter := func(a netip.AddrPort) bool { return strconv.Itoa(int(a.Port())) == outerPort }
-	_, err := fetch.New(onlyOuter).Fetch(t.Context(), outer.URL, 1024, html)
+	_, err := fetch.New(onlyOuter).Fetch(t.Context(), outer.URL, html)
 
 	if fe := problemOf(t, err); fe.Problem != content.ProblemBlockedAddress {
 		t.Errorf("problem %q, want blocked_address", fe.Problem)
@@ -192,4 +192,24 @@ func TestPublicAddr(t *testing.T) {
 
 func contextWithTimeout(t *testing.T, d time.Duration) (ctx context.Context, cancel func()) {
 	return context.WithTimeout(t.Context(), d)
+}
+
+func TestFetch_ReadsEachMediaTypeUpToItsOwnLimit(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", map[string]string{"/page": "text/html", "/file": "application/pdf", "/photo": "image/png"}[r.URL.Path])
+		_, _ = w.Write([]byte(strings.Repeat("x", 2000)))
+	}))
+	defer srv.Close()
+	accept := content.Accept{"text/html": 1000, "application/pdf": 4000, "image/*": 3000}
+
+	if _, err := fetch.New(allowLoopback).Fetch(t.Context(), srv.URL+"/page", accept); problemOf(t, err).Problem != content.ProblemTooLarge {
+		t.Errorf("a page over its limit: error %v, want too_large", err)
+	}
+	for _, path := range []string{"/file", "/photo"} {
+		got, err := fetch.New(allowLoopback).Fetch(t.Context(), srv.URL+path, accept)
+		if err != nil || len(got.Body) != 2000 {
+			t.Errorf("%s under its own limit: %d bytes, error %v; want the whole body", path, len(got.Body), err)
+		}
+	}
 }

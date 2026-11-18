@@ -146,10 +146,14 @@ type Fetched struct {
 	Body        []byte
 }
 
-// Fetcher downloads public web resources. accept lists the media types
-// allowed (a type ending in "/*" allows its family).
+// Accept maps each media type a download allows to the most bytes its body
+// may hold. A type ending in "/*" allows its family; an exact type wins
+// over its family.
+type Accept map[string]int64
+
+// Fetcher downloads public web resources of the media types in accept.
 type Fetcher interface {
-	Fetch(ctx context.Context, rawURL string, maxBytes int64, accept []string) (Fetched, error)
+	Fetch(ctx context.Context, rawURL string, accept Accept) (Fetched, error)
 }
 
 // Download problem codes, stable for clients.

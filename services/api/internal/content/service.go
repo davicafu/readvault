@@ -38,6 +38,10 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]
 
 // storableImageTypes are sniffed from the bytes, never taken from the
 // server's header. SVG is left out: it can carry scripts.
+// imageTypes are what an image download allows: servers often send images
+// with a generic type, and the bytes decide.
+var imageTypes = Accept{"image/*": maxImageBytes, "application/octet-stream": maxImageBytes, "binary/octet-stream": maxImageBytes}
+
 var storableImageTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true}
 
 // Service saves the text and images of articles.
@@ -360,8 +364,10 @@ func (s *Service) isCopyAddress(rawURL string) bool {
 // resolved against base, or against the page's own address when base is nil.
 func (s *Service) download(ctx context.Context, rawURL string, base *url.URL) (Extracted, *FetchError) {
 	pageCtx, cancel := context.WithTimeout(ctx, pageTimeout)
-	page, err := s.fetcher.Fetch(pageCtx, rawURL, max(s.maxPageBytes, maxPDFBytes),
-		[]string{"text/html", "application/xhtml+xml", "application/pdf", "application/octet-stream"})
+	page, err := s.fetcher.Fetch(pageCtx, rawURL, Accept{
+		"text/html": s.maxPageBytes, "application/xhtml+xml": s.maxPageBytes,
+		"application/pdf": maxPDFBytes, "application/octet-stream": maxPDFBytes,
+	})
 	cancel()
 	if err != nil {
 		return Extracted{}, asFetchError(err)
@@ -373,9 +379,6 @@ func (s *Service) download(ctx context.Context, rawURL string, base *url.URL) (E
 	}
 	if page.ContentType == "application/pdf" || page.ContentType == "application/octet-stream" {
 		return Extracted{}, &FetchError{Problem: ProblemNotHTML, Err: fmt.Errorf("media type %q is not a PDF", page.ContentType)}
-	}
-	if int64(len(page.Body)) > s.maxPageBytes {
-		return Extracted{}, &FetchError{Problem: ProblemTooLarge}
 	}
 	if base == nil {
 		base, _ = url.Parse(page.URL)
@@ -456,7 +459,7 @@ func (s *Service) downloadImages(ctx context.Context, refs []ImageRef) ([]NewIma
 	for range min(imageWorkers, len(usable)) {
 		wg.Go(func() {
 			for i := range jobs {
-				got, err := s.fetcher.Fetch(ctx, usable[i].URL, maxImageBytes, []string{"image/*", "application/octet-stream", "binary/octet-stream"})
+				got, err := s.fetcher.Fetch(ctx, usable[i].URL, imageTypes)
 				if err != nil {
 					continue
 				}
