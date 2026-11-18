@@ -13,7 +13,9 @@ const SLOP = 8;
 // Opening one entry closes any other one.
 const OPENED = "readvault:swipe-open";
 
-type Drag = { x: number; y: number; from: number; axis: "x" | "y" | null };
+// to is where the move left the entry: state may not have caught up yet
+// when the finger lifts after a quick swipe.
+type Drag = { x: number; y: number; from: number; to: number; axis: "x" | "y" | null };
 
 // SwipeDelete is a list entry (an <li>) that a touch screen can swipe to the
 // left to show a Delete button; tapping it deletes the article for good. A mouse or a
@@ -27,9 +29,13 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
   const [gone, setGone] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
-  // Set when the last touch swiped or closed the entry, so its click does
-  // not follow a link.
-  const swallowClick = useRef(false);
+  // Until when a click is ignored: the click that may follow a touch that
+  // swiped or closed the entry must not follow a link. It expires, so a later
+  // mouse click or Enter on the entry still opens the article.
+  const swallowUntil = useRef(0);
+  const swallowNextClick = () => {
+    swallowUntil.current = Date.now() + 500;
+  };
   const open = offset !== 0;
 
   useEffect(() => {
@@ -47,8 +53,7 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== "touch" || deleting) return;
-    drag.current = { x: e.clientX, y: e.clientY, from: offset, axis: null };
-    swallowClick.current = false;
+    drag.current = { x: e.clientX, y: e.clientY, from: offset, to: offset, axis: null };
   };
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
@@ -70,7 +75,8 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
       }
       setDragging(true);
     }
-    setOffset(Math.min(0, Math.max(-ACTION * 1.4, d.from + dx)));
+    d.to = Math.min(0, Math.max(-ACTION * 1.4, d.from + dx));
+    setOffset(d.to);
   };
 
   const onPointerUp = () => {
@@ -79,11 +85,11 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
     if (!d) return;
     if (d.axis === "x") {
       setDragging(false);
-      swallowClick.current = true;
-      settle(offset < -ACTION / 2 ? -ACTION : 0);
+      swallowNextClick();
+      settle(d.to < -ACTION / 2 ? -ACTION : 0);
     } else if (open) {
       // A tap on an open entry closes it.
-      swallowClick.current = true;
+      swallowNextClick();
       setOffset(0);
     }
   };
@@ -134,8 +140,8 @@ export function SwipeDelete({ id, title, children }: { id: string; title: string
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
         onClickCapture={(e) => {
-          if (!swallowClick.current) return;
-          swallowClick.current = false;
+          if (Date.now() >= swallowUntil.current) return;
+          swallowUntil.current = 0;
           e.preventDefault();
           e.stopPropagation();
         }}

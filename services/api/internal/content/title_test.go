@@ -23,6 +23,7 @@ func TestFetch_GivesAnArticleSavedUnderItsAddressThePageTitle(t *testing.T) {
 		want     string
 	}{
 		{"titled with its address", articleURL, nil, "Queues, explained"},
+		{"titled with its canonical address", "https://blog.example/queues", nil, "Queues, explained"},
 		{"without a title", "", nil, "Queues, explained"},
 		{"with a bookmark title", "My queues note", nil, "My queues note"},
 		{"with its address as an edited title", articleURL, &edited, articleURL},
@@ -30,7 +31,8 @@ func TestFetch_GivesAnArticleSavedUnderItsAddressThePageTitle(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			svc, f, pool, id := setup(t)
-			if _, err := pool.Exec(t.Context(), `UPDATE articles SET title = $2, title_edited_at = $3 WHERE id = $1`, id, tc.title, tc.editedAt); err != nil {
+			if _, err := pool.Exec(t.Context(), `UPDATE articles SET title = $2, title_edited_at = $3,
+				canonical_url = 'https://blog.example/queues' WHERE id = $1`, id, tc.title, tc.editedAt); err != nil {
 				t.Fatal(err)
 			}
 			var updatedBefore time.Time

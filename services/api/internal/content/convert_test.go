@@ -233,6 +233,7 @@ func TestFromHTML_FindsThePageTitle(t *testing.T) {
 			explained  </title>`, "Queues, explained"},
 		{"empty og:title falls back", `<meta property="og:title" content=" "><title>Queues</title>`, "Queues"},
 		{"no title", ``, ""},
+		{"an SVG's title is not the page's", `<svg><title>Logo</title></svg><title>Queues</title>`, "Queues"},
 		{"cut to 500 characters", `<title>` + long + `</title>`, strings.Repeat("é", 500)},
 	} {
 		got, err := content.FromHTML(strings.NewReader(`<html><head>`+tc.head+`</head>`+body+`</html>`), pageURL)
