@@ -50,12 +50,12 @@ func (r *Repository) Save(ctx context.Context, userID, articleID string, c conte
 			return err
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO article_contents
-				(article_id, user_id, status, source, markdown, words, problem, missing_images, saved_at)
-			VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, now())
+				(article_id, user_id, status, source, markdown, words, problem, missing_images, pdf, saved_at)
+			VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $8, now())
 			ON CONFLICT (article_id) DO UPDATE SET status = EXCLUDED.status, source = EXCLUDED.source,
 				markdown = EXCLUDED.markdown, words = EXCLUDED.words, problem = NULL,
-				missing_images = EXCLUDED.missing_images, saved_at = now()`,
-			articleID, userID, c.Status, c.Source, c.Markdown, c.Words, c.MissingImages); err != nil {
+				missing_images = EXCLUDED.missing_images, pdf = EXCLUDED.pdf, saved_at = now()`,
+			articleID, userID, c.Status, c.Source, c.Markdown, c.Words, c.MissingImages, c.PDF); err != nil {
 			return fmt.Errorf("saving content: %w", err)
 		}
 		if c.Title != "" {
@@ -127,9 +127,9 @@ type rowQuerier interface {
 
 func getContent(ctx context.Context, q rowQuerier, userID, articleID string) (content.Content, error) {
 	c := content.Content{ArticleID: articleID, Images: []content.ImageInfo{}}
-	err := q.QueryRow(ctx, `SELECT status, source, markdown, words, problem, missing_images, saved_at
+	err := q.QueryRow(ctx, `SELECT status, source, markdown, words, problem, missing_images, pdf IS NOT NULL, saved_at
 		FROM article_contents WHERE user_id = $1 AND article_id = $2`, userID, articleID).
-		Scan(&c.Status, &c.Source, &c.Markdown, &c.Words, &c.Problem, &c.MissingImages, &c.SavedAt)
+		Scan(&c.Status, &c.Source, &c.Markdown, &c.Words, &c.Problem, &c.MissingImages, &c.PDF, &c.SavedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return content.Content{}, content.ErrNoContent
 	}
@@ -163,6 +163,20 @@ func (r *Repository) Image(ctx context.Context, userID, articleID, imageID strin
 		return content.Image{}, fmt.Errorf("loading image: %w", err)
 	}
 	return img, nil
+}
+
+// PDF implements content.Repository.
+func (r *Repository) PDF(ctx context.Context, userID, articleID string) ([]byte, error) {
+	var data []byte
+	err := r.pool.QueryRow(ctx, `SELECT pdf FROM article_contents
+		WHERE user_id = $1 AND article_id = $2 AND pdf IS NOT NULL`, userID, articleID).Scan(&data)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, content.ErrNoContent
+	}
+	if err != nil {
+		return nil, fmt.Errorf("loading pdf: %w", err)
+	}
+	return data, nil
 }
 
 // DownloadSummary implements content.Repository.

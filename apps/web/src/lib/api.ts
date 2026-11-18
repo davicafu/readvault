@@ -47,6 +47,8 @@ export type ArticleContent = {
   problem: string | null;
   images: { id: string; sourceUrl: string }[];
   missingImages: number;
+  // The article is a PDF kept as it is, served at /api/articles/{id}/pdf.
+  pdf: boolean;
   savedAt: string;
 };
 
@@ -56,7 +58,7 @@ export const downloadProblems: Record<string, string> = {
   unreachable: "the site could not be reached",
   timeout: "the site took too long to answer",
   http_status: "the site refused to send it to a server",
-  not_html: "the address is not a web page",
+  not_html: "the address is not a web page or a PDF",
   too_large: "the page is too large",
   no_text: "the page holds no article text",
   no_copy: "no other copy of the article was found",

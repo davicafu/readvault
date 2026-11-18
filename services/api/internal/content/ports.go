@@ -46,7 +46,15 @@ type Content struct {
 	Problem       *string     `json:"problem"`
 	Images        []ImageInfo `json:"images"`
 	MissingImages int         `json:"missingImages"`
-	SavedAt       time.Time   `json:"savedAt"`
+	// PDF means the article is a PDF kept as it is, without Markdown text.
+	PDF     bool      `json:"pdf"`
+	SavedAt time.Time `json:"savedAt"`
+}
+
+// PDF is a saved PDF with the name of its file.
+type PDF struct {
+	Name string
+	Data []byte
 }
 
 // Image is a stored image with its bytes.
@@ -73,6 +81,8 @@ type NewContent struct {
 	Words         int
 	Images        []NewImage
 	MissingImages int
+	// PDF, when not nil, is a PDF kept as it is instead of a text.
+	PDF []byte
 }
 
 var (
@@ -98,6 +108,8 @@ type Repository interface {
 	SaveFailure(ctx context.Context, userID, articleID, problem string) error
 	Get(ctx context.Context, userID, articleID string) (Content, error)
 	Image(ctx context.Context, userID, articleID, imageID string) (Image, error)
+	// PDF returns the article's saved PDF; ErrNoContent when it has none.
+	PDF(ctx context.Context, userID, articleID string) ([]byte, error)
 	// DownloadSummary counts the user's articles by the state of their text.
 	DownloadSummary(ctx context.Context, userID string) (DownloadSummary, error)
 	// QueueMissing queues the text download of every article of the user

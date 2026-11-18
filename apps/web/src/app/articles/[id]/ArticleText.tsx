@@ -84,6 +84,8 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
     run("upload", () => fetch(`/api/articles/${articleId}/content`, { method: "POST", body: form }));
   };
 
+  const pdfUrl = `/api/articles/${articleId}/pdf`;
+
   const stored = new Map((content?.images ?? []).map((img) => [img.sourceUrl, img.id]));
   const resolveImage = (src: string) => {
     let abs: string;
@@ -163,7 +165,8 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
       ) : (
         <div className="reading-head">
           <p className="fine-print">
-            {content.words.toLocaleString("en-US")} words, {content.source === "fetched" ? "downloaded" : "uploaded"} on{" "}
+            {content.pdf ? "PDF" : `${content.words.toLocaleString("en-US")} words`},{" "}
+            {content.source === "fetched" ? "downloaded" : "uploaded"} on{" "}
             {formatDate(content.savedAt)}
             {content.missingImages > 0
               ? `. ${content.missingImages} ${content.missingImages === 1 ? "image" : "images"} could not be saved`
@@ -182,6 +185,24 @@ export function ArticleText({ articleId, articleUrl, content }: Props) {
         <p className="field-error" role="alert">
           {failure}
         </p>
+      ) : null}
+
+      {content?.pdf ? (
+        <div className="pdf">
+          <div className="actions">
+            <a className="button button-with-icon" href={pdfUrl} target="_blank" rel="noreferrer">
+              <ActionIcon name="open" />
+              Open PDF
+            </a>
+            <a className="button button-quiet button-with-icon" href={`${pdfUrl}?download=1`} download>
+              <ActionIcon name="download" />
+              Download PDF
+            </a>
+          </div>
+          {/* A phone's browser may show only the first page here: Open PDF
+              shows the whole file. */}
+          <iframe className="pdf-view" src={pdfUrl} title="The article's PDF" />
+        </div>
       ) : null}
 
       {content && content.markdown ? (

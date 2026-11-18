@@ -33,6 +33,9 @@ type Extracted struct {
 	Words  int
 	// Paywalled means the page says it shows only part of a paid article.
 	Paywalled bool
+	// PDF is set when the address served a PDF instead of a page; the
+	// other fields are then empty but Title.
+	PDF []byte
 	// mirrorError means the page is the reading mirror's error page
 	// (see mirrorErrorData), not an article.
 	mirrorError bool

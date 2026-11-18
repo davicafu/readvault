@@ -67,6 +67,14 @@ func (s *stubContent) Image(_ context.Context, userID, articleID, imageID string
 	return content.Image{ContentType: "image/png", Data: []byte("\x89PNG")}, nil
 }
 
+func (s *stubContent) PDF(_ context.Context, userID, articleID string) (content.PDF, error) {
+	s.gotUser, s.gotID = userID, articleID
+	if s.err != nil {
+		return content.PDF{}, s.err
+	}
+	return content.PDF{Name: "raft consensus.pdf", Data: []byte("%PDF-1.7")}, nil
+}
+
 const testMaxArticleBytes = 1024
 
 func serveContent(t *testing.T, svc *stubContent, req *http.Request) *httptest.ResponseRecorder {
@@ -224,5 +232,43 @@ func TestContent_FetchFromAnotherCopy(t *testing.T) {
 	details, _ := errBody["details"].(map[string]any)
 	if rec.Code != http.StatusBadGateway || errBody["code"] != "fetch_failed" || details["problem"] != "no_copy" {
 		t.Errorf("no copy: status %d body %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestContent_ServesTheSavedPDFToViewOrDownload(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ query, disposition string }{
+		{"", `inline; filename="raft consensus.pdf"`},
+		{"?download=1", `attachment; filename="raft consensus.pdf"`},
+	} {
+		svc := &stubContent{}
+		rec := serveContent(t, svc, httptest.NewRequest(http.MethodGet, "/api/articles/a1/pdf"+tc.query, nil))
+
+		if rec.Code != http.StatusOK || rec.Body.String() != "%PDF-1.7" {
+			t.Fatalf("%q: status = %d; body %q", tc.query, rec.Code, rec.Body.String())
+		}
+		for header, expected := range map[string]string{
+			"Content-Type":           "application/pdf",
+			"Content-Disposition":    tc.disposition,
+			"X-Content-Type-Options": "nosniff",
+			"Cache-Control":          "private, no-cache",
+		} {
+			if got := rec.Header().Get(header); got != expected {
+				t.Errorf("%q: %s = %q, want %q", tc.query, header, got, expected)
+			}
+		}
+		if svc.gotID != "a1" || svc.gotUser != testOwner {
+			t.Errorf("got id %q user %q", svc.gotID, svc.gotUser)
+		}
+	}
+}
+
+func TestContent_WithoutASavedPDFIsNotFound(t *testing.T) {
+	t.Parallel()
+	for err, code := range map[error]string{content.ErrNoContent: "pdf_not_found", content.ErrNotFound: "not_found"} {
+		rec := serveContent(t, &stubContent{err: err}, httptest.NewRequest(http.MethodGet, "/api/articles/a1/pdf", nil))
+		if rec.Code != http.StatusNotFound || errorCode(t, rec) != code {
+			t.Errorf("%v: status %d, code %q; want 404 %s", err, rec.Code, errorCode(t, rec), code)
+		}
 	}
 }

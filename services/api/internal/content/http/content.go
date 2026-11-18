@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"strconv"
 
@@ -22,6 +23,7 @@ type Service interface {
 	Fetch(ctx context.Context, userID, articleID string) (content.Content, error)
 	FetchCopy(ctx context.Context, userID, articleID string) (content.Content, error)
 	Image(ctx context.Context, userID, articleID, imageID string) (content.Image, error)
+	PDF(ctx context.Context, userID, articleID string) (content.PDF, error)
 	DownloadSummary(ctx context.Context, userID string) (content.DownloadSummary, error)
 	QueueMissing(ctx context.Context, userID string) (int, error)
 	RemoveTexts(ctx context.Context, userID, collectionID string) (int, error)
@@ -57,6 +59,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/collections/{id}/contents", h.removeTexts)
 	mux.HandleFunc("DELETE /api/articles/{id}/content", h.removeText)
 	mux.HandleFunc("GET /api/articles/{id}/images/{imageId}", h.image)
+	mux.HandleFunc("GET /api/articles/{id}/pdf", h.pdf)
 }
 
 // downloads serves GET /api/content-downloads: how many articles wait for
@@ -183,6 +186,33 @@ func (h *Handler) image(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, max-age=86400")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(img.Data)
+}
+
+// pdf serves GET /api/articles/{id}/pdf: the saved PDF, for the browser to
+// show, or with ?download=1 to save. No sandbox policy: browsers refuse to
+// show a PDF under one.
+func (h *Handler) pdf(w http.ResponseWriter, r *http.Request) {
+	p, err := h.svc.PDF(r.Context(), h.ownerID, r.PathValue("id"))
+	if errors.Is(err, content.ErrNoContent) {
+		httpapi.WriteError(w, http.StatusNotFound, "pdf_not_found", "no PDF has been saved for this article")
+		return
+	}
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	disposition := "inline"
+	if r.URL.Query().Get("download") == "1" {
+		disposition = "attachment"
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": p.Name}))
+	w.Header().Set("Content-Length", strconv.Itoa(len(p.Data)))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// A new download replaces the file under the same address.
+	w.Header().Set("Cache-Control", "private, no-cache")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(p.Data)
 }
 
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {

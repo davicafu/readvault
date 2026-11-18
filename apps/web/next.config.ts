@@ -14,6 +14,12 @@ const config: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
         ],
       },
+      // The article page shows a saved PDF in a frame: only this app's own
+      // pages may frame it. Being last, it overrides DENY above.
+      {
+        source: "/api/articles/:id/pdf",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
     ];
   },
 };

@@ -278,11 +278,12 @@ An article can keep its text as Markdown, with the images of its body. The text 
   "problem": null,
   "images": [{ "id": "5b0b0c43-3a43-4f3e-9d0a-8f2b8f6f2f10", "sourceUrl": "https://cdn.example/diagram.png" }],
   "missingImages": 0,
+  "pdf": false,
   "savedAt": "2026-11-08T13:12:46Z"
 }
 ```
 
-`source` is `fetched`, `uploaded_html` or `uploaded_markdown`. The Markdown keeps the original image addresses; `images` maps each one to a stored copy. `missingImages` counts body images that could not be stored. `problem` is the code of the last failed download, also when older text was kept. `404 content_not_found` when nothing was saved.
+`source` is `fetched`, `uploaded_html` or `uploaded_markdown`. The Markdown keeps the original image addresses; `images` maps each one to a stored copy. `missingImages` counts body images that could not be stored. `problem` is the code of the last failed download, also when older text was kept. `pdf` is `true` when the article is a PDF kept as it is (see `GET /api/articles/{id}/pdf`); it then has no Markdown, words or images. `404 content_not_found` when nothing was saved.
 
 ### `POST /api/articles/{id}/content`
 
@@ -290,7 +291,7 @@ Saves the text of a file the user chose, sent as `multipart/form-data` in the `f
 
 ### `POST /api/articles/{id}/content/fetch`
 
-Downloads the article from its original URL and saves its text the same way. A page whose schema.org data says `isAccessibleForFree: false`, or that shows Medium's "Member-only story" label, is saved as `incomplete`. When an article the mirror reads (a Medium article on medium.com, a subdomain, or its own domain served by Medium, recognised by Medium's addresses in DNS; or an article of nytimes.com, theathletic.com, washingtonpost.com, economist.com, bloomberg.com, reuters.com or quora.com, subdomains included) answers without the article (an HTTP error such as 403, or a page without text) or with a paid preview, the mirror's copy (`ARTICLE_MIRROR_URL`, Freedium by default, `off` to turn it off; the prefix followed by the article's URL) is downloaded the same way; if it has text, is not a paid preview and is not the mirror's error page (Freedium answers 200 with an error in its page data when it cannot read an article), it is saved as `complete`, otherwise the original outcome stands. Any article, Medium or not, that answers the same way and that the mirror did not save is then looked up in the archive (`ARTICLE_ARCHIVE_URL`, the Wayback Machine by default, `off` to turn it off; the prefix followed by the article's URL), whose relative image addresses resolve against the original site. An article whose URL already starts with either prefix is not sent to a copy again, and an address that did not resolve or answer, or that the API refuses to download (`blocked_address`), is never sent to one, since it may be a private or intranet host.
+Downloads the article from its original URL and saves its text the same way. An address that answers with a PDF (recognised from its bytes, also when it is sent as `application/octet-stream`; up to 50 MiB) has the PDF saved as it is, without text, replacing any saved text; the file's name in the address, without `.pdf`, fills in the title the same way a page title does. A text downloaded later replaces the PDF. A page whose schema.org data says `isAccessibleForFree: false`, or that shows Medium's "Member-only story" label, is saved as `incomplete`. When an article the mirror reads (a Medium article on medium.com, a subdomain, or its own domain served by Medium, recognised by Medium's addresses in DNS; or an article of nytimes.com, theathletic.com, washingtonpost.com, economist.com, bloomberg.com, reuters.com or quora.com, subdomains included) answers without the article (an HTTP error such as 403, or a page without text) or with a paid preview, the mirror's copy (`ARTICLE_MIRROR_URL`, Freedium by default, `off` to turn it off; the prefix followed by the article's URL) is downloaded the same way; if it has text, is not a paid preview and is not the mirror's error page (Freedium answers 200 with an error in its page data when it cannot read an article), it is saved as `complete`, otherwise the original outcome stands. Any article, Medium or not, that answers the same way and that the mirror did not save is then looked up in the archive (`ARTICLE_ARCHIVE_URL`, the Wayback Machine by default, `off` to turn it off; the prefix followed by the article's URL), whose relative image addresses resolve against the original site. An article whose URL already starts with either prefix is not sent to a copy again, and an address that did not resolve or answer, or that the API refuses to download (`blocked_address`), is never sent to one, since it may be a private or intranet host.
 
 `?from=copy` skips the original and asks only the copies (mirror, then archive); the web app offers it as **Try another copy** when a download failed or saved a paid preview. A copy with text replaces the saved text; when no copy has text the answer is `502 fetch_failed` with problem `no_copy`, and the saved text and recorded download are left as they were. Any other `from` value is `400 invalid_query`.
 
@@ -302,8 +303,8 @@ On failure the answer is `502 fetch_failed` with `details.problem`:
 | `unreachable` | DNS or connection failure, more than 5 redirects, or a redirect to another scheme |
 | `timeout` | No complete answer within 10 s |
 | `http_status` | The site answered with another status; `details.status` holds it (Medium answers 403 to servers) |
-| `not_html` | The answer is not an HTML page |
-| `too_large` | The page is larger than `MAX_ARTICLE_BYTES` |
+| `not_html` | The answer is neither an HTML page nor a PDF |
+| `too_large` | The page is larger than `MAX_ARTICLE_BYTES`, or the PDF than 50 MiB |
 | `no_text` | The page holds no article text |
 | `no_copy` | `?from=copy` only: neither the mirror nor the archive has the article's text |
 
@@ -334,6 +335,10 @@ Deletes one article's saved text, with its images and recorded download failure,
 ### `GET /api/articles/{id}/images/{imageId}`
 
 Returns a stored image with its type, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox` and `Cache-Control: private, max-age=86400`.
+
+### `GET /api/articles/{id}/pdf`
+
+Returns the article's saved PDF as `application/pdf`, for the browser to show (`Content-Disposition: inline`), or with `?download=1` to save (`attachment`), named after the file in the article's address (`article.pdf` when it names none), with `X-Content-Type-Options: nosniff` and `Cache-Control: private, no-cache`. `404 pdf_not_found` when the article has no PDF; `404 not_found` for an unknown article.
 
 ## Export
 

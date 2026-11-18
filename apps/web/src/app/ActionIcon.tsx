@@ -25,6 +25,8 @@ const paths = {
   // A closed book: marking an article unread again.
   unread: ["M6.5 4.5h11v15h-11a1.5 1.5 0 0 1-1.5-1.5V6a1.5 1.5 0 0 1 1.5-1.5z", "M5 16.5a1.5 1.5 0 0 1 1.5-1.5h11"],
   // A circling arrow: trying again.
+  // A box with an arrow leaving it: opening in a new tab.
+  open: ["M13.5 4.5h6v6", "M19.5 4.5L11 13", "M10 5.5H5.5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V14"],
   retry: ["M19.5 12a7.5 7.5 0 1 1-2.2-5.3", "M19.5 4.5v4h-4"],
   // A bell: notifications.
   bell: [

@@ -26,6 +26,9 @@ const (
 	maxImageBytes      = 5 << 20
 	maxTotalImageBytes = 30 << 20
 	imageWorkers       = 4
+	// maxPDFBytes matches the database constraint. A PDF has its own limit,
+	// larger than a page's: it holds its images.
+	maxPDFBytes = 50 << 20
 
 	pageTimeout   = 10 * time.Second
 	imagesTimeout = 15 * time.Second
@@ -96,6 +99,43 @@ func (s *Service) Image(ctx context.Context, userID, articleID, imageID string) 
 	return s.repo.Image(ctx, userID, articleID, imageID)
 }
 
+// PDF returns the article's saved PDF, named after the file in its address.
+func (s *Service) PDF(ctx context.Context, userID, articleID string) (PDF, error) {
+	if !uuidPattern.MatchString(articleID) {
+		return PDF{}, ErrNotFound
+	}
+	rawURL, err := s.repo.ArticleURL(ctx, userID, articleID)
+	if err != nil {
+		return PDF{}, err
+	}
+	data, err := s.repo.PDF(ctx, userID, articleID)
+	if err != nil {
+		return PDF{}, err
+	}
+	name := pdfName(rawURL)
+	if name == "" {
+		name = "article"
+	}
+	return PDF{Name: name + ".pdf", Data: data}, nil
+}
+
+// pdfName is the name of the file an address points to, without its .pdf
+// extension, or "" when it names no file.
+func pdfName(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	name := path.Base(u.Path)
+	if name == "/" || name == "." {
+		return ""
+	}
+	if ext := path.Ext(name); strings.EqualFold(ext, ".pdf") {
+		name = name[:len(name)-len(ext)]
+	}
+	return strings.TrimSpace(name)
+}
+
 // Upload saves the text of a file the user chose: HTML is converted to
 // Markdown, Markdown is kept as is. The user picked the file, so the text
 // counts as complete. Body images are downloaded and stored.
@@ -137,7 +177,8 @@ func (s *Service) Upload(ctx context.Context, userID, articleID, fileName string
 	return s.save(ctx, userID, articleID, ex, StatusComplete, source)
 }
 
-// Fetch downloads the article from its original URL and saves its text. A
+// Fetch downloads the article from its original URL and saves its text. An
+// address that serves a PDF has the PDF saved as it is. A
 // page that says it is a paid preview is saved as incomplete. When the page
 // fails or is a paid preview, another copy is saved instead if one holds the
 // whole text: the mirror's for the pages it serves, then the archive's. A failed download keeps any saved
@@ -319,10 +360,22 @@ func (s *Service) isCopyAddress(rawURL string) bool {
 // resolved against base, or against the page's own address when base is nil.
 func (s *Service) download(ctx context.Context, rawURL string, base *url.URL) (Extracted, *FetchError) {
 	pageCtx, cancel := context.WithTimeout(ctx, pageTimeout)
-	page, err := s.fetcher.Fetch(pageCtx, rawURL, s.maxPageBytes, []string{"text/html", "application/xhtml+xml"})
+	page, err := s.fetcher.Fetch(pageCtx, rawURL, max(s.maxPageBytes, maxPDFBytes),
+		[]string{"text/html", "application/xhtml+xml", "application/pdf", "application/octet-stream"})
 	cancel()
 	if err != nil {
 		return Extracted{}, asFetchError(err)
+	}
+	// The bytes decide, not the server's header: a PDF is often sent as
+	// application/octet-stream.
+	if http.DetectContentType(page.Body) == "application/pdf" {
+		return Extracted{Title: pdfName(rawURL), PDF: page.Body}, nil
+	}
+	if page.ContentType == "application/pdf" || page.ContentType == "application/octet-stream" {
+		return Extracted{}, &FetchError{Problem: ProblemNotHTML, Err: fmt.Errorf("media type %q is not a PDF", page.ContentType)}
+	}
+	if int64(len(page.Body)) > s.maxPageBytes {
+		return Extracted{}, &FetchError{Problem: ProblemTooLarge}
 	}
 	if base == nil {
 		base, _ = url.Parse(page.URL)
@@ -367,6 +420,9 @@ func (s *Service) articleBase(ctx context.Context, userID, articleID string) (*u
 }
 
 func (s *Service) save(ctx context.Context, userID, articleID string, ex Extracted, status Status, source Source) (Content, error) {
+	if ex.PDF != nil {
+		return s.repo.Save(ctx, userID, articleID, NewContent{Title: ex.Title, Status: status, Source: source, PDF: ex.PDF})
+	}
 	images, missing := s.downloadImages(ctx, ex.Images)
 	return s.repo.Save(ctx, userID, articleID, NewContent{
 		Title: ex.Title, Status: status, Source: source, Markdown: ex.Markdown, Words: ex.Words,
