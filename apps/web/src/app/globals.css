@@ -793,8 +793,10 @@ body::before {
   }
 }
 
+/* The bottom space lets the last entries and tags scroll far enough for
+   the scroll reveal (below) to finish: it ends a quarter of the screen up. */
 .page {
-  padding-block: 2rem 4rem;
+  padding-block: 2rem max(4rem, 25vh);
 }
 
 .page-head {
@@ -1000,6 +1002,8 @@ body::before {
 }
 
 .entry-title {
+  /* A title that is an address has no spaces to wrap at. */
+  overflow-wrap: anywhere;
   font-family: var(--font-read);
   font-size: var(--step-1);
   font-weight: 600;
