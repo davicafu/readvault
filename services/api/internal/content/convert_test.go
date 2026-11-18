@@ -222,3 +222,25 @@ func TestFromMarkdown_FindsImagesAndWords(t *testing.T) {
 		t.Errorf("words = %d, want 5 (Title, Some, words, here., and)", got.Words)
 	}
 }
+
+func TestFromHTML_FindsThePageTitle(t *testing.T) {
+	t.Parallel()
+	body := `<body><article><p>Some text.</p></article></body>`
+	long := strings.Repeat("é", 600)
+	for _, tc := range []struct{ name, head, want string }{
+		{"og:title first", `<title>Queues | Blog</title><meta property="og:title" content="Queues">`, "Queues"},
+		{"title element", `<title>  Queues,
+			explained  </title>`, "Queues, explained"},
+		{"empty og:title falls back", `<meta property="og:title" content=" "><title>Queues</title>`, "Queues"},
+		{"no title", ``, ""},
+		{"cut to 500 characters", `<title>` + long + `</title>`, strings.Repeat("é", 500)},
+	} {
+		got, err := content.FromHTML(strings.NewReader(`<html><head>`+tc.head+`</head>`+body+`</html>`), pageURL)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if got.Title != tc.want {
+			t.Errorf("%s: title %q, want %q", tc.name, got.Title, tc.want)
+		}
+	}
+}

@@ -64,6 +64,9 @@ type NewImage struct {
 
 // NewContent is a text ready to store; it replaces the previous one.
 type NewContent struct {
+	// Title, when not "", becomes the article's title if the article has
+	// none or only its own address, and the reader did not edit it.
+	Title         string
 	Status        Status
 	Source        Source
 	Markdown      string

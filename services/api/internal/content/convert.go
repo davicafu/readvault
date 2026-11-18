@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -24,6 +25,8 @@ type ImageRef struct {
 
 // Extracted is the article text found in a page.
 type Extracted struct {
+	// Title is the page's own title (see pageTitle), or "" when it has none.
+	Title    string
 	Markdown string
 	// Images lists each distinct body image once, in reading order.
 	Images []ImageRef
@@ -61,11 +64,48 @@ func FromHTML(r io.Reader, base *url.URL) (Extracted, error) {
 		md = strings.Join(blocks, "\n\n") + "\n"
 	}
 	return Extracted{
+		Title:     pageTitle(doc),
 		Markdown:  md,
 		Images:    c.images,
 		Words:     countWords(text.String()),
 		Paywalled: declaresNotFree(doc) || strings.Contains(text.String(), memberOnlyMarker),
 	}, nil
+}
+
+// maxTitleRunes is the longest title an article can store.
+const maxTitleRunes = 500
+
+// pageTitle is the title the page gives itself: its og:title, which sites
+// keep free of their own name more often, else its <title>. Spaces are
+// collapsed and it is cut to maxTitleRunes.
+func pageTitle(doc *html.Node) string {
+	var og, title string
+	var rec func(*html.Node)
+	rec = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type != html.ElementNode {
+				continue
+			}
+			switch {
+			case c.DataAtom == atom.Meta && og == "" && attr(c, "property") == "og:title":
+				og = strings.Join(strings.Fields(attr(c, "content")), " ")
+			case c.DataAtom == atom.Title && title == "":
+				title = strings.Join(strings.Fields(rawText(c)), " ")
+			case c.DataAtom == atom.Svg:
+				continue // an SVG's <title> names a drawing, not the page
+			}
+			rec(c)
+		}
+	}
+	rec(doc)
+	t := og
+	if t == "" {
+		t = title
+	}
+	if utf8.RuneCountInString(t) > maxTitleRunes {
+		t = string([]rune(t)[:maxTitleRunes])
+	}
+	return t
 }
 
 var markdownImage = regexp.MustCompile(`!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)`)

@@ -40,7 +40,9 @@ func (r *Repository) ArticleURL(ctx context.Context, userID, articleID string) (
 
 // Save implements content.Repository. It locks the article row first, the
 // order every other writer of an article uses, then replaces the text and
-// its images in one transaction.
+// its images in one transaction. A page title fills in a title that is
+// empty or only the article's address and was never edited; that is not an
+// edit, so updated_at stays.
 func (r *Repository) Save(ctx context.Context, userID, articleID string, c content.NewContent) (content.Content, error) {
 	var saved content.Content
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
@@ -55,6 +57,14 @@ func (r *Repository) Save(ctx context.Context, userID, articleID string, c conte
 				missing_images = EXCLUDED.missing_images, saved_at = now()`,
 			articleID, userID, c.Status, c.Source, c.Markdown, c.Words, c.MissingImages); err != nil {
 			return fmt.Errorf("saving content: %w", err)
+		}
+		if c.Title != "" {
+			if _, err := tx.Exec(ctx, `UPDATE articles SET title = $3
+				WHERE id = $1 AND user_id = $2 AND title_edited_at IS NULL
+					AND (title = '' OR title IN (original_url, canonical_url))`,
+				articleID, userID, c.Title); err != nil {
+				return fmt.Errorf("saving the page title: %w", err)
+			}
 		}
 		if _, err := tx.Exec(ctx, `DELETE FROM article_images WHERE article_id = $1`, articleID); err != nil {
 			return fmt.Errorf("replacing images: %w", err)

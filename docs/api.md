@@ -286,7 +286,7 @@ An article can keep its text as Markdown, with the images of its body. The text 
 
 ### `POST /api/articles/{id}/content`
 
-Saves the text of a file the user chose, sent as `multipart/form-data` in the `file` field: an HTML page (for example one saved from the browser) or a Markdown file (`.md`, `.markdown`, `.txt`). HTML is reduced to the article body (the `<article>` element, or the block with the most paragraph text) and converted to Markdown; navigation, scripts, forms and small images (avatars, icons, tracking pixels) are left out. Markdown is kept as is. The text counts as `complete` and replaces any saved text and images. Up to `MAX_ARTICLE_BYTES` (default 5 MiB): `413 file_too_large`; no text: `422 no_text`.
+Saves the text of a file the user chose, sent as `multipart/form-data` in the `file` field: an HTML page (for example one saved from the browser) or a Markdown file (`.md`, `.markdown`, `.txt`). HTML is reduced to the article body (the `<article>` element, or the block with the most paragraph text) and converted to Markdown; navigation, scripts, forms and small images (avatars, icons, tracking pixels) are left out. Markdown is kept as is. The text counts as `complete` and replaces any saved text and images. An HTML page's title (its `og:title`, else its `<title>`, up to 500 characters) becomes the article's title when the article has no title or only its own address as title (as links added one by one do) and the title was never edited; this is not an edit, so `titleEditedAt` and `updatedAt` stay as they were. A downloaded page does the same. Up to `MAX_ARTICLE_BYTES` (default 5 MiB): `413 file_too_large`; no text: `422 no_text`.
 
 ### `POST /api/articles/{id}/content/fetch`
 

@@ -346,7 +346,7 @@ func (s *Service) articleBase(ctx context.Context, userID, articleID string) (*u
 func (s *Service) save(ctx context.Context, userID, articleID string, ex Extracted, status Status, source Source) (Content, error) {
 	images, missing := s.downloadImages(ctx, ex.Images)
 	return s.repo.Save(ctx, userID, articleID, NewContent{
-		Status: status, Source: source, Markdown: ex.Markdown, Words: ex.Words,
+		Title: ex.Title, Status: status, Source: source, Markdown: ex.Markdown, Words: ex.Words,
 		Images: images, MissingImages: missing,
 	})
 }
