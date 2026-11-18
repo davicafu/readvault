@@ -269,6 +269,7 @@ func (s *Service) mayAskCopies(ctx context.Context, rawURL string, ex Extracted,
 func (s *Service) fromCopies(ctx context.Context, rawURL string) (Extracted, bool) {
 	if s.mirror != "" && (s.mirrorServes == nil || s.mirrorServes(ctx, rawURL)) {
 		if ex, fe := s.download(ctx, s.mirror+rawURL, nil); fe == nil && !ex.Paywalled && !ex.mirrorError {
+			ex.Title = withoutSiteName(ex.Title, s.mirror)
 			return ex, true
 		}
 	}
@@ -281,6 +282,28 @@ func (s *Service) fromCopies(ctx context.Context, rawURL string) (Extracted, boo
 		}
 	}
 	return Extracted{}, false
+}
+
+// withoutSiteName drops a site's name that a page appends to its title
+// ("Queues - Freedium"): the last " - " or " | " part when it is the site's
+// name, the first word of its host (freedium-mirror.cfd gives "freedium"),
+// compared without case.
+func withoutSiteName(title, siteURL string) string {
+	u, err := url.Parse(siteURL)
+	if err != nil {
+		return title
+	}
+	i := max(strings.LastIndex(title, " - "), strings.LastIndex(title, " | "))
+	if i <= 0 {
+		return title
+	}
+	name := strings.TrimSpace(title[i+3:])
+	site, _, _ := strings.Cut(strings.TrimPrefix(u.Hostname(), "www."), ".")
+	site, _, _ = strings.Cut(site, "-")
+	if site != "" && strings.EqualFold(name, site) {
+		return strings.TrimSpace(title[:i])
+	}
+	return title
 }
 
 // mirrorErrorData finds the error Freedium embeds in its page data when it

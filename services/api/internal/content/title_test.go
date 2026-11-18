@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"readvault/api/internal/content"
+	contentpg "readvault/api/internal/content/postgres"
 )
 
 const titledPage = `<html><head><title>Queues | Blog</title><meta property="og:title" content="Queues, explained"></head>
@@ -90,5 +91,34 @@ func TestUpload_GivesAnArticleSavedUnderItsAddressThePageTitle(t *testing.T) {
 	var title string
 	if err := pool.QueryRow(t.Context(), `SELECT title FROM articles WHERE id = $1`, id).Scan(&title); err != nil || title != "Queues, explained" {
 		t.Errorf("title %q (err %v), want the page title", title, err)
+	}
+}
+
+func TestFetch_TitleFromTheMirrorLeavesOutTheMirrorsName(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ page, want string }{
+		{"Queues, explained - Mirror", "Queues, explained"},
+		{"Queues, explained | MIRROR", "Queues, explained"},
+		{"Queues - a guide", "Queues - a guide"},
+		{"Mirror", "Mirror"},
+	} {
+		_, f, pool, id := setup(t)
+		svc := content.NewService(contentpg.NewRepository(pool), f, 64<<10, content.WithMirror(mirror, everyPage))
+		if _, err := pool.Exec(t.Context(), `UPDATE articles SET title = original_url WHERE id = $1`, id); err != nil {
+			t.Fatal(err)
+		}
+		f.errs[articleURL] = &content.FetchError{Problem: content.ProblemHTTPStatus, Status: 403}
+		f.responses[mirror+articleURL] = content.Fetched{ContentType: "text/html", Body: []byte(
+			`<html><head><title>` + tc.page + `</title></head><body><article><p>The whole article.</p></article></body></html>`)}
+		if _, err := svc.Fetch(t.Context(), owner, id); err != nil {
+			t.Fatal(err)
+		}
+		var title string
+		if err := pool.QueryRow(t.Context(), `SELECT title FROM articles WHERE id = $1`, id).Scan(&title); err != nil {
+			t.Fatal(err)
+		}
+		if title != tc.want {
+			t.Errorf("mirror page title %q: article title %q, want %q", tc.page, title, tc.want)
+		}
 	}
 }
