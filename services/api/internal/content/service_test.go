@@ -56,14 +56,14 @@ func (f *fakeFetcher) Fetch(ctx context.Context, rawURL string, accept content.A
 	if !ok {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemHTTPStatus, Status: 404}
 	}
-	maxBytes, allowed := accept[got.ContentType]
+	lim, allowed := accept[got.ContentType]
 	if family, _, _ := strings.Cut(got.ContentType, "/"); !allowed {
-		maxBytes, allowed = accept[family+"/*"]
+		lim, allowed = accept[family+"/*"]
 	}
 	if !allowed {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemNotHTML}
 	}
-	if int64(len(got.Body)) > maxBytes {
+	if int64(len(got.Body)) > lim.Bytes {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemTooLarge}
 	}
 	if got.URL == "" {

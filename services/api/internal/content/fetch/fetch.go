@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -68,7 +69,9 @@ func New(allow func(netip.AddrPort) bool) *Client {
 	}
 	return &Client{http: &http.Client{
 		Transport: transport,
-		Timeout:   30 * time.Second,
+		// A backstop: each download's own time (content.Limit) ends it
+		// sooner.
+		Timeout: 2 * time.Minute,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= maxRedirects {
 				return errTooManyRedirects
@@ -126,7 +129,15 @@ func (c *Client) Fetch(ctx context.Context, rawURL string, accept content.Accept
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemBlockedAddress, Err: errBlocked}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	// The request runs until the shortest time accept allows; once the
+	// answer's type is known, until that type's own time.
+	reqCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var timedOut atomic.Bool
+	start := time.Now()
+	deadline := time.AfterFunc(shortest(accept), func() { timedOut.Store(true); cancel() })
+	defer deadline.Stop()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemBlockedAddress, Err: err}
 	}
@@ -136,7 +147,7 @@ func (c *Client) Fetch(ctx context.Context, rawURL string, accept content.Accept
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return content.Fetched{}, classify(ctx, err)
+		return content.Fetched{}, classify(ctx, timedOut.Load(), err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -144,40 +155,55 @@ func (c *Client) Fetch(ctx context.Context, rawURL string, accept content.Accept
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemHTTPStatus, Status: resp.StatusCode}
 	}
 	mediaType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	maxBytes, ok := limit(mediaType, accept)
+	lim, ok := limitFor(mediaType, accept)
 	if !ok {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemNotHTML, Err: fmt.Errorf("media type %q", mediaType)}
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
-	if err != nil {
-		return content.Fetched{}, classify(ctx, err)
+	if !deadline.Stop() {
+		return content.Fetched{}, &content.FetchError{Problem: content.ProblemTimeout, Err: errors.New("no answer in time")}
 	}
-	if int64(len(body)) > maxBytes {
+	deadline.Reset(lim.Time - time.Since(start))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, lim.Bytes+1))
+	if err != nil {
+		return content.Fetched{}, classify(ctx, timedOut.Load(), err)
+	}
+	if int64(len(body)) > lim.Bytes {
 		return content.Fetched{}, &content.FetchError{Problem: content.ProblemTooLarge}
 	}
 	return content.Fetched{URL: resp.Request.URL.String(), ContentType: mediaType, Body: body}, nil
 }
 
-// limit is the most bytes accept allows for mediaType: its own entry, else
-// its family's ("image/*").
-func limit(mediaType string, accept content.Accept) (int64, bool) {
-	if n, ok := accept[mediaType]; ok {
-		return n, true
+// limitFor is accept's limit for mediaType: its own entry, else its
+// family's ("image/*").
+func limitFor(mediaType string, accept content.Accept) (content.Limit, bool) {
+	if lim, ok := accept[mediaType]; ok {
+		return lim, true
 	}
 	family, _, found := strings.Cut(mediaType, "/")
 	if !found || family == "" {
-		return 0, false
+		return content.Limit{}, false
 	}
-	n, ok := accept[family+"/*"]
-	return n, ok
+	lim, ok := accept[family+"/*"]
+	return lim, ok
 }
 
-func classify(ctx context.Context, err error) *content.FetchError {
+// shortest is the least time any type in accept allows.
+func shortest(accept content.Accept) time.Duration {
+	var d time.Duration
+	for _, lim := range accept {
+		if d == 0 || lim.Time < d {
+			d = lim.Time
+		}
+	}
+	return d
+}
+
+func classify(ctx context.Context, timedOut bool, err error) *content.FetchError {
 	var netErr net.Error
 	switch {
 	case errors.Is(err, errBlocked):
 		return &content.FetchError{Problem: content.ProblemBlockedAddress, Err: err}
-	case errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil || (errors.As(err, &netErr) && netErr.Timeout()):
+	case timedOut || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil || (errors.As(err, &netErr) && netErr.Timeout()):
 		return &content.FetchError{Problem: content.ProblemTimeout, Err: err}
 	default:
 		return &content.FetchError{Problem: content.ProblemUnreachable, Err: err}

@@ -301,7 +301,7 @@ On failure the answer is `502 fetch_failed` with `details.problem`:
 |---|---|
 | `blocked_address` | The address is not a public `http` or `https` address on port 80 or 443 (private, local and metadata addresses are refused, also after redirects) |
 | `unreachable` | DNS or connection failure, more than 5 redirects, or a redirect to another scheme |
-| `timeout` | No complete answer within 10 s |
+| `timeout` | No complete answer within 10 s, or 60 s for a PDF |
 | `http_status` | The site answered with another status; `details.status` holds it (Medium answers 403 to servers) |
 | `not_html` | The answer is neither an HTML page nor a PDF |
 | `too_large` | The page is larger than `MAX_ARTICLE_BYTES`, or the PDF than 50 MiB |

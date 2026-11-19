@@ -32,6 +32,9 @@ const (
 
 	pageTimeout   = 10 * time.Second
 	imagesTimeout = 15 * time.Second
+	// pdfTimeout is longer than a page's: a PDF of tens of MiB takes a
+	// while to download.
+	pdfTimeout = 60 * time.Second
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -40,7 +43,11 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]
 // server's header. SVG is left out: it can carry scripts.
 // imageTypes are what an image download allows: servers often send images
 // with a generic type, and the bytes decide.
-var imageTypes = Accept{"image/*": maxImageBytes, "application/octet-stream": maxImageBytes, "binary/octet-stream": maxImageBytes}
+var imageTypes = Accept{
+	"image/*":                  {Bytes: maxImageBytes, Time: imagesTimeout},
+	"application/octet-stream": {Bytes: maxImageBytes, Time: imagesTimeout},
+	"binary/octet-stream":      {Bytes: maxImageBytes, Time: imagesTimeout},
+}
 
 var storableImageTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true}
 
@@ -363,10 +370,13 @@ func (s *Service) isCopyAddress(rawURL string) bool {
 // download fetches one page and extracts its text. Links and images are
 // resolved against base, or against the page's own address when base is nil.
 func (s *Service) download(ctx context.Context, rawURL string, base *url.URL) (Extracted, *FetchError) {
-	pageCtx, cancel := context.WithTimeout(ctx, pageTimeout)
+	// The fetcher holds a page to pageTimeout; this bounds a PDF too.
+	pageCtx, cancel := context.WithTimeout(ctx, pdfTimeout)
 	page, err := s.fetcher.Fetch(pageCtx, rawURL, Accept{
-		"text/html": s.maxPageBytes, "application/xhtml+xml": s.maxPageBytes,
-		"application/pdf": maxPDFBytes, "application/octet-stream": maxPDFBytes,
+		"text/html":                {Bytes: s.maxPageBytes, Time: pageTimeout},
+		"application/xhtml+xml":    {Bytes: s.maxPageBytes, Time: pageTimeout},
+		"application/pdf":          {Bytes: maxPDFBytes, Time: pdfTimeout},
+		"application/octet-stream": {Bytes: maxPDFBytes, Time: pdfTimeout},
 	})
 	cancel()
 	if err != nil {

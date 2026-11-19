@@ -146,10 +146,17 @@ type Fetched struct {
 	Body        []byte
 }
 
-// Accept maps each media type a download allows to the most bytes its body
-// may hold. A type ending in "/*" allows its family; an exact type wins
-// over its family.
-type Accept map[string]int64
+// Accept maps each media type a download allows to its limits. A type
+// ending in "/*" allows its family; an exact type wins over its family.
+type Accept map[string]Limit
+
+// Limit bounds one media type's download: the most bytes its body may hold
+// and the time the whole download may take, from the request on. Until the
+// answer says its type, the request has the shortest time in Accept.
+type Limit struct {
+	Bytes int64
+	Time  time.Duration
+}
 
 // Fetcher downloads public web resources of the media types in accept.
 type Fetcher interface {

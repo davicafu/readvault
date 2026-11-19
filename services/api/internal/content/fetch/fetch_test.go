@@ -16,7 +16,7 @@ import (
 	"readvault/api/internal/content/fetch"
 )
 
-var html = content.Accept{"text/html": 1024}
+var html = content.Accept{"text/html": {Bytes: 1024, Time: time.Minute}}
 
 // allowLoopback lets tests reach httptest servers; production uses PublicAddr.
 func allowLoopback(netip.AddrPort) bool { return true }
@@ -201,7 +201,7 @@ func TestFetch_ReadsEachMediaTypeUpToItsOwnLimit(t *testing.T) {
 		_, _ = w.Write([]byte(strings.Repeat("x", 2000)))
 	}))
 	defer srv.Close()
-	accept := content.Accept{"text/html": 1000, "application/pdf": 4000, "image/*": 3000}
+	accept := content.Accept{"text/html": {Bytes: 1000, Time: time.Minute}, "application/pdf": {Bytes: 4000, Time: time.Minute}, "image/*": {Bytes: 3000, Time: time.Minute}}
 
 	if _, err := fetch.New(allowLoopback).Fetch(t.Context(), srv.URL+"/page", accept); problemOf(t, err).Problem != content.ProblemTooLarge {
 		t.Errorf("a page over its limit: error %v, want too_large", err)
@@ -211,5 +211,33 @@ func TestFetch_ReadsEachMediaTypeUpToItsOwnLimit(t *testing.T) {
 		if err != nil || len(got.Body) != 2000 {
 			t.Errorf("%s under its own limit: %d bytes, error %v; want the whole body", path, len(got.Body), err)
 		}
+	}
+}
+
+func TestFetch_GivesEachMediaTypeItsOwnTimeToFinish(t *testing.T) {
+	t.Parallel()
+	// The headers come at once; the rest of the body after a pause.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", map[string]string{"/page": "text/html", "/file": "application/pdf"}[r.URL.Path])
+		_, _ = w.Write([]byte("start "))
+		w.(http.Flusher).Flush()
+		select {
+		case <-r.Context().Done():
+		case <-time.After(300 * time.Millisecond):
+		}
+		_, _ = w.Write([]byte("end"))
+	}))
+	defer srv.Close()
+	accept := content.Accept{
+		"text/html":       {Bytes: 1024, Time: 100 * time.Millisecond},
+		"application/pdf": {Bytes: 1024, Time: 5 * time.Second},
+	}
+
+	if _, err := fetch.New(allowLoopback).Fetch(t.Context(), srv.URL+"/page", accept); problemOf(t, err).Problem != content.ProblemTimeout {
+		t.Errorf("a page slower than its time: error %v, want timeout", err)
+	}
+	got, err := fetch.New(allowLoopback).Fetch(t.Context(), srv.URL+"/file", accept)
+	if err != nil || string(got.Body) != "start end" {
+		t.Errorf("a PDF within its own time: body %q, error %v; want the whole file", got.Body, err)
 	}
 }
